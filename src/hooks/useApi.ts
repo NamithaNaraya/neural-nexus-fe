@@ -5,11 +5,11 @@
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, endpoints } from '@/lib/api';
-import { GraphNode, GraphLink } from '@/store/graphStore';
+import type { GraphNode, GraphLink } from '@/store/graphStore';
 
 // === Types ===
 
-interface Folder {
+interface FolderData {
     id: string;
     name: string;
     description?: string;
@@ -19,7 +19,7 @@ interface Folder {
     updatedAt: string;
 }
 
-interface File {
+interface FileData {
     id: string;
     filename: string;
     fileType: string;
@@ -52,7 +52,7 @@ interface QueryResponse {
 export function useFolders() {
     return useQuery({
         queryKey: ['folders'],
-        queryFn: () => api.get<Folder[]>(endpoints.folders.list),
+        queryFn: () => api.get<FolderData[]>(endpoints.folders.list),
         staleTime: 1000 * 60 * 5, // 5 minutes
     });
 }
@@ -60,7 +60,7 @@ export function useFolders() {
 export function useFolder(folderId: string) {
     return useQuery({
         queryKey: ['folder', folderId],
-        queryFn: () => api.get<Folder>(endpoints.folders.get(folderId)),
+        queryFn: () => api.get<FolderData>(endpoints.folders.get(folderId)),
         enabled: !!folderId,
     });
 }
@@ -70,7 +70,7 @@ export function useCreateFolder() {
 
     return useMutation({
         mutationFn: (data: { name: string; description?: string }) =>
-            api.post<Folder>(endpoints.folders.create, data),
+            api.post<FolderData>(endpoints.folders.create, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['folders'] });
         },
@@ -94,7 +94,7 @@ export function useDeleteFolder() {
 export function useFiles(folderId: string) {
     return useQuery({
         queryKey: ['files', folderId],
-        queryFn: () => api.get<File[]>(endpoints.files.list(folderId)),
+        queryFn: () => api.get<FileData[]>(endpoints.files.list(folderId)),
         enabled: !!folderId,
         staleTime: 1000 * 60, // 1 minute
     });
@@ -103,10 +103,11 @@ export function useFiles(folderId: string) {
 export function useFileStatus(fileId: string) {
     return useQuery({
         queryKey: ['file-status', fileId],
-        queryFn: () => api.get<File>(endpoints.files.status(fileId)),
+        queryFn: () => api.get<FileData>(endpoints.files.status(fileId)),
         enabled: !!fileId,
-        refetchInterval: (data) => {
+        refetchInterval: (query) => {
             // Poll until processing is complete
+            const data = query.state.data;
             if (data?.status === 'processing') return 2000;
             return false;
         },
@@ -117,7 +118,7 @@ export function useUploadFile() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ folderId, file }: { folderId: string; file: File }) => {
+        mutationFn: async ({ folderId, file }: { folderId: string; file: Blob }) => {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('folder_id', folderId);
