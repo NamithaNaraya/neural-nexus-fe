@@ -3,7 +3,7 @@
  * 
  * Main application layout with providers and global styles.
  */
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Providers } from '@/components/providers';
 import './globals.css';
 
@@ -12,7 +12,11 @@ export const metadata: Metadata = {
     description: 'Enterprise-grade knowledge extraction and visualization platform',
     keywords: ['knowledge graph', 'AI', 'data visualization', 'graph database'],
     authors: [{ name: 'Neural Nexus Team' }],
-    viewport: 'width=device-width, initial-scale=1',
+};
+
+export const viewport: Viewport = {
+    width: 'device-width',
+    initialScale: 1,
     themeColor: [
         { media: '(prefers-color-scheme: light)', color: '#F8FAFC' },
         { media: '(prefers-color-scheme: dark)', color: '#0A0C10' },
