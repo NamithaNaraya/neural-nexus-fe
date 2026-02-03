@@ -197,6 +197,8 @@ export const endpoints = {
     graph: {
         folder: (folderId: string) => `/graph/folder/${folderId}`,
         file: (fileId: string) => `/graph/file/${fileId}`,
+        expand: (nodeId: string) => `/graph/expand/${nodeId}`,
+        path: (sourceId: string, targetId: string) => `/graph/path/${sourceId}/${targetId}`,
         search: '/graph/search',
     },
 

@@ -40,25 +40,34 @@ export const useAuthStore = create<AuthState>()(
                 set({ isLoading: true, error: null });
 
                 try {
-                    const response = await fetch(
-                        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/login`,
-                        {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/x-www-form-urlencoded",
-                            },
-                            body: new URLSearchParams({
-                                username: email,
-                                password: password,
-                            }),
-                        }
-                    );
+                    // Use a raw fetch with the correct URL logic or update the API client to handle form data
+                    // For now, let's fix the duplication by using the correct base URL logic
+                    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+                    // Remove double /api/v1 if it exists
+                    const cleanUrl = baseUrl.endsWith('/api/v1')
+                        ? `${baseUrl}/auth/login`
+                        : `${baseUrl}/api/v1/auth/login`;
+
+                    const response = await fetch(cleanUrl, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/x-www-form-urlencoded",
+                        },
+                        body: new URLSearchParams({
+                            username: email,
+                            password: password,
+                        }),
+                    });
 
                     if (!response.ok) {
                         throw new Error("Invalid credentials");
                     }
 
                     const data = await response.json();
+
+                    // Store token in localStorage for API client
+                    localStorage.setItem('access_token', data.access_token);
 
                     set({
                         isAuthenticated: true,
@@ -80,6 +89,9 @@ export const useAuthStore = create<AuthState>()(
             },
 
             logout: () => {
+                // Clear token from localStorage
+                localStorage.removeItem('access_token');
+
                 set({
                     isAuthenticated: false,
                     user: null,

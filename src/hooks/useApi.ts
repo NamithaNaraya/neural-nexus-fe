@@ -13,28 +13,40 @@ interface FolderData {
     id: string;
     name: string;
     description?: string;
-    fileCount: number;
-    nodeCount: number;
-    createdAt: string;
-    updatedAt: string;
+    file_count: number;
+    node_count: number;
+    created_at: string;
+    updated_at: string;
 }
 
 interface FileData {
     id: string;
     filename: string;
-    fileType: string;
-    fileSize: number;
+    file_type: string;
+    file_size: number;
     status: 'pending' | 'processing' | 'ready_for_review' | 'completed' | 'failed';
-    nodeCount: number;
-    relationshipCount: number;
-    createdAt: string;
-    processedAt?: string;
-    errorMessage?: string;
+    node_count: number;
+    relationship_count: number;
+    created_at: string;
+    processed_at?: string;
+    error_message?: string;
 }
+
+interface UploadResponse {
+    file_id: string;
+    filename: string;
+    folder_id: string;
+    status: string;
+    message: string;
+}
+
 
 interface GraphData {
     nodes: GraphNode[];
     links: GraphLink[];
+    relationships?: GraphLink[]; // Alias for links (backend compatibility)
+    total_nodes?: number;
+    total_links?: number;
 }
 
 interface QueryResponse {
@@ -122,7 +134,7 @@ export function useUploadFile() {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('folder_id', folderId);
-            return api.upload<{ fileId: string }>(endpoints.files.upload, formData);
+            return api.upload<UploadResponse>(endpoints.files.upload, formData);
         },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['files', variables.folderId] });
@@ -149,6 +161,23 @@ export function useFileGraph(fileId: string) {
         staleTime: 1000 * 60 * 2,
     });
 }
+
+export function useNodeExpansion() {
+    return useMutation({
+        mutationFn: ({ nodeId, depth = 1 }: { nodeId: string; depth?: number }) =>
+            api.get<GraphData>(endpoints.graph.expand(nodeId), { depth }),
+    });
+}
+
+export function useShortestPath() {
+    return useMutation({
+        mutationFn: ({ sourceId, targetId }: { sourceId: string; targetId: string }) =>
+            api.get<{ path_exists: boolean; node_ids: string[]; link_ids: string[]; length: number }>(
+                endpoints.graph.path(sourceId, targetId)
+            ),
+    });
+}
+
 
 export function useGraphSearch(query: string, folderId?: string) {
     return useQuery({

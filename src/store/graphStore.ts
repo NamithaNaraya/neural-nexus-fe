@@ -18,7 +18,9 @@ export interface GraphNode {
     name: string;
     type: string;
     description?: string;
-    properties?: Record<string, unknown>;
+    properties?: Record<string, unknown> & {
+        conflicts?: Record<string, Array<{ value: unknown; source: string }>>;
+    };
     fileId?: string;
     folderId?: string;
 
@@ -149,8 +151,8 @@ export const useGraphStore = create<GraphState>()(
         nodes: [],
         links: [],
         setGraphData: (nodes, links) => {
-            const nodeTypes = [...new Set(nodes.map((n) => n.type))];
-            const linkTypes = [...new Set(links.map((l) => l.type))];
+            const nodeTypes = Array.from(new Set(nodes.map((n) => n.type)));
+            const linkTypes = Array.from(new Set(links.map((l) => l.type)));
 
             set({
                 nodes,
@@ -305,7 +307,7 @@ export const useGraphStore = create<GraphState>()(
             return {
                 nodes: [...state.nodes, node],
                 nodeCount: state.nodeCount + 1,
-                nodeTypes: [...new Set([...state.nodeTypes, node.type])],
+                nodeTypes: Array.from(new Set([...state.nodeTypes, node.type])),
             };
         }),
 
@@ -331,7 +333,7 @@ export const useGraphStore = create<GraphState>()(
             return {
                 links: [...state.links, link],
                 linkCount: state.linkCount + 1,
-                linkTypes: [...new Set([...state.linkTypes, link.type])],
+                linkTypes: Array.from(new Set([...state.linkTypes, link.type])),
             };
         }),
 
