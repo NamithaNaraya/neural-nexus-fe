@@ -21,11 +21,18 @@ export { GraphSearch } from './shared/GraphSearch';
 export { GraphFilters } from './shared/GraphFilters';
 export { GraphLegend } from './shared/GraphLegend';
 export { GraphStats } from './shared/GraphStats';
+export { NodeContextMenu } from './shared/NodeContextMenu';
 
 // Panels
 export { NodeDetailPanel } from './panels/NodeDetailPanel';
 export { NodeTooltip } from './panels/NodeTooltip';
 export { GraphToolbar } from './panels/GraphToolbar';
+export { FileScopePanel } from './panels/FileScopePanel';
+
+// Phase 6: Advanced Intelligence Panels
+export { ClusterComparisonPanel } from './panels/ClusterComparisonPanel';
+export { BlindSpotsPanel } from './panels/BlindSpotsPanel';
+export { AnalyticsExportPanel } from './panels/AnalyticsExportPanel';
 
 // Types
 export type { GraphViewMode, NodeInteraction, GraphConfig } from './types';

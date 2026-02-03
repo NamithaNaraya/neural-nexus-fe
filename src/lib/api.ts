@@ -200,12 +200,18 @@ export const endpoints = {
         expand: (nodeId: string) => `/graph/expand/${nodeId}`,
         path: (sourceId: string, targetId: string) => `/graph/path/${sourceId}/${targetId}`,
         search: '/graph/search',
+        compare: '/graph/compare',
+        blindSpots: (folderId: string) => `/graph/blind-spots/${folderId}`,
+        crossTopic: '/graph/blind-spots/cross-topic',
+        export: (folderId: string) => `/graph/export/${folderId}`,
+        layout: (folderId: string) => `/graph/layout/${folderId}`,
     },
 
     // Query
     query: {
-        ask: '/query',
-        history: '/query/history',
+        ask: '/query/query',
+        history: (sessionId: string) => `/query/chat/history/${sessionId}`,
+        sessions: '/query/chat/sessions',
     },
 
     // Analytics
@@ -214,12 +220,113 @@ export const endpoints = {
         community: (algorithm: string) => `/analytics/community/${algorithm}`,
         similarity: (algorithm: string) => `/analytics/similarity/${algorithm}`,
         path: (algorithm: string) => `/analytics/path/${algorithm}`,
+        health: '/analytics/health',
+        completeness: '/analytics/completeness',
+        linkPrediction: '/analytics/link-prediction',
     },
 
     // Health
     health: {
         check: '/health',
         detailed: '/health/detailed',
+    },
+};
+
+// Higher-level API methods
+export const docAiApi = {
+    // Graph operations
+    graph: {
+        // Get folder graph data
+        getFolder: (folderId: string, options?: { type?: string; limit?: number }) =>
+            api.get(endpoints.graph.folder(folderId), options),
+
+        // Expand node connections
+        expand: (nodeId: string, depth?: number) =>
+            api.get(endpoints.graph.expand(nodeId), { depth: depth || 1 }),
+
+        // Find shortest path
+        findPath: (sourceId: string, targetId: string) =>
+            api.get(endpoints.graph.path(sourceId, targetId)),
+
+        // Compare two clusters
+        compare: (data: {
+            left: { type: string; id: string; node_ids?: string[] };
+            right: { type: string; id: string; node_ids?: string[] };
+            include_bridges?: boolean;
+            include_similarity?: boolean;
+        }) => api.post(endpoints.graph.compare, data),
+
+        // Discover blind spots
+        discoverBlindSpots: (
+            folderId: string,
+            options?: { method?: string; min_confidence?: number; limit?: number }
+        ) => api.get(endpoints.graph.blindSpots(folderId), options),
+
+        // Cross-topic bridges
+        findCrossTopicBridges: (folderIds: string[]) =>
+            api.get(endpoints.graph.crossTopic, { folder_ids: folderIds.join(',') }),
+
+        // Export analytics
+        exportAnalytics: (
+            folderId: string,
+            options?: {
+                format?: string;
+                include_centrality?: boolean;
+                include_clustering?: boolean;
+                include_ghost_lines?: boolean;
+                include_health?: boolean;
+            }
+        ) => api.get(endpoints.graph.export(folderId), options),
+
+        // Get layout
+        getLayout: (
+            folderId: string,
+            options?: { algorithm?: string; iterations?: number; scale?: number }
+        ) => api.get(endpoints.graph.layout(folderId), options),
+    },
+
+    // Query operations (Hybrid RAG)
+    query: {
+        // Ask a question
+        ask: (data: {
+            question: string;
+            scope?: { type: string; id: string };
+            session_id?: string;
+            clear_history?: boolean;
+        }) => api.post(endpoints.query.ask, data),
+
+        // Get chat history
+        getHistory: (sessionId: string, limit?: number) =>
+            api.get(endpoints.query.history(sessionId), { limit: limit || 20 }),
+
+        // List sessions
+        getSessions: () => api.get(endpoints.query.sessions),
+    },
+
+    // Analytics operations
+    analytics: {
+        // Run algorithm
+        runAlgorithm: (category: string, algorithm: string, options?: Record<string, any>) => {
+            const endpoint = (endpoints.analytics as any)[category]?.(algorithm);
+            return endpoint ? api.get(endpoint, options) : Promise.reject('Unknown algorithm');
+        },
+
+        // Get graph health
+        getHealth: (folderId?: string) =>
+            api.get(endpoints.analytics.health, folderId ? { folder_id: folderId } : undefined),
+
+        // Get completeness score
+        getCompleteness: (folderId?: string) =>
+            api.get(endpoints.analytics.completeness, folderId ? { folder_id: folderId } : undefined),
+
+        // Get link predictions
+        getLinkPredictions: (folderId?: string, options?: { method?: string; top_k?: number }) => {
+            const params: Record<string, string | number | boolean> = {};
+            if (folderId) params.folder_id = folderId;
+            if (options?.method) params.method = options.method;
+            if (options?.top_k) params.top_k = options.top_k;
+            return api.get(endpoints.analytics.linkPrediction, params);
+        },
     },
 };
 
