@@ -10,14 +10,11 @@ export { GraphContainer } from './GraphContainer';
 
 // 3D Components
 export { NeuralSpace3D } from './3d/NeuralSpace3D';
-export { Node3D } from './3d/Node3D';
-export { Link3D } from './3d/Link3D';
-export { CameraController } from './3d/CameraController';
+export { InstancedNodes } from './3d/InstancedNodes';
+export { InstancedLinks } from './3d/InstancedLinks';
 
 // 2D Components
 export { ForceGraph2D } from './2d/ForceGraph2D';
-export { Node2D } from './2d/Node2D';
-export { Link2D } from './2d/Link2D';
 
 // Shared Components
 export { GraphSearch } from './shared/GraphSearch';

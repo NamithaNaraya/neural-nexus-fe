@@ -10,7 +10,7 @@
  */
 'use client';
 
-import React, { useState, useCallback, useMemo, Suspense } from 'react';
+import React, { useState, useCallback, useMemo, Suspense, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGraphStore, GraphNode, GraphLink } from '@/store/graphStore';
@@ -21,9 +21,12 @@ import { GraphSearch } from './shared/GraphSearch';
 import { GraphFilters } from './shared/GraphFilters';
 import { GraphLegend } from './shared/GraphLegend';
 import { GraphStats } from './shared/GraphStats';
+import { NodeContextMenu, initialContextMenuState } from './shared/NodeContextMenu';
+import { FileScopePanel } from './panels/FileScopePanel';
 import { GraphViewMode } from './types';
 import { useNodeExpansion, useShortestPath } from '@/hooks/useApi';
-import { Loader2, Maximize2, Minimize2, Zap } from 'lucide-react';
+import { useDevice, useViewModeLock } from '@/hooks/useDevice';
+import { Loader2, Maximize2, Minimize2, Zap, FolderTree, AlertTriangle } from 'lucide-react';
 
 // Dynamic imports for heavy visualization components
 const NeuralSpace3D = dynamic(() => import('./3d/NeuralSpace3D').then(m => ({ default: m.NeuralSpace3D })), {
@@ -92,6 +95,19 @@ export function GraphContainer({
     const [isImmersive, setIsImmersive] = useState(initialImmersive);
     const [showFilters, setShowFilters] = useState(false);
     const [showLegend, setShowLegend] = useState(true);
+    const [showFileScope, setShowFileScope] = useState(false);
+    const [contextMenu, setContextMenu] = useState(initialContextMenuState);
+
+    // Device detection for mobile 2D lock
+    const device = useDevice();
+    const { lockedMode, isLocked, reason: lockReason } = useViewModeLock(viewMode, setViewMode);
+
+    // Auto-lock to 2D on mobile/tablet
+    useEffect(() => {
+        if (!device.is3DCapable && viewMode === '3d') {
+            setViewMode('2d');
+        }
+    }, [device.is3DCapable, viewMode]);
 
     // Graph store
     const {
@@ -201,7 +217,26 @@ export function GraphContainer({
 
     const handleBackgroundClick = useCallback(() => {
         clearSelection();
+        setContextMenu(initialContextMenuState);
     }, [clearSelection]);
+
+    // Context menu handler (right-click)
+    const handleNodeContextMenu = useCallback((nodeId: string, x: number, y: number) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node) {
+            setContextMenu({
+                isOpen: true,
+                x,
+                y,
+                nodeId,
+                nodeName: node.name,
+            });
+        }
+    }, [nodes]);
+
+    const closeContextMenu = useCallback(() => {
+        setContextMenu(initialContextMenuState);
+    }, []);
 
     const toggleImmersive = useCallback(() => {
         setIsImmersive(prev => !prev);
@@ -343,6 +378,36 @@ export function GraphContainer({
             {/* Tooltip */}
             {hoveredNodeData && !selectedNode && (
                 <NodeTooltip node={hoveredNodeData} />
+            )}
+
+            {/* Context Menu */}
+            <AnimatePresence>
+                {contextMenu.isOpen && contextMenu.nodeId && contextMenu.nodeName && (
+                    <NodeContextMenu
+                        x={contextMenu.x}
+                        y={contextMenu.y}
+                        nodeId={contextMenu.nodeId}
+                        nodeName={contextMenu.nodeName}
+                        onClose={closeContextMenu}
+                        onExpand={() => handleNodeDoubleClick(contextMenu.nodeId!)}
+                        onFindConnected={() => {
+                            selectNode(contextMenu.nodeId!);
+                            closeContextMenu();
+                        }}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* Mobile 2D Lock Warning */}
+            {isLocked && lockReason && (
+                <motion.div
+                    initial={{ y: -50, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    className="absolute top-16 left-1/2 -translate-x-1/2 z-40 px-4 py-2 bg-amber-500/20 border border-amber-500/40 rounded-lg flex items-center gap-2"
+                >
+                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    <span className="text-sm text-amber-500">{lockReason}</span>
+                </motion.div>
             )}
 
             {/* Immersive Mode Toggle Button (when in immersive) */}

@@ -78,8 +78,8 @@ function Node3D({ node, isSelected, isHovered, onClick, onDoubleClick, onHover }
     });
 
     // Handle click with double-click detection
-    const handleClick = useCallback((event: THREE.Event) => {
-        event.stopPropagation?.();
+    const handleClick = useCallback((event: { stopPropagation?: () => void }) => {
+        if (event.stopPropagation) event.stopPropagation();
 
         const now = Date.now();
         if (now - lastClickTime < 300) {
@@ -174,17 +174,14 @@ function Link3D({ link, sourceNode, targetNode, isHighlighted }: Link3DProps) {
     if (points.length === 0) return null;
 
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({
+        color,
+        opacity: isHighlighted ? 1 : 0.3,
+        transparent: true,
+    });
+    const lineObj = new THREE.Line(geometry, material);
 
-    return (
-        <line ref={ref} geometry={geometry}>
-            <lineBasicMaterial
-                color={color}
-                opacity={isHighlighted ? 1 : 0.3}
-                transparent
-                linewidth={isHighlighted ? 2 : 1}
-            />
-        </line>
-    );
+    return <primitive object={lineObj} />;
 }
 
 // Camera Controls Component

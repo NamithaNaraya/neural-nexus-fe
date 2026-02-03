@@ -1,0 +1,248 @@
+/**
+ * Instanced Nodes Component
+ * 
+ * High-performance node rendering using THREE.InstancedMesh.
+ * Renders 100k+ nodes in a single draw call for GPU efficiency.
+ */
+'use client';
+
+import React, { useRef, useMemo, useEffect } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import * as THREE from 'three';
+import { GraphNode } from '@/store/graphStore';
+import { NODE_TYPE_COLORS } from '../types';
+
+interface InstancedNodesProps {
+    nodes: GraphNode[];
+    selectedNodes: string[];
+    hoveredNode: string | null;
+    onNodeClick: (nodeId: string) => void;
+    onNodeDoubleClick: (nodeId: string) => void;
+    onNodeHover: (nodeId: string | null) => void;
+}
+
+// Temporary objects for matrix calculations (reused to avoid GC)
+const tempMatrix = new THREE.Matrix4();
+const tempColor = new THREE.Color();
+const tempPosition = new THREE.Vector3();
+const tempScale = new THREE.Vector3();
+
+export function InstancedNodes({
+    nodes,
+    selectedNodes,
+    hoveredNode,
+    onNodeClick,
+    onNodeDoubleClick,
+    onNodeHover,
+}: InstancedNodesProps) {
+    const meshRef = useRef<THREE.InstancedMesh>(null);
+    const glowMeshRef = useRef<THREE.InstancedMesh>(null);
+    const { raycaster, camera, pointer } = useThree();
+
+    // Track double-click timing
+    const lastClickRef = useRef<{ time: number; index: number }>({ time: 0, index: -1 });
+
+    // Create node ID to index mapping for fast lookup
+    const nodeIndexMap = useMemo(() => {
+        const map = new Map<string, number>();
+        nodes.forEach((node, i) => map.set(node.id, i));
+        return map;
+    }, [nodes]);
+
+    // Create color array based on node types
+    const colors = useMemo(() => {
+        return nodes.map(node => {
+            const hex = NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
+            return new THREE.Color(hex);
+        });
+    }, [nodes]);
+
+    // Calculate base sizes based on degree
+    const sizes = useMemo(() => {
+        return nodes.map(node => {
+            const baseSize = 4;
+            const degreeBonus = (node.degree || 0) * 0.3;
+            return Math.min(baseSize + degreeBonus, 20);
+        });
+    }, [nodes]);
+
+    // Update instance matrices and colors
+    useEffect(() => {
+        if (!meshRef.current || nodes.length === 0) return;
+
+        const mesh = meshRef.current;
+        const glowMesh = glowMeshRef.current;
+
+        nodes.forEach((node, i) => {
+            // Position
+            tempPosition.set(
+                node.x ?? (Math.random() - 0.5) * 400,
+                node.y ?? (Math.random() - 0.5) * 400,
+                node.z ?? (Math.random() - 0.5) * 400
+            );
+
+            // Scale based on size
+            const size = sizes[i];
+            tempScale.set(size, size, size);
+
+            // Build matrix
+            tempMatrix.compose(tempPosition, new THREE.Quaternion(), tempScale);
+            mesh.setMatrixAt(i, tempMatrix);
+
+            // Set color
+            mesh.setColorAt(i, colors[i]);
+
+            // Glow mesh (larger scale)
+            if (glowMesh) {
+                tempScale.set(size * 1.5, size * 1.5, size * 1.5);
+                tempMatrix.compose(tempPosition, new THREE.Quaternion(), tempScale);
+                glowMesh.setMatrixAt(i, tempMatrix);
+                glowMesh.setColorAt(i, colors[i]);
+            }
+        });
+
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+
+        if (glowMesh) {
+            glowMesh.instanceMatrix.needsUpdate = true;
+            if (glowMesh.instanceColor) glowMesh.instanceColor.needsUpdate = true;
+        }
+    }, [nodes, colors, sizes]);
+
+    // Update visual states on selection/hover change
+    useFrame((state) => {
+        if (!meshRef.current) return;
+
+        const mesh = meshRef.current;
+        const time = state.clock.elapsedTime;
+
+        // Update colors based on selection/hover state
+        nodes.forEach((node, i) => {
+            const isSelected = selectedNodes.includes(node.id);
+            const isHovered = hoveredNode === node.id;
+
+            // Pulse effect for selected nodes
+            if (isSelected) {
+                const pulse = 1 + Math.sin(time * 3) * 0.15;
+                tempScale.set(sizes[i] * pulse, sizes[i] * pulse, sizes[i] * pulse);
+
+                // Get current position
+                mesh.getMatrixAt(i, tempMatrix);
+                tempMatrix.decompose(tempPosition, new THREE.Quaternion(), new THREE.Vector3());
+
+                tempMatrix.compose(tempPosition, new THREE.Quaternion(), tempScale);
+                mesh.setMatrixAt(i, tempMatrix);
+
+                // Brighten color
+                tempColor.copy(colors[i]).multiplyScalar(1.5);
+                mesh.setColorAt(i, tempColor);
+            } else if (isHovered) {
+                // Slightly larger and brighter on hover
+                tempScale.set(sizes[i] * 1.2, sizes[i] * 1.2, sizes[i] * 1.2);
+
+                mesh.getMatrixAt(i, tempMatrix);
+                tempMatrix.decompose(tempPosition, new THREE.Quaternion(), new THREE.Vector3());
+
+                tempMatrix.compose(tempPosition, new THREE.Quaternion(), tempScale);
+                mesh.setMatrixAt(i, tempMatrix);
+
+                tempColor.copy(colors[i]).multiplyScalar(1.3);
+                mesh.setColorAt(i, tempColor);
+            } else {
+                // Reset to normal
+                tempScale.set(sizes[i], sizes[i], sizes[i]);
+
+                mesh.getMatrixAt(i, tempMatrix);
+                tempMatrix.decompose(tempPosition, new THREE.Quaternion(), new THREE.Vector3());
+
+                tempMatrix.compose(tempPosition, new THREE.Quaternion(), tempScale);
+                mesh.setMatrixAt(i, tempMatrix);
+
+                mesh.setColorAt(i, colors[i]);
+            }
+        });
+
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    });
+
+    // Handle pointer events
+    const handlePointerMove = (event: THREE.Event) => {
+        if (!meshRef.current) return;
+
+        raycaster.setFromCamera(pointer, camera);
+        const intersects = raycaster.intersectObject(meshRef.current);
+
+        if (intersects.length > 0) {
+            const instanceId = intersects[0].instanceId;
+            if (instanceId !== undefined && nodes[instanceId]) {
+                onNodeHover(nodes[instanceId].id);
+            }
+        } else {
+            onNodeHover(null);
+        }
+    };
+
+    const handleClick = (event: THREE.Event) => {
+        if (!meshRef.current) return;
+
+        raycaster.setFromCamera(pointer, camera);
+        const intersects = raycaster.intersectObject(meshRef.current);
+
+        if (intersects.length > 0) {
+            const instanceId = intersects[0].instanceId;
+            if (instanceId !== undefined && nodes[instanceId]) {
+                const now = Date.now();
+
+                // Check for double-click
+                if (
+                    lastClickRef.current.index === instanceId &&
+                    now - lastClickRef.current.time < 300
+                ) {
+                    onNodeDoubleClick(nodes[instanceId].id);
+                    lastClickRef.current = { time: 0, index: -1 };
+                } else {
+                    onNodeClick(nodes[instanceId].id);
+                    lastClickRef.current = { time: now, index: instanceId };
+                }
+            }
+        }
+    };
+
+    if (nodes.length === 0) return null;
+
+    return (
+        <group>
+            {/* Glow layer (rendered behind) */}
+            <instancedMesh
+                ref={glowMeshRef}
+                args={[undefined, undefined, nodes.length]}
+                frustumCulled={false}
+            >
+                <sphereGeometry args={[1, 8, 8]} />
+                <meshBasicMaterial
+                    transparent
+                    opacity={0.15}
+                    depthWrite={false}
+                />
+            </instancedMesh>
+
+            {/* Main nodes */}
+            <instancedMesh
+                ref={meshRef}
+                args={[undefined, undefined, nodes.length]}
+                onPointerMove={handlePointerMove}
+                onClick={handleClick}
+                frustumCulled={false}
+            >
+                <sphereGeometry args={[1, 16, 16]} />
+                <meshStandardMaterial
+                    metalness={0.3}
+                    roughness={0.7}
+                    emissiveIntensity={0.2}
+                />
+            </instancedMesh>
+        </group>
+    );
+}
