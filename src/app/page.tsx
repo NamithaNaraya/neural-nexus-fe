@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
@@ -8,8 +8,10 @@ import { useAuthStore } from "@/store/authStore";
 export default function HomePage() {
     const router = useRouter();
     const { isAuthenticated, checkAuth } = useAuthStore();
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
+        setMounted(true);
         // Check authentication status
         checkAuth();
     }, [checkAuth]);
@@ -22,6 +24,9 @@ export default function HomePage() {
             router.push("/login");
         }
     }, [isAuthenticated, router]);
+
+    // Don't render until mounted to avoid hydration mismatch
+    if (!mounted) return null;
 
     return (
         <div className="min-h-screen bg-neural-bg flex items-center justify-center">
@@ -66,6 +71,23 @@ export default function HomePage() {
 
 // Simple animated neural network background
 function NeuralBackground() {
+    // Generate static random values once on component mount
+    const [nodes] = useState(() => [...Array(20)].map(() => ({
+        cx: Math.random() * 100,
+        cy: Math.random() * 100,
+        duration: 2 + Math.random() * 2,
+        delay: Math.random() * 2,
+    })));
+
+    const [lines] = useState(() => [...Array(15)].map(() => ({
+        x1: Math.random() * 100,
+        y1: Math.random() * 100,
+        x2: Math.random() * 100,
+        y2: Math.random() * 100,
+        duration: 3 + Math.random() * 2,
+        delay: Math.random() * 2,
+    })));
+
     return (
         <svg
             className="w-full h-full opacity-10"
@@ -73,38 +95,38 @@ function NeuralBackground() {
             preserveAspectRatio="none"
         >
             {/* Animated nodes */}
-            {[...Array(20)].map((_, i) => (
+            {nodes.map((node, i) => (
                 <motion.circle
                     key={i}
-                    cx={Math.random() * 100}
-                    cy={Math.random() * 100}
+                    cx={node.cx}
+                    cy={node.cy}
                     r={0.5}
                     fill="#10B981"
                     initial={{ opacity: 0.3 }}
                     animate={{ opacity: [0.3, 0.8, 0.3] }}
                     transition={{
-                        duration: 2 + Math.random() * 2,
+                        duration: node.duration,
                         repeat: Infinity,
-                        delay: Math.random() * 2,
+                        delay: node.delay,
                     }}
                 />
             ))}
             {/* Animated connections */}
-            {[...Array(15)].map((_, i) => (
+            {lines.map((line, i) => (
                 <motion.line
                     key={`line-${i}`}
-                    x1={Math.random() * 100}
-                    y1={Math.random() * 100}
-                    x2={Math.random() * 100}
-                    y2={Math.random() * 100}
+                    x1={line.x1}
+                    y1={line.y1}
+                    x2={line.x2}
+                    y2={line.y2}
                     stroke="#10B981"
                     strokeWidth={0.1}
                     initial={{ opacity: 0.1 }}
                     animate={{ opacity: [0.1, 0.4, 0.1] }}
                     transition={{
-                        duration: 3 + Math.random() * 2,
+                        duration: line.duration,
                         repeat: Infinity,
-                        delay: Math.random() * 2,
+                        delay: line.delay,
                     }}
                 />
             ))}

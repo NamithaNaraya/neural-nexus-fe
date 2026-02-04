@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
 import { useFolders, useUploadFile, useFileStatus } from "@/hooks/useApi";
+import { useSSE, PHASE_LABELS, PHASE_COLORS } from "@/hooks/useSSE";
 import {
     Upload,
     File,
@@ -16,6 +17,7 @@ import {
     FolderOpen,
     AlertCircle,
     ChevronDown,
+    Zap,
 } from "lucide-react";
 
 // Types
@@ -27,18 +29,34 @@ interface FolderOption {
 interface UploadedFile {
     id: string;
     file: File;
-    status: "pending" | "uploading" | "processing" | "completed" | "failed";
+    status: "pending" | "uploading" | "processing" | "ready_for_review" | "completed" | "failed";
     progress: number;
     fileId?: string;
     error?: string;
     nodeCount?: number;
     relationshipCount?: number;
+    currentPhase?: string;
+    phaseMessage?: string;
 }
 
 export default function UploadPage() {
+    return (
+        <div className="min-h-screen bg-background">
+            <Suspense fallback={
+                <div className="flex items-center justify-center min-h-screen">
+                    <Loader2 className="w-8 h-8 animate-spin text-emerald" />
+                </div>
+            }>
+                <UploadContent />
+            </Suspense>
+        </div>
+    );
+}
+
+function UploadContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { isAuthenticated } = useAuthStore();
+    const { isAuthenticated, isHydrated } = useAuthStore();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Folder selection
@@ -55,11 +73,53 @@ export default function UploadPage() {
     const { data: folders } = useFolders();
     const uploadMutation = useUploadFile();
 
+    // SSE for real-time progress
+    const { ingestionProgress, isConnected } = useSSE();
+
     useEffect(() => {
-        if (!isAuthenticated) {
+        if (isHydrated && !isAuthenticated) {
             router.push("/login");
         }
-    }, [isAuthenticated, router]);
+    }, [isAuthenticated, isHydrated, router]);
+
+    if (!isHydrated || !isAuthenticated) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-emerald animate-spin" />
+            </div>
+        );
+    }
+
+    // Update file status from SSE events
+    useEffect(() => {
+        setUploadedFiles((prev) =>
+            prev.map((upload) => {
+                if (!upload.fileId) return upload;
+
+                const progress = ingestionProgress[upload.fileId];
+                if (!progress) return upload;
+
+                // Update status based on SSE event
+                let newStatus = upload.status;
+                if (progress.phase === "completed") {
+                    newStatus = "completed";
+                } else if (progress.phase === "failed") {
+                    newStatus = "failed";
+                } else if (progress.phase !== "completed" && progress.phase !== "failed") {
+                    newStatus = "processing";
+                }
+
+                return {
+                    ...upload,
+                    status: newStatus,
+                    progress: progress.progress,
+                    currentPhase: progress.phase,
+                    phaseMessage: progress.message,
+                    error: progress.phase === "failed" ? progress.message : upload.error,
+                };
+            })
+        );
+    }, [ingestionProgress]);
 
     // Get selected folder name
     const selectedFolder = (folders as FolderOption[] || []).find(
@@ -72,7 +132,7 @@ export default function UploadPage() {
             if (!files || !selectedFolderId) return;
 
             const newFiles: UploadedFile[] = Array.from(files).map((file) => ({
-                id: crypto.randomUUID(),
+                id: `file-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
                 file,
                 status: "pending" as const,
                 progress: 0,
@@ -170,10 +230,11 @@ export default function UploadPage() {
                             f.id === uploadId
                                 ? {
                                     ...f,
-                                    status: "completed",
+                                    status: "ready_for_review" as any, // Cast to any or update type definition above if needed
                                     progress: 100,
                                     nodeCount: data.node_count,
                                     relationshipCount: data.relationship_count,
+                                    phaseMessage: "Waiting for approval"
                                 }
                                 : f
                         )
@@ -221,13 +282,22 @@ export default function UploadPage() {
                     >
                         <ArrowLeft className="w-5 h-5 text-muted-foreground" />
                     </button>
-                    <div>
+                    <div className="flex-1">
                         <h1 className="text-xl font-bold text-foreground">
                             Upload Files
                         </h1>
                         <p className="text-sm text-muted-foreground">
                             Extract knowledge from your documents
                         </p>
+                    </div>
+                    {/* Real-time connection indicator */}
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs ${isConnected
+                        ? "bg-emerald/10 text-emerald"
+                        : "bg-muted text-muted-foreground"
+                        }`}>
+                        <span className={`w-2 h-2 rounded-full ${isConnected ? "bg-emerald animate-pulse" : "bg-muted-foreground"
+                            }`} />
+                        {isConnected ? "Live Updates" : "Connecting..."}
                     </div>
                 </div>
             </header>
@@ -384,8 +454,8 @@ export default function UploadPage() {
                                                     ? `✓ ${upload.nodeCount} entities, ${upload.relationshipCount} relationships`
                                                     : upload.status === "failed"
                                                         ? `Error: ${upload.error}`
-                                                        : upload.status === "processing"
-                                                            ? "Processing with AI..."
+                                                        : upload.status === "processing" && upload.currentPhase
+                                                            ? PHASE_LABELS[upload.currentPhase] || upload.phaseMessage || "Processing..."
                                                             : upload.status === "uploading"
                                                                 ? "Uploading..."
                                                                 : "Pending"
@@ -398,20 +468,34 @@ export default function UploadPage() {
                                             ? "bg-emerald/20 text-emerald"
                                             : upload.status === "failed"
                                                 ? "bg-destructive/20 text-destructive"
-                                                : "bg-muted text-muted-foreground"
+                                                : upload.currentPhase
+                                                    ? `${PHASE_COLORS[upload.currentPhase] || "bg-muted"} text-white`
+                                                    : "bg-muted text-muted-foreground"
                                             }`}>
-                                            {upload.status}
+                                            {upload.status === "processing" && upload.currentPhase
+                                                ? `${upload.progress}%`
+                                                : upload.status}
                                         </div>
                                     </div>
 
-                                    {/* Progress Bar */}
+                                    {/* Progress Bar with Phase Info */}
                                     {(upload.status === "uploading" || upload.status === "processing") && (
-                                        <div className="mt-3 h-1 bg-muted rounded-full overflow-hidden">
-                                            <motion.div
-                                                initial={{ width: 0 }}
-                                                animate={{ width: `${upload.progress}%` }}
-                                                className="h-full bg-emerald"
-                                            />
+                                        <div className="mt-3">
+                                            <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                                <span className="flex items-center gap-1">
+                                                    <Zap className="w-3 h-3" />
+                                                    {upload.currentPhase ? PHASE_LABELS[upload.currentPhase]?.split(" ").slice(1).join(" ") || "Processing" : "Processing"}
+                                                </span>
+                                                <span>{upload.progress}%</span>
+                                            </div>
+                                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                                <motion.div
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${upload.progress}%` }}
+                                                    transition={{ duration: 0.3 }}
+                                                    className={`h-full ${upload.currentPhase ? PHASE_COLORS[upload.currentPhase] || "bg-emerald" : "bg-emerald"}`}
+                                                />
+                                            </div>
                                         </div>
                                     )}
                                 </motion.div>
@@ -420,19 +504,31 @@ export default function UploadPage() {
                     </div>
                 )}
 
-                {/* View in Graph Button */}
-                {uploadedFiles.some((f) => f.status === "completed") && selectedFolderId && (
+                {/* View in Graph Button / Review Button */}
+                {uploadedFiles.some((f) => f.status === "completed" || f.status === "ready_for_review") && selectedFolderId && (
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="mt-8 text-center"
+                        className="mt-8 flex gap-4 justify-center"
                     >
-                        <button
-                            onClick={() => router.push(`/dashboard?folder=${selectedFolderId}`)}
-                            className="px-6 py-3 bg-emerald hover:bg-emerald-dark text-white font-medium rounded-lg transition-colors"
-                        >
-                            View in Knowledge Graph →
-                        </button>
+                        {uploadedFiles.some(f => f.status === "ready_for_review") && (
+                            <button
+                                onClick={() => router.push(`/graph?folder=${selectedFolderId}&view=inbox`)}
+                                className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                            >
+                                <CheckCircle className="w-5 h-5" />
+                                Review & Commit Data
+                            </button>
+                        )}
+
+                        {uploadedFiles.some(f => f.status === "completed") && (
+                            <button
+                                onClick={() => router.push(`/graph?folder=${selectedFolderId}`)}
+                                className="px-6 py-3 bg-emerald hover:bg-emerald-dark text-white font-medium rounded-lg transition-colors"
+                            >
+                                View in Knowledge Graph →
+                            </button>
+                        )}
                     </motion.div>
                 )}
             </main>

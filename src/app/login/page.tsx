@@ -27,10 +27,10 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen bg-neural-bg flex items-center justify-center relative overflow-hidden">
+        <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden">
             {/* Animated Background */}
             <div className="absolute inset-0">
-                <div className="absolute inset-0 bg-gradient-to-br from-neural-bg via-neural-bg to-emerald/5" />
+                <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-emerald/5" />
                 <motion.div
                     className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald/10 rounded-full blur-3xl"
                     animate={{
@@ -44,7 +44,7 @@ export default function LoginPage() {
                     }}
                 />
                 <motion.div
-                    className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-electric/10 rounded-full blur-3xl"
+                    className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-primary/10 rounded-full blur-3xl"
                     animate={{
                         scale: [1, 1.3, 1],
                         opacity: [0.2, 0.4, 0.2],
@@ -65,18 +65,18 @@ export default function LoginPage() {
                 transition={{ duration: 0.5 }}
                 className="relative z-10 w-full max-w-md p-8"
             >
-                <div className="glass-panel p-8 rounded-2xl">
+                <div className="bg-card border border-border p-8 rounded-2xl shadow-xl">
                     {/* Logo */}
                     <div className="text-center mb-8">
                         <motion.h1
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ delay: 0.2 }}
-                            className="text-3xl font-bold text-white mb-2"
+                            className="text-3xl font-bold text-foreground mb-2"
                         >
                             <span className="text-emerald">Neural</span> Nexus
                         </motion.h1>
-                        <p className="text-neural-muted">
+                        <p className="text-muted-foreground">
                             Welcome to the Knowledge Graph Platform
                         </p>
                     </div>
@@ -87,7 +87,7 @@ export default function LoginPage() {
                         <div>
                             <label
                                 htmlFor="email"
-                                className="block text-sm font-medium text-neural-text mb-2"
+                                className="block text-sm font-medium text-foreground mb-2"
                             >
                                 Email
                             </label>
@@ -97,7 +97,8 @@ export default function LoginPage() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-neural-muted focus:outline-none focus:ring-2 focus:ring-emerald/50 focus:border-emerald/50 transition-all"
+                                autoComplete="email"
+                                className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald/50 focus:border-emerald/50 transition-all"
                                 placeholder="you@example.com"
                             />
                         </div>
@@ -106,7 +107,7 @@ export default function LoginPage() {
                         <div>
                             <label
                                 htmlFor="password"
-                                className="block text-sm font-medium text-neural-text mb-2"
+                                className="block text-sm font-medium text-foreground mb-2"
                             >
                                 Password
                             </label>
@@ -117,13 +118,14 @@ export default function LoginPage() {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
-                                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-neural-muted focus:outline-none focus:ring-2 focus:ring-emerald/50 focus:border-emerald/50 transition-all pr-12"
+                                    autoComplete="current-password"
+                                    className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald/50 focus:border-emerald/50 transition-all pr-12"
                                     placeholder="••••••••"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neural-muted hover:text-white transition-colors"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                                 >
                                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                 </button>
@@ -135,7 +137,7 @@ export default function LoginPage() {
                             <motion.div
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm"
+                                className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm"
                             >
                                 {error}
                             </motion.div>
@@ -145,7 +147,7 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full py-3 px-4 bg-emerald hover:bg-emerald-dark text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed glow-emerald"
+                            className="w-full py-3 px-4 bg-emerald hover:bg-emerald-dark text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald/20"
                         >
                             {isLoading ? (
                                 <>
@@ -159,7 +161,7 @@ export default function LoginPage() {
                     </form>
 
                     {/* Footer */}
-                    <div className="mt-6 text-center text-sm text-neural-muted">
+                    <div className="mt-6 text-center text-sm text-muted-foreground">
                         <p>
                             Don&apos;t have an account?{" "}
                             <a
@@ -173,10 +175,11 @@ export default function LoginPage() {
                 </div>
 
                 {/* Version */}
-                <p className="text-center text-neural-muted text-xs mt-4">
+                <p className="text-center text-muted-foreground text-xs mt-4">
                     Version 2.1.0
                 </p>
             </motion.div>
         </div>
     );
 }
+

@@ -12,6 +12,7 @@
 
 import React, { useState, useCallback, useMemo, Suspense, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGraphStore, GraphNode, GraphLink } from '@/store/graphStore';
 import { GraphToolbar } from './panels/GraphToolbar';
@@ -48,6 +49,7 @@ interface GraphContainerProps {
     showToolbar?: boolean;
     showSidebar?: boolean;
     immersiveMode?: boolean;
+    initialShowInbox?: boolean;
 }
 
 // Loading state component
@@ -63,23 +65,90 @@ function GraphLoadingState({ message }: { message: string }) {
 }
 
 // Empty state component
-function GraphEmptyState() {
+function GraphEmptyState({ folderId }: { folderId?: string }) {
+    const router = useRouter();
+
     return (
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center bg-background">
             <div className="text-center max-w-md px-6">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                    <svg className="w-8 h-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald/20 to-cyan-500/20 flex items-center justify-center">
+                    <svg className="w-10 h-10 text-emerald" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                     </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">No Graph Data</h3>
-                <p className="text-sm text-muted-foreground">
-                    Upload documents to start building your knowledge graph, or select a folder with existing data.
+                <h3 className="text-xl font-semibold text-foreground mb-3">No Knowledge Graph Yet</h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                    Upload documents to this folder to automatically extract entities and relationships.
+                    Your knowledge graph will appear here once processing is complete.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <button
+                        onClick={() => router.push(folderId ? `/upload?folder=${folderId}` : '/upload')}
+                        className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald text-white rounded-lg hover:bg-emerald-dark transition-colors font-medium"
+                    >
+                        <Zap className="w-4 h-4" />
+                        Upload Documents
+                    </button>
+                    <button
+                        onClick={() => router.push('/library')}
+                        className="flex items-center justify-center gap-2 px-5 py-2.5 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors"
+                    >
+                        <FolderTree className="w-4 h-4" />
+                        Browse Library
+                    </button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-6">
+                    Supported formats: PDF, CSV, TXT, MD, DOCX
                 </p>
             </div>
         </div>
     );
 }
+
+// Error Boundary Component
+class GraphErrorBoundary extends React.Component<
+    { children: React.ReactNode },
+    { hasError: boolean; error: Error | null }
+> {
+    constructor(props: { children: React.ReactNode }) {
+        super(props);
+        this.state = { hasError: false, error: null };
+    }
+
+    static getDerivedStateFromError(error: Error) {
+        return { hasError: true, error };
+    }
+
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+        console.error("Graph Rendering Error:", error, errorInfo);
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+                    <AlertTriangle className="w-12 h-12 text-destructive mb-4" />
+                    <h3 className="text-lg font-semibold text-foreground">Visualization Error</h3>
+                    <p className="text-sm text-muted-foreground mb-4 max-w-md">
+                        {this.state.error?.message || "An unexpected error occurred while rendering the graph."}
+                    </p>
+                    <button
+                        onClick={() => this.setState({ hasError: false })}
+                        className="px-4 py-2 bg-emerald text-white rounded-lg hover:bg-emerald-dark"
+                    >
+                        Try Again
+                    </button>
+                </div>
+            );
+        }
+
+        return this.props.children;
+    }
+}
+
+import { ReviewInboxPanel } from './panels/ReviewInboxPanel';
+
+// ... other imports
 
 export function GraphContainer({
     folderId,
@@ -89,12 +158,16 @@ export function GraphContainer({
     showToolbar = true,
     showSidebar = true,
     immersiveMode: initialImmersive = false,
+    initialShowInbox = false,
 }: GraphContainerProps) {
+    console.log("GraphContainer MOUNTING", { folderId });
+
     // State
     const [viewMode, setViewMode] = useState<GraphViewMode>(initialMode);
     const [isImmersive, setIsImmersive] = useState(initialImmersive);
     const [showFilters, setShowFilters] = useState(false);
     const [showLegend, setShowLegend] = useState(true);
+    const [showReviewInbox, setShowReviewInbox] = useState(initialShowInbox); // New State
     const [showFileScope, setShowFileScope] = useState(false);
     const [contextMenu, setContextMenu] = useState(initialContextMenuState);
 
@@ -123,11 +196,33 @@ export function GraphContainer({
         clearSelection,
         filteredNodes,
         filteredLinks,
+        filters,
     } = useGraphStore();
 
     // Get filtered data
-    const visibleNodes = useMemo(() => filteredNodes(), [filteredNodes]);
-    const visibleLinks = useMemo(() => filteredLinks(), [filteredLinks]);
+    // Use useMemo with proper dependencies to ensure updates when data/filters change
+    const visibleNodes = useMemo(() => filteredNodes(), [filteredNodes, nodes, filters]);
+    const visibleLinks = useMemo(() => filteredLinks(), [filteredLinks, links, filters, nodes]); // Links depend on nodes filtering too
+
+    // Debug Data
+    useEffect(() => {
+        if (visibleNodes.length > 0) {
+            console.log("Graph Data Ready:", {
+                nodeCount: visibleNodes.length,
+                linkCount: visibleLinks.length,
+                sampleNode: visibleNodes[0],
+                sampleLink: visibleLinks[0]
+            });
+        } else {
+            console.log("Graph Data Empty or Loading:", {
+                hasNodes: nodes.length > 0,
+                hasLinks: links.length > 0,
+                filters
+            });
+        }
+    }, [visibleNodes, visibleLinks, nodes.length, links.length, filters]);
+
+    // ... (rest of render)
 
     // Check if we have data
     const hasData = nodes.length > 0;
@@ -264,8 +359,10 @@ export function GraphContainer({
                     onToggleImmersive={toggleImmersive}
                     onToggleFilters={() => setShowFilters(prev => !prev)}
                     onToggleLegend={() => setShowLegend(prev => !prev)}
+                    onToggleReviewInbox={() => setShowReviewInbox(prev => !prev)}
                     showFilters={showFilters}
                     showLegend={showLegend}
+                    showReviewInbox={showReviewInbox}
                 />
             )}
 
@@ -289,55 +386,67 @@ export function GraphContainer({
                 {isGraphLoading ? (
                     <GraphLoadingState message="Loading graph data..." />
                 ) : !hasData ? (
-                    <GraphEmptyState />
+                    <GraphEmptyState folderId={folderId} />
                 ) : (
-                    <AnimatePresence mode="wait">
-                        {viewMode === '3d' ? (
-                            <motion.div
-                                key="3d"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="w-full h-full"
-                            >
-                                <Suspense fallback={<GraphLoadingState message="Loading 3D view..." />}>
-                                    <NeuralSpace3D
-                                        nodes={visibleNodes}
-                                        links={visibleLinks}
-                                        selectedNodes={selectedNodes}
-                                        hoveredNode={hoveredNode}
-                                        onNodeClick={handleNodeClick}
-                                        onNodeDoubleClick={handleNodeDoubleClick}
-                                        onNodeHover={handleNodeHover}
-                                        onBackgroundClick={handleBackgroundClick}
-                                    />
-                                </Suspense>
-                            </motion.div>
-                        ) : (
-                            <motion.div
-                                key="2d"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="w-full h-full"
-                            >
-                                <Suspense fallback={<GraphLoadingState message="Loading 2D view..." />}>
-                                    <ForceGraph2D
-                                        nodes={visibleNodes}
-                                        links={visibleLinks}
-                                        selectedNodes={selectedNodes}
-                                        hoveredNode={hoveredNode}
-                                        onNodeClick={handleNodeClick}
-                                        onNodeDoubleClick={handleNodeDoubleClick}
-                                        onNodeHover={handleNodeHover}
-                                        onBackgroundClick={handleBackgroundClick}
-                                    />
-                                </Suspense>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                    <GraphErrorBoundary>
+                        <AnimatePresence mode="wait">
+                            {viewMode === '3d' ? (
+                                <motion.div
+                                    key="3d"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="w-full h-full"
+                                >
+                                    <Suspense fallback={<GraphLoadingState message="Loading 3D view..." />}>
+                                        <NeuralSpace3D
+                                            nodes={visibleNodes}
+                                            links={visibleLinks}
+                                            selectedNodes={selectedNodes}
+                                            hoveredNode={hoveredNode}
+                                            onNodeClick={handleNodeClick}
+                                            onNodeDoubleClick={handleNodeDoubleClick}
+                                            onNodeHover={handleNodeHover}
+                                            onBackgroundClick={handleBackgroundClick}
+                                        />
+                                    </Suspense>
+                                </motion.div>
+                            ) : (
+                                <motion.div
+                                    key="2d"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="w-full h-full"
+                                >
+                                    <Suspense fallback={<GraphLoadingState message="Loading 2D view..." />}>
+                                        <ForceGraph2D
+                                            nodes={visibleNodes}
+                                            links={visibleLinks}
+                                            selectedNodes={selectedNodes}
+                                            hoveredNode={hoveredNode}
+                                            onNodeClick={handleNodeClick}
+                                            onNodeDoubleClick={handleNodeDoubleClick}
+                                            onNodeHover={handleNodeHover}
+                                            onBackgroundClick={handleBackgroundClick}
+                                        />
+                                    </Suspense>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </GraphErrorBoundary>
                 )}
             </div>
+
+            {/* Review Inbox Panel */}
+            <ReviewInboxPanel
+                isOpen={showReviewInbox}
+                onClose={() => setShowReviewInbox(false)}
+                onApprove={(fileId) => {
+                    console.log("Approved file:", fileId);
+                    // Optionally trigger a graph refresh here if needed
+                }}
+            />
 
             {/* Filters Panel */}
             <AnimatePresence>

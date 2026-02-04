@@ -3,11 +3,13 @@
  * 
  * Wraps the application with all necessary providers:
  * - React Query for data fetching
+ * - Command Palette for quick actions (Ctrl+K)
  */
 'use client';
 
 import React, { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { CommandPaletteProvider } from '@/components/command-palette';
 
 interface ProvidersProps {
     children: React.ReactNode;
@@ -39,7 +41,10 @@ export function Providers({ children }: ProvidersProps) {
 
     return (
         <QueryClientProvider client={queryClient}>
-            {children}
+            <CommandPaletteProvider>
+                {children}
+            </CommandPaletteProvider>
         </QueryClientProvider>
     );
 }
+

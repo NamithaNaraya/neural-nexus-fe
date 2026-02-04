@@ -84,13 +84,13 @@ interface UIState {
 export const useUIStore = create<UIState>()(
     persist(
         (set, get) => ({
-            // Theme - defaults to dark
-            theme: 'dark',
+            // Theme - defaults to light
+            theme: 'light',
             setTheme: (theme) => {
                 set({ theme });
                 // Update document class for Tailwind
                 if (typeof document !== 'undefined') {
-                    document.documentElement.classList.toggle('light', theme === 'light');
+                    document.documentElement.classList.toggle('dark', theme === 'dark');
                 }
             },
             toggleTheme: () => {
@@ -186,8 +186,8 @@ if (typeof window !== 'undefined') {
     if (savedTheme) {
         try {
             const parsed = JSON.parse(savedTheme);
-            if (parsed?.state?.theme === 'light') {
-                document.documentElement.classList.add('light');
+            if (parsed?.state?.theme === 'dark') {
+                document.documentElement.classList.add('dark');
             }
         } catch {
             // Ignore parse errors

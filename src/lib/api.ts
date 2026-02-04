@@ -8,7 +8,7 @@
  * - Request/response interceptors
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 interface RequestConfig extends RequestInit {
     params?: Record<string, string | number | boolean>;
@@ -191,6 +191,10 @@ export const endpoints = {
         get: (id: string) => `/files/${id}`,
         delete: (id: string) => `/files/${id}`,
         status: (id: string) => `/files/${id}/status`,
+        pending: '/files/pending',
+        preview: (id: string) => `/files/${id}/extraction-preview`,
+        approve: (id: string) => `/files/${id}/approve`,
+        reject: (id: string) => `/files/${id}/reject`,
     },
 
     // Graph
@@ -209,7 +213,7 @@ export const endpoints = {
 
     // Query
     query: {
-        ask: '/query/query',
+        ask: '/query',
         history: (sessionId: string) => `/query/chat/history/${sessionId}`,
         sessions: '/query/chat/sessions',
     },
@@ -223,6 +227,12 @@ export const endpoints = {
         health: '/analytics/health',
         completeness: '/analytics/completeness',
         linkPrediction: '/analytics/link-prediction',
+    },
+
+    // Dashboard
+    dashboard: {
+        stats: '/dashboard/stats',
+        activity: '/dashboard/activity',
     },
 
     // Health
@@ -328,6 +338,68 @@ export const docAiApi = {
             return api.get(endpoints.analytics.linkPrediction, params);
         },
     },
+
+    // File operations
+    files: {
+        // List pending files for review
+        listPending: () => api.get(endpoints.files.pending),
+
+        // Get extraction preview for a file
+        getExtractionPreview: (fileId: string) => api.get(endpoints.files.preview(fileId)),
+
+        // Approve file ingestion
+        approveIngestion: (fileId: string) => api.post(endpoints.files.approve(fileId)),
+
+        // Reject file ingestion
+        rejectIngestion: (fileId: string) => api.post(endpoints.files.reject(fileId)),
+
+        // Get file status
+        getStatus: (fileId: string) => api.get(endpoints.files.status(fileId)),
+
+        // Delete file
+        deleteFile: (fileId: string) => api.delete(endpoints.files.delete(fileId)),
+    },
+
+    // Folder operations
+    folders: {
+        // List all folders
+        list: () => api.get(endpoints.folders.list),
+
+        // Create folder
+        create: (data: { name: string; description?: string; parent_id?: string }) =>
+            api.post(endpoints.folders.create, data),
+
+        // Get folder details
+        get: (folderId: string) => api.get(endpoints.folders.get(folderId)),
+
+        // Update folder
+        update: (folderId: string, data: { name?: string; description?: string }) =>
+            api.patch(endpoints.folders.update(folderId), data),
+
+        // Delete folder
+        delete: (folderId: string) => api.delete(endpoints.folders.delete(folderId)),
+
+        // Get folder permissions
+        getPermissions: (folderId: string) =>
+            api.get(`/folders/${folderId}/permissions`),
+
+        // Update folder permissions
+        updatePermissions: (folderId: string, data: {
+            user_id: string;
+            permission: 'read' | 'write' | 'admin'
+        }) => api.post(`/folders/${folderId}/permissions`, data),
+
+        // Remove folder permissions
+        removePermissions: (folderId: string, userId: string) =>
+            api.delete(`/folders/${folderId}/permissions/${userId}`),
+    },
+
+    // Dashboard operations
+    dashboard: {
+        getStats: () => api.get(endpoints.dashboard.stats),
+        getActivity: (limit?: number) => api.get(endpoints.dashboard.activity, { limit: limit || 5 }),
+    },
 };
 
 export default api;
+

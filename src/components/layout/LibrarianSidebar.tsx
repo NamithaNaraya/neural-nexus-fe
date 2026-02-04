@@ -11,10 +11,11 @@
  */
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useUIStore } from '@/store/uiStore';
 import { useGraphStore } from '@/store/graphStore';
+import { docAiApi } from '@/lib/api';
 
 // Icons (using simple SVG)
 const Icons = {
@@ -92,23 +93,10 @@ const Icons = {
     ),
     EyeOff: () => (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
         </svg>
     ),
 };
-
-// Mock data for demonstration
-const mockFolders = [
-    { id: '1', name: 'Medical Research', fileCount: 12 },
-    { id: '2', name: 'Legal Documents', fileCount: 8 },
-    { id: '3', name: 'Academic Papers', fileCount: 24 },
-];
-
-const mockFiles = [
-    { id: '1', name: 'research_paper_v2.pdf', status: 'completed', visible: true },
-    { id: '2', name: 'patient_data.csv', status: 'completed', visible: true },
-    { id: '3', name: 'clinical_notes.txt', status: 'processing', visible: false },
-];
 
 interface LibrarianSidebarProps {
     onFileToggle?: (fileId: string, visible: boolean) => void;
@@ -143,18 +131,58 @@ export default function LibrarianSidebar({
 
     // Local state
     const [searchQuery, setSearchQuery] = useState('');
-    const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['1']));
-    const [fileVisibility, setFileVisibility] = useState<Record<string, boolean>>(
-        Object.fromEntries(mockFiles.map(f => [f.id, f.visible]))
-    );
+    const [folders, setFolders] = useState<any[]>([]);
+    const [folderFiles, setFolderFiles] = useState<Record<string, any[]>>({});
+    const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+    const [fileVisibility, setFileVisibility] = useState<Record<string, boolean>>({});
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Initial load of folders
+    useEffect(() => {
+        const fetchFolders = async () => {
+            try {
+                const data = await docAiApi.folders.list();
+                setFolders(data);
+
+                // If there's an active folder, expand it
+                if (activeFolderId) {
+                    setExpandedFolders(new Set([activeFolderId]));
+                    fetchFiles(activeFolderId);
+                }
+            } catch (error) {
+                console.error('Failed to fetch folders:', error);
+            }
+        };
+        fetchFolders();
+    }, [activeFolderId]);
+
+    // Fetch files for a folder
+    const fetchFiles = async (folderId: string) => {
+        if (folderFiles[folderId]) return; // Already loaded
+
+        try {
+            const data = await docAiApi.files.list(folderId);
+            setFolderFiles(prev => ({ ...prev, [folderId]: data }));
+
+            // Set initial visibility
+            const visibility: Record<string, boolean> = {};
+            data.forEach((f: any) => {
+                visibility[f.id] = true;
+            });
+            setFileVisibility(prev => ({ ...prev, ...visibility }));
+        } catch (error) {
+            console.error(`Failed to fetch files for folder ${folderId}:`, error);
+        }
+    };
 
     // Handle folder expansion
-    const toggleFolder = (folderId: string) => {
+    const toggleFolder = async (folderId: string) => {
         const newExpanded = new Set(expandedFolders);
         if (newExpanded.has(folderId)) {
             newExpanded.delete(folderId);
         } else {
             newExpanded.add(folderId);
+            await fetchFiles(folderId);
         }
         setExpandedFolders(newExpanded);
         setActiveFolder(folderId);
@@ -209,7 +237,6 @@ export default function LibrarianSidebar({
                 {!sidebarCollapsed && (
                     <div className="p-3">
                         <div className="relative">
-                            <Icons.Search />
                             <input
                                 type="text"
                                 placeholder="Search nodes..."
@@ -246,7 +273,7 @@ export default function LibrarianSidebar({
                                 Topics
                             </h3>
 
-                            {mockFolders.map((folder) => (
+                            {folders.map((folder) => (
                                 <div key={folder.id}>
                                     <button
                                         onClick={() => toggleFolder(folder.id)}
@@ -258,22 +285,25 @@ export default function LibrarianSidebar({
                                     >
                                         <Icons.Folder />
                                         <span className="text-sm flex-1 text-left">{folder.name}</span>
-                                        <span className="text-xs text-muted-foreground">{folder.fileCount}</span>
+                                        <span className="text-xs text-muted-foreground">{folder.file_count || 0}</span>
                                     </button>
 
                                     {/* Files under folder */}
-                                    {expandedFolders.has(folder.id) && folder.id === '1' && (
+                                    {expandedFolders.has(folder.id) && folderFiles[folder.id] && (
                                         <div className="ml-6 mt-1 space-y-1">
-                                            {mockFiles.map((file) => (
+                                            {folderFiles[folder.id].map((file) => (
                                                 <div
                                                     key={file.id}
                                                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5 group"
                                                 >
                                                     <Icons.File />
-                                                    <span className="text-xs flex-1 truncate">{file.name}</span>
+                                                    <span className="text-xs flex-1 truncate">{file.filename}</span>
                                                     <button
-                                                        onClick={() => handleFileToggle(file.id)}
-                                                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/10"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleFileToggle(file.id);
+                                                        }}
+                                                        className={`transition-opacity p-1 rounded hover:bg-white/10 ${fileVisibility[file.id] ? 'opacity-100' : 'opacity-40'}`}
                                                         aria-label={fileVisibility[file.id] ? 'Hide file' : 'Show file'}
                                                     >
                                                         {fileVisibility[file.id] ? <Icons.Eye /> : <Icons.EyeOff />}
@@ -299,13 +329,13 @@ export default function LibrarianSidebar({
                                         key={mode}
                                         onClick={() => setViewMode(mode)}
                                         className={`
-                      flex-1 flex flex-col items-center gap-1 p-2 rounded-lg
-                      transition-colors text-xs
-                      ${viewMode === mode
+                       flex-1 flex flex-col items-center gap-1 p-2 rounded-lg
+                       transition-colors text-xs
+                       ${viewMode === mode
                                                 ? 'bg-emerald-500/20 text-emerald-400'
                                                 : 'hover:bg-white/10'
                                             }
-                    `}
+                     `}
                                         title={label}
                                     >
                                         <Icon />

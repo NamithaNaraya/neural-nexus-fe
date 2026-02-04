@@ -19,6 +19,15 @@ const nextConfig = {
     config.externals = [...(config.externals || []), { canvas: 'canvas' }];
     return config;
   },
+  // Proxy API requests to backend
+  async rewrites() {
+      return [
+          {
+              source: '/api/v1/:path*',
+              destination: 'http://127.0.0.1:8000/api/v1/:path*',
+          },
+      ];
+  },
 };
 
 module.exports = nextConfig;

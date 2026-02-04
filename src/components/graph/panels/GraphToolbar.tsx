@@ -20,6 +20,7 @@ import {
     Minimize2,
     Download,
     Settings,
+    Inbox,
 } from 'lucide-react';
 
 interface GraphToolbarProps {
@@ -29,8 +30,10 @@ interface GraphToolbarProps {
     onToggleImmersive: () => void;
     onToggleFilters: () => void;
     onToggleLegend: () => void;
+    onToggleReviewInbox: () => void;
     showFilters: boolean;
     showLegend: boolean;
+    showReviewInbox: boolean;
 }
 
 export function GraphToolbar({
@@ -40,8 +43,10 @@ export function GraphToolbar({
     onToggleImmersive,
     onToggleFilters,
     onToggleLegend,
+    onToggleReviewInbox,
     showFilters,
     showLegend,
+    showReviewInbox,
 }: GraphToolbarProps) {
     return (
         <div className="absolute top-0 left-0 right-0 z-40 h-14 px-4 flex items-center justify-between bg-background/80 backdrop-blur-md border-b border-border/40">
@@ -67,6 +72,12 @@ export function GraphToolbar({
                 <div className="w-px h-6 bg-border/50 mx-2" />
 
                 {/* Utility Buttons */}
+                <ToolbarButton
+                    onClick={onToggleReviewInbox}
+                    isActive={showReviewInbox}
+                    icon={<Inbox className="w-4 h-4" />}
+                    title="Review Inbox"
+                />
                 <ToolbarButton
                     onClick={onToggleFilters}
                     isActive={showFilters}

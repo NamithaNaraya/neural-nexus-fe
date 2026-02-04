@@ -17,6 +17,7 @@ import {
     Loader2,
     X,
     AlertCircle,
+    Upload,
 } from "lucide-react";
 
 // Types
@@ -51,9 +52,9 @@ function formatRelativeTime(dateString: string): string {
 
 export default function LibraryPage() {
     const router = useRouter();
-    const { user, logout, isAuthenticated } = useAuthStore();
+    const { user, logout, isAuthenticated, isHydrated } = useAuthStore();
     const [searchQuery, setSearchQuery] = useState("");
-    const [isDarkMode, setIsDarkMode] = useState(true);
+    const [isDarkMode, setIsDarkMode] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
     const [newFolderDesc, setNewFolderDesc] = useState("");
@@ -63,12 +64,21 @@ export default function LibraryPage() {
     const createFolderMutation = useCreateFolder();
 
     useEffect(() => {
-        if (!isAuthenticated) {
+        if (isHydrated && !isAuthenticated) {
             router.push("/login");
         }
-    }, [isAuthenticated, router]);
+    }, [isAuthenticated, isHydrated, router]);
+
+    if (!isHydrated || !isAuthenticated) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-emerald animate-spin" />
+            </div>
+        );
+    }
 
     const handleFolderClick = (folderId: string) => {
+        console.log("Navigating to graph for folder:", folderId);
         router.push(`/graph?folder=${folderId}`);
     };
 
@@ -270,6 +280,18 @@ export default function LibraryPage() {
                                     <p className="text-xs text-muted-foreground mt-3">
                                         Updated {formatRelativeTime(folder.updated_at)}
                                     </p>
+
+                                    {/* Upload Button */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            router.push(`/upload?folder=${folder.id}`);
+                                        }}
+                                        className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 bg-emerald/10 hover:bg-emerald/20 text-emerald rounded-lg transition-colors text-sm font-medium"
+                                    >
+                                        <Upload className="w-4 h-4" />
+                                        <span>Upload Files</span>
+                                    </button>
                                 </div>
                             </motion.div>
                         ))}

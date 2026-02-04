@@ -19,6 +19,7 @@ interface AuthState {
     token: string | null;
     isLoading: boolean;
     error: string | null;
+    isHydrated: boolean;
 
     // Actions
     login: (email: string, password: string) => Promise<void>;
@@ -35,6 +36,7 @@ export const useAuthStore = create<AuthState>()(
             token: null,
             isLoading: false,
             error: null,
+            isHydrated: false,
 
             login: async (email: string, password: string) => {
                 set({ isLoading: true, error: null });
@@ -102,10 +104,11 @@ export const useAuthStore = create<AuthState>()(
 
             checkAuth: () => {
                 const { token } = get();
-                if (token) {
-                    // Token exists, consider authenticated
-                    // In production, validate token with backend
-                    set({ isAuthenticated: true });
+                // Check if we have a token in the store OR in localStorage directly
+                const localToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+
+                if (token || localToken) {
+                    set({ isAuthenticated: true, token: token || localToken });
                 } else {
                     set({ isAuthenticated: false });
                 }
@@ -122,6 +125,15 @@ export const useAuthStore = create<AuthState>()(
                 user: state.user,
                 isAuthenticated: state.isAuthenticated,
             }),
+            onRehydrateStorage: () => (state) => {
+                if (state) {
+                    state.isHydrated = true;
+                    // Sync token to localStorage for the API client
+                    if (state.token) {
+                        localStorage.setItem('access_token', state.token);
+                    }
+                }
+            },
         }
     )
 );

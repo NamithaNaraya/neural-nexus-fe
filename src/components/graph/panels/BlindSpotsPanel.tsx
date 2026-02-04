@@ -50,6 +50,36 @@ const METHODS = [
     { value: 'jaccard', label: 'Jaccard Coefficient', icon: Filter },
 ];
 
+// Loading progress indicator with time estimation
+function LoadingProgress() {
+    const [elapsed, setElapsed] = React.useState(0);
+
+    React.useEffect(() => {
+        const interval = setInterval(() => {
+            setElapsed(prev => prev + 1);
+        }, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const progress = Math.min(elapsed / 20, 1) * 100; // 20 seconds max
+
+    return (
+        <div className="w-48 space-y-1">
+            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <motion.div
+                    className="h-full bg-gradient-to-r from-purple-500 to-violet-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress}%` }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                />
+            </div>
+            <p className="text-[10px] text-center text-muted-foreground">
+                {elapsed < 20 ? `${elapsed}s elapsed` : 'Finishing up...'}
+            </p>
+        </div>
+    );
+}
+
 export function BlindSpotsPanel({
     folderId,
     isOpen,
@@ -241,8 +271,13 @@ export function BlindSpotsPanel({
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {isLoading && (
                     <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                        <Loader2 className="w-8 h-8 animate-spin mb-3" />
-                        <p className="text-sm">Analyzing graph structure...</p>
+                        <div className="relative mb-4">
+                            <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
+                            <div className="absolute inset-0 w-10 h-10 border-2 border-purple-500/20 rounded-full animate-pulse" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground mb-1">Discovering Hidden Connections</p>
+                        <p className="text-xs text-muted-foreground mb-3">This analysis typically takes 10-20 seconds</p>
+                        <LoadingProgress />
                     </div>
                 )}
 

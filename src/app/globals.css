@@ -6,45 +6,7 @@
 
 /* === CSS Custom Properties for Theme Engine === */
 :root {
-  /* Neural Dark Theme (Default) */
-  --background: 222 47% 4%;
-  --foreground: 210 40% 98%;
-
-  --card: 222 47% 6%;
-  --card-foreground: 210 40% 98%;
-
-  --popover: 222 47% 6%;
-  --popover-foreground: 210 40% 98%;
-
-  --primary: 160 84% 39%;
-  --primary-foreground: 210 40% 98%;
-
-  --secondary: 217 33% 17%;
-  --secondary-foreground: 210 40% 98%;
-
-  --muted: 217 33% 17%;
-  --muted-foreground: 215 20% 65%;
-
-  --accent: 217 33% 17%;
-  --accent-foreground: 210 40% 98%;
-
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
-
-  --border: 217 33% 17%;
-  --input: 217 33% 17%;
-  --ring: 160 84% 39%;
-
-  --radius: 0.75rem;
-
-  /* Neural Custom Colors */
-  --neural-glow: rgba(16, 185, 129, 0.5);
-  --neural-glow-strong: rgba(16, 185, 129, 0.8);
-  --neural-pulse: rgba(59, 130, 246, 0.4);
-}
-
-/* Architect Light Theme */
-.light {
+  /* Architect Light Theme (Default) */
   --background: 210 40% 98%;
   --foreground: 222 47% 11%;
 
@@ -73,9 +35,47 @@
   --input: 214 32% 91%;
   --ring: 160 84% 39%;
 
+  --radius: 0.75rem;
+
+  /* Neural Custom Colors */
   --neural-glow: rgba(16, 185, 129, 0.3);
   --neural-glow-strong: rgba(16, 185, 129, 0.5);
   --neural-pulse: rgba(59, 130, 246, 0.2);
+}
+
+/* Neural Dark Theme */
+.dark {
+  --background: 222 47% 4%;
+  --foreground: 210 40% 98%;
+
+  --card: 222 47% 6%;
+  --card-foreground: 210 40% 98%;
+
+  --popover: 222 47% 6%;
+  --popover-foreground: 210 40% 98%;
+
+  --primary: 160 84% 39%;
+  --primary-foreground: 210 40% 98%;
+
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
+
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+
+  --accent: 217 33% 17%;
+  --accent-foreground: 210 40% 98%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+
+  --border: 217 33% 17%;
+  --input: 217 33% 17%;
+  --ring: 160 84% 39%;
+
+  --neural-glow: rgba(16, 185, 129, 0.5);
+  --neural-glow-strong: rgba(16, 185, 129, 0.8);
+  --neural-pulse: rgba(59, 130, 246, 0.4);
 }
 
 /* === Base Styles === */
@@ -100,27 +100,27 @@ body {
 /* === Glassmorphism Utilities === */
 @layer components {
   .glass {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .glass-strong {
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-  }
-
-  .light .glass {
-    background: rgba(255, 255, 255, 0.7);
     border: 1px solid rgba(0, 0, 0, 0.1);
   }
 
-  .light .glass-strong {
+  .glass-strong {
     background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(0, 0, 0, 0.15);
+  }
+
+  .dark .glass {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .dark .glass-strong {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
   }
 
   /* Neural Glow Effect */
@@ -195,8 +195,8 @@ body {
   /* Input Styles */
   .input-neural {
     @apply w-full px-4 py-2 rounded-lg transition-all duration-200;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.1);
     color: hsl(var(--foreground));
   }
 
@@ -206,9 +206,9 @@ body {
     box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
   }
 
-  .light .input-neural {
-    background: rgba(0, 0, 0, 0.03);
-    border: 1px solid rgba(0, 0, 0, 0.1);
+  .dark .input-neural {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
 }
 
@@ -300,29 +300,29 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.05);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.2);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.light ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.light ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.light ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.3);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 /* === Selection Styling === */
