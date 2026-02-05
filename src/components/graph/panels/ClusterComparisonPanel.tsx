@@ -20,8 +20,11 @@ import {
     FileText,
     Folder,
     Grid3X3,
+    Maximize2,
 } from 'lucide-react';
 import { docAiApi } from '@/lib/api';
+import { ComparisonView } from '../comparison';
+
 
 interface ClusterConfig {
     type: 'file' | 'folder' | 'cluster' | 'selection';
@@ -71,6 +74,8 @@ export function ClusterComparisonPanel({
     const [result, setResult] = useState<ComparisonResult | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showVisualComparison, setShowVisualComparison] = useState(false);
+
 
     // Run comparison
     const runComparison = useCallback(async () => {
@@ -298,8 +303,18 @@ export function ClusterComparisonPanel({
                             animate={{ opacity: 1, y: 0 }}
                             className="space-y-4"
                         >
+                            {/* Open Visual Comparison Button */}
+                            <button
+                                onClick={() => setShowVisualComparison(true)}
+                                className="w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30"
+                            >
+                                <Maximize2 className="w-4 h-4" />
+                                Open Visual Comparison (Split-Screen)
+                            </button>
+
                             {/* Similarity Metrics */}
                             <div className="grid grid-cols-3 gap-4">
+
                                 <MetricCard
                                     label="Jaccard Index"
                                     value={`${(result.jaccard_index * 100).toFixed(1)}%`}
@@ -406,9 +421,20 @@ export function ClusterComparisonPanel({
                     )}
                 </AnimatePresence>
             </div>
+
+            {/* Visual Comparison View */}
+            {showVisualComparison && leftCluster && rightCluster && (
+                <ComparisonView
+                    isOpen={showVisualComparison}
+                    onClose={() => setShowVisualComparison(false)}
+                    leftCluster={leftCluster}
+                    rightCluster={rightCluster}
+                />
+            )}
         </motion.div>
     );
 }
+
 
 // Metric Card Component
 function MetricCard({

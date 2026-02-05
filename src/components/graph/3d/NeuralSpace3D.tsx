@@ -28,6 +28,7 @@ interface NeuralSpace3DProps {
     onNodeDoubleClick: (nodeId: string) => void;
     onNodeHover: (nodeId: string | null) => void;
     onBackgroundClick: () => void;
+    onNodeContextMenu?: (nodeId: string, x: number, y: number) => void;
 }
 
 // Individual 3D Node Component
@@ -38,9 +39,10 @@ interface Node3DProps {
     onClick: (nodeId: string) => void;
     onDoubleClick: (nodeId: string) => void;
     onHover: (nodeId: string | null) => void;
+    onContextMenu?: (nodeId: string, x: number, y: number) => void;
 }
 
-function Node3D({ node, isSelected, isHovered, onClick, onDoubleClick, onHover }: Node3DProps) {
+function Node3D({ node, isSelected, isHovered, onClick, onDoubleClick, onHover, onContextMenu }: Node3DProps) {
     const meshRef = useRef<THREE.Mesh>(null);
     const glowRef = useRef<THREE.Mesh>(null);
     const [lastClickTime, setLastClickTime] = useState(0);
@@ -90,6 +92,20 @@ function Node3D({ node, isSelected, isHovered, onClick, onDoubleClick, onHover }
         setLastClickTime(now);
     }, [node.id, onClick, onDoubleClick, lastClickTime]);
 
+    const handleContextMenu = useCallback((event: { clientX: number, clientY: number, stopPropagation?: () => void, preventDefault?: () => void }) => {
+        if (event.stopPropagation) event.stopPropagation();
+        // Prevent browser context menu - though R3F events might be slightly different wrappers
+        // calling preventDefault on the native event if accessible is often needed, 
+        // but often R3F onContextMenu event args might differ. 
+        // Checking basic ThreeEvent structure usually has nativeEvent.
+
+        // However, for consistency with standard React events, let's treat it safely
+
+        if (onContextMenu) {
+            onContextMenu(node.id, event.clientX, event.clientY);
+        }
+    }, [node.id, onContextMenu]);
+
     return (
         <group position={position}>
             {/* Glow effect for selected/hovered */}
@@ -108,6 +124,7 @@ function Node3D({ node, isSelected, isHovered, onClick, onDoubleClick, onHover }
             <mesh
                 ref={meshRef}
                 onClick={handleClick}
+                onContextMenu={handleContextMenu}
                 onPointerOver={() => onHover(node.id)}
                 onPointerOut={() => onHover(null)}
             >
@@ -264,6 +281,7 @@ function Scene({
     onNodeDoubleClick,
     onNodeHover,
     onBackgroundClick,
+    onNodeContextMenu,
 }: NeuralSpace3DProps) {
     // Create node lookup map
     const nodeMap = useMemo(() => {
@@ -323,6 +341,7 @@ function Scene({
                     onClick={onNodeClick}
                     onDoubleClick={onNodeDoubleClick}
                     onHover={onNodeHover}
+                    onContextMenu={onNodeContextMenu}
                 />
             ))}
         </>

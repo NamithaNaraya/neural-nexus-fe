@@ -183,7 +183,7 @@ function LibraryContent() {
                     console.error('Failed to poll file status:', err);
                 }
             }
-        }, 2000);
+        }, 5000);
 
         return () => clearInterval(interval);
     }, [uploadingFiles]);
@@ -197,7 +197,7 @@ function LibraryContent() {
     }
 
     const handleFolderClick = (folderId: string) => {
-        router.push(`/graph?folder=${folderId}`);
+        router.push(`/folders/${folderId}`);
     };
 
     const handleCreateFolder = async () => {
@@ -301,7 +301,7 @@ function LibraryContent() {
         if (!files || !selectedFolder) return;
 
         const newFiles: UploadingFile[] = Array.from(files).map(file => ({
-            id: crypto.randomUUID(),
+            id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             file,
             status: 'uploading',
             progress: 0,

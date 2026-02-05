@@ -58,10 +58,7 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
     }, [filters.showOrphans, setFilters]);
 
     return (
-        <motion.div
-            initial={{ x: -20, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -20, opacity: 0 }}
+        <div
             className="bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-xl overflow-hidden flex flex-col h-full"
         >
             {/* Header */}
@@ -170,7 +167,7 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
                     />
                 </div>
             </div>
-        </motion.div>
+        </div>
     );
 }
 

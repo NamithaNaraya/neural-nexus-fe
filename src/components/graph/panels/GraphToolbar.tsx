@@ -13,7 +13,6 @@ import {
     Box,
     Grid3X3,
     Filter,
-    Info,
     RotateCcw,
     Maximize2,
     Minimize2,
@@ -24,6 +23,7 @@ import {
     Search,
     ChevronDown,
     Shrink,
+    PieChart,
 } from 'lucide-react';
 import { AlgorithmDrawer } from './AlgorithmDrawer';
 
@@ -33,19 +33,18 @@ interface GraphToolbarProps {
     isImmersive: boolean;
     onToggleImmersive: () => void;
     onToggleFilters: () => void;
-    onToggleLegend: () => void;
-    onToggleReviewInbox: () => void;
+
     onResetCamera?: () => void;
     onCollapseAll?: () => void;
     onExport?: () => void;
     onStartTour?: () => void;
     showFilters: boolean;
-    showLegend: boolean;
-    showReviewInbox: boolean;
     hasExpandedNodes?: boolean;
     folderId?: string;
     nodeCount?: number;
     linkCount?: number;
+    totalNodeCount?: number;
+    totalLinkCount?: number;
 }
 
 export function GraphToolbar({
@@ -54,21 +53,23 @@ export function GraphToolbar({
     isImmersive,
     onToggleImmersive,
     onToggleFilters,
-    onToggleLegend,
-    onToggleReviewInbox,
     onResetCamera,
     onCollapseAll,
     onExport,
     onStartTour,
     showFilters,
-    showLegend,
-    showReviewInbox,
+
     hasExpandedNodes = false,
     folderId,
-    nodeCount,
-    linkCount,
+    nodeCount = 0,
+    linkCount = 0,
+    totalNodeCount = 0,
+    totalLinkCount = 0,
 }: GraphToolbarProps) {
     const [showAlgorithmDrawer, setShowAlgorithmDrawer] = useState(false);
+
+    // Calculate if filtering is active
+    const isFiltered = nodeCount !== totalNodeCount || linkCount !== totalLinkCount;
 
     return (
         <>
@@ -90,18 +91,19 @@ export function GraphToolbar({
                             icon={<Grid3X3 className="w-4 h-4" />}
                             label="2D"
                         />
+                        <ViewModeButton
+                            mode="charts"
+                            currentMode={viewMode}
+                            onClick={() => onViewModeChange('charts')}
+                            icon={<PieChart className="w-4 h-4" />}
+                            label="Charts"
+                        />
                     </div>
 
                     <div className="w-px h-6 bg-border/50 mx-2" />
 
                     {/* Core Actions */}
-                    <ToolbarButton
-                        onClick={onToggleReviewInbox}
-                        isActive={showReviewInbox}
-                        icon={<Inbox className="w-4 h-4" />}
-                        title="Review Inbox"
-                        data-tour="review-inbox"
-                    />
+
                     <ToolbarButton
                         onClick={onToggleFilters}
                         isActive={showFilters}
@@ -119,21 +121,43 @@ export function GraphToolbar({
                     />
                 </div>
 
-                {/* Center Section - Stats */}
-                <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
-                    <span className="text-sm font-medium text-foreground">Neural Nexus</span>
-                    <span className="text-xs text-muted-foreground px-2 py-0.5 bg-primary/10 text-primary rounded-full">
-                        {viewMode.toUpperCase()}
-                    </span>
-                    {nodeCount !== undefined && (
-                        <span className="text-xs text-muted-foreground">
-                            {nodeCount} nodes • {linkCount} links
-                        </span>
-                    )}
-                </div>
 
-                {/* Right Section - Actions */}
-                <div className="flex items-center gap-2">
+
+                {/* Right Section - Stats & Actions */}
+                <div className="flex items-center gap-4">
+                    {/* Stats Pill */}
+                    <div className="flex items-center h-9 px-3 bg-background border border-border rounded-full shadow-sm text-sm hidden md:flex">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            <div className="w-2 h-2 rounded-full border border-current" />
+                            <span className="font-medium text-foreground">{nodeCount}</span>
+                            <span className="text-muted-foreground/60">/{totalNodeCount} Nodes</span>
+                        </div>
+
+                        <div className="w-px h-4 bg-border mx-3" />
+
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            {/* Link Icon */}
+                            <svg className="w-3.5 h-3.5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                            <span className="font-medium text-foreground">{linkCount}</span>
+                            <span className="text-muted-foreground/60">/{totalLinkCount} Links</span>
+                        </div>
+
+                        {isFiltered && (
+                            <>
+                                <div className="w-px h-4 bg-border mx-3" />
+                                <div className="flex items-center gap-1.5 text-amber-500">
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                    <span className="font-medium text-xs">Filtered</span>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
                     {/* Collapse All - Only visible when nodes are expanded */}
                     {hasExpandedNodes && onCollapseAll && (
                         <ToolbarButton
@@ -143,40 +167,6 @@ export function GraphToolbar({
                             className="text-orange-500"
                         />
                     )}
-
-                    <ToolbarButton
-                        onClick={onResetCamera}
-                        icon={<RotateCcw className="w-4 h-4" />}
-                        title="Reset View"
-                    />
-
-                    <ToolbarButton
-                        onClick={onToggleLegend}
-                        isActive={showLegend}
-                        icon={<Info className="w-4 h-4" />}
-                        title="Toggle Legend"
-                    />
-
-                    <ToolbarButton
-                        onClick={onExport}
-                        icon={<Download className="w-4 h-4" />}
-                        title="Export Graph"
-                    />
-
-                    <div className="w-px h-6 bg-border/50 mx-2" />
-
-                    {/* Help / Tour */}
-                    <ToolbarButton
-                        onClick={onStartTour}
-                        icon={<HelpCircle className="w-4 h-4" />}
-                        title="Start Tour"
-                    />
-
-                    <ToolbarButton
-                        onClick={onToggleImmersive}
-                        icon={isImmersive ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                        title={isImmersive ? "Exit Fullscreen" : "Fullscreen"}
-                    />
                 </div>
             </div>
 

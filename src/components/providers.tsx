@@ -41,7 +41,7 @@ export function useTheme() {
  * ThemeProvider - Manages dark/light mode
  */
 function ThemeProvider({ children }: { children: React.ReactNode }) {
-    const [theme, setThemeState] = useState<Theme>('dark'); // Default to dark
+    const [theme, setThemeState] = useState<Theme>('light'); // Default to light
     const [mounted, setMounted] = useState(false);
 
     // Initialize theme from localStorage or system preference
@@ -52,9 +52,19 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
         if (stored) {
             setThemeState(stored);
         } else {
-            // Check system preference
+            // Check system preference, but default to light if no preference
             const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            setThemeState(prefersDark ? 'dark' : 'light');
+            // User requested default to light. We can respect system or force light.
+            // Usually "default to light" means "if I haven't chosen, give me light".
+            // We will respect system if it's explicitly dark, but otherwise light.
+            // Actually, to fully "make the default light", let's prioritize light 
+            // but still allow system override if we want to be nice. 
+            // However, the prompt implies the current default (dark) is unwanted.
+            // Let's just set it to matches ? 'dark' : 'light' but ensure initial state was light.
+            // Wait, if line 44 is 'light', and system is 'dark', this effect will flip it to 'dark'.
+            // If the user wants "Default to light", they might mean "Ignore system dark mode".
+            // I will set it to 'light' in the else block to force the default.
+            setThemeState('light');
         }
     }, []);
 
@@ -90,8 +100,8 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
     // Prevent hydration mismatch by not rendering until mounted
     if (!mounted) {
         return (
-            <div className="min-h-screen bg-[#0A0C10]">
-                {/* Dark placeholder while loading */}
+            <div className="min-h-screen bg-[#F8FAFC]">
+                {/* Light placeholder while loading */}
             </div>
         );
     }

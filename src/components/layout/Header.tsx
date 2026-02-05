@@ -46,13 +46,13 @@ export function Header({ showThemeToggle = true, minimal = false }: HeaderProps)
 
     return (
         <header className="border-b border-border/40 backdrop-blur-sm bg-background/80 sticky top-0 z-50">
-            <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div className="w-full mx-auto px-6 py-4 flex items-center justify-between">
                 {/* Logo */}
                 <button
                     onClick={() => router.push('/library')}
                     className="text-xl font-bold text-foreground hover:opacity-80 transition-opacity"
                 >
-                    <span className="text-emerald">Neural</span> Nexus
+                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-orange-500 to-purple-600">Neural</span> Nexus
                 </button>
 
                 {/* Right Section */}
@@ -76,8 +76,8 @@ export function Header({ showThemeToggle = true, minimal = false }: HeaderProps)
                     {isAuthenticated && (
                         <>
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-emerald/20 flex items-center justify-center">
-                                    <span className="text-emerald text-sm font-medium">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-500/20 to-purple-600/20 flex items-center justify-center">
+                                    <span className="text-pink-600 font-medium text-sm">
                                         {user?.email?.[0]?.toUpperCase() || "U"}
                                     </span>
                                 </div>

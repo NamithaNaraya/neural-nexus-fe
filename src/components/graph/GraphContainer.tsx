@@ -20,15 +20,17 @@ import { NodeDetailPanel } from './panels/NodeDetailPanel';
 import { NodeTooltip } from './panels/NodeTooltip';
 import { GraphSearch } from './shared/GraphSearch';
 import { GraphFilters } from './shared/GraphFilters';
-import { GraphLegend } from './shared/GraphLegend';
 import { GraphStats } from './shared/GraphStats';
 import { NodeContextMenu, initialContextMenuState } from './shared/NodeContextMenu';
+import { DataCanvas } from '../../visualizations/DataCanvas';
 import { FileScopePanel } from './panels/FileScopePanel';
 import { GraphViewMode } from './types';
 import { useNodeExpansion, useShortestPath } from '@/hooks/useApi';
 import { useDevice, useViewModeLock } from '@/hooks/useDevice';
 import { Loader2, Maximize2, Minimize2, Zap, FolderTree, AlertTriangle } from 'lucide-react';
 import { OnboardingOverlay, useOnboarding } from '@/components/onboarding';
+import { NodeEditorModal, RelationshipEditorModal, DeleteConfirmModal } from './modals';
+import { graphApi } from '@/lib/api';
 
 // Dynamic imports for heavy visualization components
 const NeuralSpace3D = dynamic(() => import('./3d/NeuralSpace3D').then(m => ({ default: m.NeuralSpace3D })), {
@@ -147,7 +149,7 @@ class GraphErrorBoundary extends React.Component<
     }
 }
 
-import { ReviewInboxPanel } from './panels/ReviewInboxPanel';
+
 
 // ... other imports
 
@@ -167,10 +169,18 @@ export function GraphContainer({
     const [viewMode, setViewMode] = useState<GraphViewMode>(initialMode);
     const [isImmersive, setIsImmersive] = useState(initialImmersive);
     const [showFilters, setShowFilters] = useState(false);
-    const [showLegend, setShowLegend] = useState(true);
-    const [showReviewInbox, setShowReviewInbox] = useState(initialShowInbox); // New State
+
     const [showFileScope, setShowFileScope] = useState(false);
     const [contextMenu, setContextMenu] = useState(initialContextMenuState);
+
+    // CRUD Modal states
+    const [showNodeEditor, setShowNodeEditor] = useState(false);
+    const [nodeEditorMode, setNodeEditorMode] = useState<'create' | 'edit'>('create');
+    const [editingNode, setEditingNode] = useState<GraphNode | null>(null);
+    const [showRelationshipEditor, setShowRelationshipEditor] = useState(false);
+    const [relationshipSourceNode, setRelationshipSourceNode] = useState<GraphNode | null>(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleteTargetNode, setDeleteTargetNode] = useState<GraphNode | null>(null);
 
     // Device detection for mobile 2D lock
     const device = useDevice();
@@ -249,9 +259,24 @@ export function GraphContainer({
     const pathMutation = useShortestPath();
 
     // Handlers
+    // Left-click: Show CRUD context menu (Edit, Delete, Add Relationship)
     const handleNodeClick = useCallback(async (nodeId: string, event?: React.MouseEvent) => {
         const isMultiSelect = event?.shiftKey || event?.ctrlKey || event?.metaKey;
         selectNode(nodeId, isMultiSelect);
+
+        // Show CRUD context menu on left-click (single node selection)
+        if (!isMultiSelect) {
+            const node = nodes.find(n => n.id === nodeId);
+            if (node && event) {
+                setContextMenu({
+                    isOpen: true,
+                    x: event.clientX,
+                    y: event.clientY,
+                    nodeId,
+                    nodeName: node.name,
+                });
+            }
+        }
 
         // If we now have two nodes selected, offer to find path
         const nextState = useGraphStore.getState();
@@ -271,7 +296,8 @@ export function GraphContainer({
                 console.error('Path finding failed:', err);
             }
         }
-    }, [selectNode, pathMutation]);
+    }, [selectNode, pathMutation, nodes]);
+
 
     const handleNodeDoubleClick = useCallback(async (nodeId: string) => {
         console.log('Expanding node:', nodeId);
@@ -316,23 +342,79 @@ export function GraphContainer({
         setContextMenu(initialContextMenuState);
     }, [clearSelection]);
 
-    // Context menu handler (right-click)
-    const handleNodeContextMenu = useCallback((nodeId: string, x: number, y: number) => {
-        const node = nodes.find(n => n.id === nodeId);
-        if (node) {
-            setContextMenu({
-                isOpen: true,
-                x,
-                y,
-                nodeId,
-                nodeName: node.name,
-            });
-        }
-    }, [nodes]);
+    // Right-click: Progressive Expansion (Neo4j Browser Style)
+    const handleNodeRightClick = useCallback((nodeId: string, _x: number, _y: number) => {
+        // Right-click triggers expansion (Neo4j Browser style)
+        console.log('Right-click expanding node:', nodeId);
+        handleNodeDoubleClick(nodeId); // Reuse the expansion logic
+    }, [handleNodeDoubleClick]);
 
     const closeContextMenu = useCallback(() => {
         setContextMenu(initialContextMenuState);
     }, []);
+
+    // CRUD Handlers
+    const handleEditNode = useCallback((nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node) {
+            setEditingNode(node);
+            setNodeEditorMode('edit');
+            setShowNodeEditor(true);
+        }
+        closeContextMenu();
+    }, [nodes, closeContextMenu]);
+
+    const handleAddRelationship = useCallback((nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node) {
+            setRelationshipSourceNode(node);
+            setShowRelationshipEditor(true);
+        }
+        closeContextMenu();
+    }, [nodes, closeContextMenu]);
+
+    const handleDeleteNode = useCallback((nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node) {
+            setDeleteTargetNode(node);
+            setShowDeleteConfirm(true);
+        }
+        closeContextMenu();
+    }, [nodes, closeContextMenu]);
+
+    const handleNodeCreated = useCallback((newNode: any) => {
+        const { addNode } = useGraphStore.getState();
+        addNode({
+            id: newNode.id,
+            name: newNode.name,
+            type: newNode.type,
+            description: newNode.description,
+            properties: newNode.properties || {},
+            degree: 0,
+        });
+    }, []);
+
+    const handleNodeUpdated = useCallback(() => {
+        // Refresh graph data - could trigger a refetch
+        console.log('Node updated, graph will refresh on next load');
+    }, []);
+
+    const handleRelationshipCreated = useCallback((relationship: any) => {
+        const { addLink } = useGraphStore.getState();
+        addLink({
+            source: relationship.source_id,
+            target: relationship.target_id,
+            type: relationship.type,
+            strength: relationship.strength,
+        });
+    }, []);
+
+    const confirmDeleteNode = useCallback(async () => {
+        if (!deleteTargetNode) return;
+        await graphApi.deleteNode(deleteTargetNode.id);
+        const { removeNode } = useGraphStore.getState();
+        removeNode(deleteTargetNode.id);
+    }, [deleteTargetNode]);
 
     const toggleImmersive = useCallback(() => {
         setIsImmersive(prev => !prev);
@@ -359,39 +441,37 @@ export function GraphContainer({
                     isImmersive={isImmersive}
                     onToggleImmersive={toggleImmersive}
                     onToggleFilters={() => setShowFilters(prev => !prev)}
-                    onToggleLegend={() => setShowLegend(prev => !prev)}
-                    onToggleReviewInbox={() => setShowReviewInbox(prev => !prev)}
-                    onResetCamera={() => useGraphStore.getState().resetCamera()}
-                    onCollapseAll={() => {
-                        const state = useGraphStore.getState();
-                        state.expandedNodes.forEach((_, nodeId) => {
-                            state.collapseNode(nodeId);
-                        });
+                    onStartTour={() => console.log('Tour started')}
+                    onResetCamera={useGraphStore.getState().resetCamera}
+                    onExport={() => {
+                        const data = {
+                            nodes: visibleNodes,
+                            links: visibleLinks,
+                            timestamp: new Date().toISOString()
+                        };
+                        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `neural-nexus-graph-${new Date().toISOString().slice(0, 10)}.json`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
                     }}
-                    onStartTour={() => { }}
                     showFilters={showFilters}
-                    showLegend={showLegend}
-                    showReviewInbox={showReviewInbox}
+
                     hasExpandedNodes={useGraphStore.getState().expandedNodes.size > 0}
                     folderId={folderId}
                     nodeCount={visibleNodes.length}
                     linkCount={visibleLinks.length}
+                    totalNodeCount={nodeCount}
+                    totalLinkCount={linkCount}
                 />
             )}
 
             {/* Search Bar */}
             <div className="absolute top-16 left-4 z-30 w-72">
                 <GraphSearch />
-            </div>
-
-            {/* Stats */}
-            <div className="absolute top-16 right-4 z-30">
-                <GraphStats
-                    nodeCount={visibleNodes.length}
-                    linkCount={visibleLinks.length}
-                    totalNodes={nodeCount}
-                    totalLinks={linkCount}
-                />
             </div>
 
             {/* Main Visualization Area */}
@@ -421,10 +501,11 @@ export function GraphContainer({
                                             onNodeDoubleClick={handleNodeDoubleClick}
                                             onNodeHover={handleNodeHover}
                                             onBackgroundClick={handleBackgroundClick}
+                                            onNodeContextMenu={handleNodeRightClick}
                                         />
                                     </Suspense>
                                 </motion.div>
-                            ) : (
+                            ) : viewMode === '2d' ? (
                                 <motion.div
                                     key="2d"
                                     initial={{ opacity: 0 }}
@@ -442,8 +523,20 @@ export function GraphContainer({
                                             onNodeDoubleClick={handleNodeDoubleClick}
                                             onNodeHover={handleNodeHover}
                                             onBackgroundClick={handleBackgroundClick}
+                                            onNodeContextMenu={handleNodeRightClick}
                                         />
                                     </Suspense>
+
+                                </motion.div>
+                            ) : (
+                                <motion.div
+                                    key="charts"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="w-full h-full bg-background"
+                                >
+                                    <DataCanvas />
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -451,15 +544,7 @@ export function GraphContainer({
                 )}
             </div>
 
-            {/* Review Inbox Panel */}
-            <ReviewInboxPanel
-                isOpen={showReviewInbox}
-                onClose={() => setShowReviewInbox(false)}
-                onApprove={(fileId) => {
-                    console.log("Approved file:", fileId);
-                    // Optionally trigger a graph refresh here if needed
-                }}
-            />
+
 
             {/* Filters Panel */}
             <AnimatePresence>
@@ -475,19 +560,7 @@ export function GraphContainer({
                 )}
             </AnimatePresence>
 
-            {/* Legend */}
-            <AnimatePresence>
-                {showLegend && hasData && (
-                    <motion.div
-                        initial={{ y: 20, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: 20, opacity: 0 }}
-                        className="absolute bottom-4 left-4 z-20"
-                    >
-                        <GraphLegend />
-                    </motion.div>
-                )}
-            </AnimatePresence>
+
 
             {/* Node Detail Panel */}
             {showSidebar && selectedNode && (
@@ -497,9 +570,9 @@ export function GraphContainer({
                 />
             )}
 
-            {/* Tooltip */}
-            {hoveredNodeData && !selectedNode && (
-                <NodeTooltip node={hoveredNodeData} />
+            {/* Tooltip - Show on Click (Selection) as requested */}
+            {selectedNode && (
+                <NodeTooltip node={selectedNode} />
             )}
 
             {/* Context Menu */}
@@ -516,6 +589,9 @@ export function GraphContainer({
                             selectNode(contextMenu.nodeId!);
                             closeContextMenu();
                         }}
+                        onEdit={() => handleEditNode(contextMenu.nodeId!)}
+                        onAddRelationship={() => handleAddRelationship(contextMenu.nodeId!)}
+                        onDelete={() => handleDeleteNode(contextMenu.nodeId!)}
                     />
                 )}
             </AnimatePresence>
@@ -542,6 +618,52 @@ export function GraphContainer({
                     <Minimize2 className="w-5 h-5 text-foreground" />
                 </button>
             )}
+
+            {/* CRUD Modals */}
+            <NodeEditorModal
+                isOpen={showNodeEditor}
+                onClose={() => {
+                    setShowNodeEditor(false);
+                    setEditingNode(null);
+                }}
+                onSuccess={nodeEditorMode === 'create' ? handleNodeCreated : handleNodeUpdated}
+                mode={nodeEditorMode}
+                initialData={editingNode ? {
+                    id: editingNode.id,
+                    name: editingNode.name,
+                    type: editingNode.type,
+                    description: editingNode.description,
+                    properties: editingNode.properties as Record<string, string>,
+                } : undefined}
+                folderId={folderId}
+                fileId={fileId}
+            />
+
+            {relationshipSourceNode && (
+                <RelationshipEditorModal
+                    isOpen={showRelationshipEditor}
+                    onClose={() => {
+                        setShowRelationshipEditor(false);
+                        setRelationshipSourceNode(null);
+                    }}
+                    onSuccess={handleRelationshipCreated}
+                    sourceNode={relationshipSourceNode}
+                    availableNodes={nodes}
+                />
+            )}
+
+            <DeleteConfirmModal
+                isOpen={showDeleteConfirm}
+                onClose={() => {
+                    setShowDeleteConfirm(false);
+                    setDeleteTargetNode(null);
+                }}
+                onConfirm={confirmDeleteNode}
+                title="Delete Entity"
+                message={`Are you sure you want to delete "${deleteTargetNode?.name}"? This will also remove all relationships connected to this entity.`}
+                itemName={deleteTargetNode?.name}
+            />
         </div>
+
     );
 }

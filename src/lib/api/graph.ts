@@ -58,4 +58,54 @@ export const graphApi = {
     // Get layout positions
     getLayout: (folderId: string, algorithm?: string) =>
         api.get<Record<string, { x: number; y: number; z?: number }>>(`/graph/layout/${folderId}${algorithm ? `?algorithm=${algorithm}` : ''}`),
+
+    // === CRUD Operations ===
+
+    // Create a new node
+    createNode: (data: {
+        name: string;
+        type: string;
+        description?: string;
+        properties?: Record<string, string>;
+        folder_id?: string;
+        file_id?: string;
+        color?: string;
+        size?: number;
+    }) => api.post<{ success: boolean; node: any }>('/graph/nodes', data),
+
+    // Update an existing node
+    updateNode: (nodeId: string, data: {
+        name?: string;
+        type?: string;
+        description?: string;
+        properties?: Record<string, string>;
+        color?: string;
+        size?: number;
+    }) => api.put<{ success: boolean; node_id: string; updated_fields: string[] }>(`/graph/nodes/${nodeId}`, data),
+
+    // Delete a node
+    deleteNode: (nodeId: string) =>
+        api.delete<{ success: boolean; node_id: string; message: string }>(`/graph/nodes/${nodeId}`),
+
+    // Create a relationship
+    createRelationship: (data: {
+        source_id: string;
+        target_id: string;
+        type: string;
+        strength?: number;
+        properties?: Record<string, string>;
+    }) => api.post<{ success: boolean; relationship: any }>('/graph/relationships', data),
+
+    // Delete a relationship
+    deleteRelationship: (relationshipId: string) =>
+        api.delete<{ success: boolean; relationship_id: string; message: string }>(`/graph/relationships/${relationshipId}`),
+
+    // Get available node types
+    getNodeTypes: () =>
+        api.get<{ types: string[] }>('/graph/node-types'),
+
+    // Get available relationship types
+    getRelationshipTypes: () =>
+        api.get<{ types: string[] }>('/graph/relationship-types'),
 };
+

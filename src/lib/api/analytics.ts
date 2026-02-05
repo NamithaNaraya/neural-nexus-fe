@@ -82,7 +82,32 @@ export const analyticsApi = {
 
     kCore: (folderId?: string) =>
         api.get<AlgorithmResult>(`/analytics/k-core${buildParams({ folder_id: folderId })}`),
+
+    // Cluster comparison
+    compare: (params: {
+        left: { type: string; id: string; node_ids?: string[] };
+        right: { type: string; id: string; node_ids?: string[] };
+        include_bridges?: boolean;
+        include_similarity?: boolean;
+    }) =>
+        api.post('/analytics/compare', params),
+
+    findMissing: (params: {
+        left_nodes: unknown[];
+        right_nodes: unknown[];
+    }) =>
+        api.post('/analytics/find-missing', params),
+
+    exportComparison: (params: {
+        format: 'json' | 'pdf';
+        left_name: string;
+        right_name: string;
+        result: unknown;
+    }) =>
+        api.post('/analytics/comparison/export', params),
 };
+
+
 
 // Helper to build query params
 function buildParams(params: Record<string, unknown>): string {

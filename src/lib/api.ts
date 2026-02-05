@@ -193,6 +193,7 @@ export const endpoints = {
         status: (id: string) => `/files/${id}/status`,
         pending: '/files/pending',
         preview: (id: string) => `/files/${id}/extraction-preview`,
+        extraction: (id: string) => `/files/${id}/extraction`,
         approve: (id: string) => `/files/${id}/approve`,
         reject: (id: string) => `/files/${id}/reject`,
     },
@@ -347,6 +348,10 @@ export const docAiApi = {
         // Get extraction preview for a file
         getExtractionPreview: (fileId: string) => api.get(endpoints.files.preview(fileId)),
 
+        // Update extraction data
+        updateExtraction: (fileId: string, data: { entities: any[], relationships: any[] }) =>
+            api.put(endpoints.files.extraction(fileId), data),
+
         // Approve file ingestion
         approveIngestion: (fileId: string) => api.post(endpoints.files.approve(fileId)),
 
@@ -364,6 +369,9 @@ export const docAiApi = {
     folders: {
         // List all folders
         list: () => api.get(endpoints.folders.list),
+
+        // List files in a folder
+        getFiles: (folderId: string) => api.get(endpoints.files.list(folderId)),
 
         // Create folder
         create: (data: { name: string; description?: string; parent_id?: string }) =>

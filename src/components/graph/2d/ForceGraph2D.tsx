@@ -26,6 +26,7 @@ interface ForceGraph2DProps {
     onNodeDoubleClick: (nodeId: string) => void;
     onNodeHover: (nodeId: string | null) => void;
     onBackgroundClick: () => void;
+    onNodeContextMenu?: (nodeId: string, x: number, y: number) => void; // Right-click for expand
 }
 
 // D3 Node type with simulation properties
@@ -55,6 +56,7 @@ export function ForceGraph2D({
     onNodeDoubleClick,
     onNodeHover,
     onBackgroundClick,
+    onNodeContextMenu,
 }: ForceGraph2DProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const svgRef = useRef<SVGSVGElement>(null);
@@ -64,6 +66,9 @@ export function ForceGraph2D({
 
     // Track last click for double-click detection
     const lastClickRef = useRef<{ time: number; nodeId: string | null }>({ time: 0, nodeId: null });
+
+    // Store previous node positions to prevent resetting on re-renders
+    const nodeStateRef = useRef<Map<string, { x: number; y: number; vx?: number; vy?: number }>>(new Map());
 
     // Detect dark mode
     useEffect(() => {
@@ -86,29 +91,64 @@ export function ForceGraph2D({
     const textColor = isDark ? '#F1F5F9' : '#1E293B';
     const strokeColor = isDark ? '#1E293B' : '#E2E8F0';
 
-    // Convert nodes for D3 - spread them out more initially
+    // Convert nodes for D3 - ALWAYS spread them out freshly for clean initialization
     const d3Nodes: D3Node[] = useMemo(() => {
         const spread = Math.max(dimensions.width, dimensions.height) * 0.4;
+        // Use a seeded random based on node index for consistent but spread positions
         return nodes.map((n, i) => {
-            const angle = (i / nodes.length) * 2 * Math.PI;
-            const radius = spread * (0.3 + Math.random() * 0.7);
+            const existingState = nodeStateRef.current.get(n.id);
+
+            // If we have valid previous position, use it to prevent jumping
+            if (existingState && !isNaN(existingState.x) && !isNaN(existingState.y)) {
+                return {
+                    ...n,
+                    x: existingState.x,
+                    y: existingState.y,
+                    vx: existingState.vx,
+                    vy: existingState.vy
+                };
+            }
+
+            // Fallback to initial layout for new nodes
+            const angle = (i / Math.max(nodes.length, 1)) * 2 * Math.PI;
+            const radius = spread * (0.3 + (((i * 17) % 10) / 10) * 0.7); // Deterministic "random"
             return {
                 ...n,
-                x: n.x ?? Math.cos(angle) * radius,
-                y: n.y ?? Math.sin(angle) * radius,
+                // Always use fresh calculated positions for clean layout on view switch
+                x: Math.cos(angle) * radius,
+                y: Math.sin(angle) * radius,
             };
         });
-    }, [nodes, dimensions]);
+    }, [nodes, dimensions.width, dimensions.height]); // Depend on width/height separately
 
-    // Convert links for D3
+
+
+    // Convert links for D3 - filter out self-loops
+    // CRITICAL: Links must reference the EXACT SAME node objects as d3Nodes
     const d3Links: D3Link[] = useMemo(() => {
-        return links.map(l => ({
-            source: l.source,
-            target: l.target,
-            type: l.type,
-            strength: l.strength,
-        }));
-    }, [links]);
+        // Create a lookup map for the current d3Nodes
+        const nodeMap = new Map(d3Nodes.map(n => [n.id, n]));
+
+        return links.reduce<D3Link[]>((acc, l) => {
+            if (l.source === l.target) return acc;
+
+            const sourceNode = nodeMap.get(l.source);
+            const targetNode = nodeMap.get(l.target);
+
+            if (sourceNode && targetNode) {
+                acc.push({
+                    source: sourceNode,
+                    target: targetNode,
+                    type: l.type,
+                    strength: l.strength,
+                });
+            }
+            return acc;
+        }, []);
+    }, [links, d3Nodes]); // Depend on d3Nodes to refresh references when nodes are recreated
+
+
+
 
     // Node size calculation
     const getNodeSize = useCallback((node: D3Node) => {
@@ -173,20 +213,24 @@ export function ForceGraph2D({
         const simulation = d3.forceSimulation<D3Node>(d3Nodes)
             .force('link', d3.forceLink<D3Node, D3Link>(d3Links)
                 .id(d => d.id)
-                .distance(150) // Longer link distance
-                .strength(0.3) // Weaker link strength
+                .distance(250) // Significantly increased distance
+                .strength(0.15) // Weaker link tension to allow spreading
             )
             .force('charge', d3.forceManyBody()
-                .strength(-800) // MUCH stronger repulsion
-                .distanceMax(500)
+                .strength(-3000) // Much stronger repulsion
+                .distanceMax(2000) // Affect nodes further away
             )
-            .force('center', d3.forceCenter(0, 0).strength(0.05))
+            .force('center', d3.forceCenter(0, 0).strength(0.02)) // Very weak center pull
             .force('collision', d3.forceCollide()
-                .radius(d => getNodeSize(d as D3Node) + 40) // Larger collision radius
-                .strength(0.8)
+                .radius(d => getNodeSize(d as D3Node) + 60) // Larger safety bubble
+                .strength(0.9)
             )
-            .force('x', d3.forceX(0).strength(0.02))
-            .force('y', d3.forceY(0).strength(0.02));
+            .force('x', d3.forceX(0).strength(0.01))
+            .force('y', d3.forceY(0).strength(0.01))
+            .velocityDecay(0.3) // Higher friction to stop dancing
+            .alphaDecay(0.05); // Faster cooling to stabilize layout
+
+
 
         simulationRef.current = simulation;
 
@@ -198,10 +242,26 @@ export function ForceGraph2D({
             .attr('stroke', d => getLinkColor(d))
             .attr('stroke-opacity', 0.4)
             .attr('stroke-width', 2)
-            .attr('fill', 'none');
+            .attr('fill', 'none')
+            .attr('marker-end', 'url(#arrow-marker)');
 
-        // Add glow filter
+        // Add defs for filters and markers
         const defs = svg.append('defs');
+
+        // Arrow marker for directional links
+        defs.append('marker')
+            .attr('id', 'arrow-marker')
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 25) // Offset from target node
+            .attr('refY', 0)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('fill', '#ffffff80')
+            .attr('d', 'M0,-5L10,0L0,5');
+
+        // Glow filter for nodes
         const filter = defs.append('filter')
             .attr('id', 'node-glow')
             .attr('x', '-100%')
@@ -216,6 +276,23 @@ export function ForceGraph2D({
         const feMerge = filter.append('feMerge');
         feMerge.append('feMergeNode').attr('in', 'coloredBlur');
         feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+        // Create link labels group (relationship names)
+        const linkLabelsGroup = container.append('g').attr('class', 'link-labels');
+        const linkLabels = linkLabelsGroup.selectAll<SVGTextElement, D3Link>('text')
+            .data(d3Links)
+            .join('text')
+            .attr('class', 'link-label')
+            .attr('text-anchor', 'middle')
+            .attr('fill', isDark ? '#94A3B8' : '#64748B') // Visible on both backgrounds
+            .attr('font-size', '10px')
+            .attr('font-weight', '500')
+            .attr('pointer-events', 'none')
+            .attr('dy', -6)
+            .attr('paint-order', 'stroke')
+            .attr('stroke', isDark ? '#0A0C10' : '#F8FAFC') // Background color stroke for readability
+            .attr('stroke-width', 3)
+            .text(d => d.type ? (d.type.length > 18 ? d.type.slice(0, 15) + '...' : d.type) : '');
 
         // Create node groups
         const nodeGroups = nodesGroup.selectAll<SVGGElement, D3Node>('g')
@@ -318,7 +395,26 @@ export function ForceGraph2D({
                     .transition()
                     .duration(150)
                     .attr('stroke-opacity', 0);
+            })
+            .on('contextmenu', (event, d) => {
+                // Right-click for progressive expansion (Neo4j Browser style)
+                if (event) {
+                    if (event.preventDefault) event.preventDefault();
+                    if (event.stopPropagation) event.stopPropagation();
+                    // Handle D3 v6+ wrapped events if necessary
+                    if (event.sourceEvent) {
+                        event.sourceEvent.preventDefault();
+                        event.sourceEvent.stopPropagation();
+                    }
+                }
+
+                if (onNodeContextMenu) {
+                    onNodeContextMenu(d.id, event.clientX, event.clientY);
+                }
             });
+
+
+
 
         // Background click - clear hover
         svg.on('click', (event) => {
@@ -328,26 +424,71 @@ export function ForceGraph2D({
             }
         });
 
+        // Clear hover when mouse leaves the graph area
+        svg.on('mouseleave', () => {
+            onNodeHover(null);
+        });
+
         // Update positions on simulation tick
         simulation.on('tick', () => {
-            // Curved links
+            // Save current positions for persistence across re-renders
+            d3Nodes.forEach(node => {
+                if (node.x !== undefined && node.y !== undefined) {
+                    nodeStateRef.current.set(node.id, {
+                        x: node.x,
+                        y: node.y,
+                        vx: node.vx,
+                        vy: node.vy
+                    });
+                }
+            });
+
+
+            // Curved links - ensure source/target are resolved D3Node objects
             linkElements.attr('d', d => {
                 const source = d.source as D3Node;
                 const target = d.target as D3Node;
-                const dx = target.x - source.x;
-                const dy = target.y - source.y;
+                // Guard against undefined positions during initialization
+                if (source.x === undefined || source.y === undefined ||
+                    target.x === undefined || target.y === undefined) {
+                    return '';
+                }
+                const dx = (target.x ?? 0) - (source.x ?? 0);
+                const dy = (target.y ?? 0) - (source.y ?? 0);
                 const dr = Math.sqrt(dx * dx + dy * dy) * 0.8;
                 return `M${source.x},${source.y}A${dr},${dr} 0 0,1 ${target.x},${target.y}`;
             });
 
-            nodeGroups.attr('transform', d => `translate(${d.x}, ${d.y})`);
+            // Position link labels at curve midpoint
+            linkLabels.attr('transform', d => {
+                const source = d.source as D3Node;
+                const target = d.target as D3Node;
+                // Guard against undefined positions
+                if (source.x === undefined || source.y === undefined ||
+                    target.x === undefined || target.y === undefined) {
+                    return 'translate(0,0)';
+                }
+                // Approximate midpoint with slight offset for curved path
+                const midX = ((source.x ?? 0) + (target.x ?? 0)) / 2;
+                const midY = ((source.y ?? 0) + (target.y ?? 0)) / 2;
+                // Offset slightly perpendicular to the line for curve
+                const dx = (target.x ?? 0) - (source.x ?? 0);
+                const dy = (target.y ?? 0) - (source.y ?? 0);
+                const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                const offsetX = -dy / len * 15;
+                const offsetY = dx / len * 15;
+                return `translate(${midX + offsetX}, ${midY + offsetY})`;
+            });
+
+            nodeGroups.attr('transform', d => `translate(${d.x ?? 0}, ${d.y ?? 0})`);
         });
+
 
         // Cleanup
         return () => {
             simulation.stop();
         };
-    }, [d3Nodes, d3Links, dimensions, getNodeSize, getNodeColor, getLinkColor, onNodeClick, onNodeDoubleClick, onNodeHover, onBackgroundClick, strokeColor, textColor]);
+    }, [d3Nodes, d3Links, dimensions, getNodeSize, getNodeColor, getLinkColor, onNodeClick, onNodeDoubleClick, onNodeHover, onBackgroundClick, strokeColor, textColor, isDark]);
 
     // Update visual states when selection/hover changes
     useEffect(() => {
