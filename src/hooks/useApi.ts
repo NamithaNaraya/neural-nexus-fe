@@ -95,9 +95,50 @@ export function useDeleteFolder() {
     return useMutation({
         mutationFn: (folderId: string) =>
             api.delete(endpoints.folders.delete(folderId)),
+        onMutate: async (folderId) => {
+            // Cancel any outgoing refetches so they don't overwrite our optimistic update
+            await queryClient.cancelQueries({ queryKey: ['folders'] });
+
+            // Snapshot the previous value
+            const previousFolders = queryClient.getQueryData<FolderData[]>(['folders']);
+
+            // Optimistically update to the new value
+            queryClient.setQueryData<FolderData[]>(['folders'], (old) =>
+                old ? old.filter((folder) => folder.id !== folderId) : []
+            );
+
+            // Return a context object with the snapshotted value
+            return { previousFolders };
+        },
+        onError: (err, newTodo, context) => {
+            // If the mutation fails, use the context returned from onMutate to roll back
+            if (context?.previousFolders) {
+                queryClient.setQueryData(['folders'], context.previousFolders);
+            }
+        },
+        onSettled: () => {
+            // Always refetch after error or success to ensure we're in sync
+            queryClient.invalidateQueries({ queryKey: ['folders'] });
+        },
+    });
+}
+
+export function useUpdateFolder() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ folderId, data }: { folderId: string; data: { name?: string; description?: string } }) =>
+            api.put(endpoints.folders.update(folderId), data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['folders'] });
         },
+    });
+}
+
+export function useShareFolder() {
+    return useMutation({
+        mutationFn: ({ folderId, userEmail, permission }: { folderId: string; userEmail: string; permission: string }) =>
+            api.post(`/folders/${folderId}/permissions`, { user_email: userEmail, permission }),
     });
 }
 

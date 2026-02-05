@@ -26,6 +26,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useGraphStore } from '@/store/graphStore';
 import { useFolderGraph } from '@/hooks/useApi';
 import { GraphContainer } from '@/components/graph/GraphContainer';
+import { Header } from '@/components/layout/Header';
 import {
     Loader2,
     ArrowLeft,
@@ -247,6 +248,7 @@ class PageErrorBoundary extends React.Component<
 export default function GraphPage() {
     return (
         <div className="h-screen w-full bg-background flex flex-col">
+            <Header />
             <PageErrorBoundary>
                 <Suspense fallback={
                     <div className="flex-1 flex items-center justify-center">

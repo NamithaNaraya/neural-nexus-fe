@@ -181,7 +181,7 @@ export const endpoints = {
         create: '/folders',
         get: (id: string) => `/folders/${id}`,
         update: (id: string) => `/folders/${id}`,
-        delete: (id: string) => `/folders/${id}`,
+        delete: (id: string) => `/deletion/folder/${id}`,
     },
 
     // Files
@@ -189,7 +189,7 @@ export const endpoints = {
         upload: '/upload',
         list: (folderId: string) => `/folders/${folderId}/files`,
         get: (id: string) => `/files/${id}`,
-        delete: (id: string) => `/files/${id}`,
+        delete: (id: string) => `/deletion/file/${id}`,
         status: (id: string) => `/files/${id}/status`,
         pending: '/files/pending',
         preview: (id: string) => `/files/${id}/extraction-preview`,

@@ -6,3 +6,5 @@
 export { default as DashboardLayout } from './DashboardLayout';
 export { default as LibrarianSidebar } from './LibrarianSidebar';
 export { default as Navbar } from './Navbar';
+export { Header } from './Header';
+

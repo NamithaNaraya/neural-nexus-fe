@@ -90,7 +90,7 @@ export default function DashboardPage() {
 
                     <div className="flex gap-2">
                         <button
-                            onClick={() => router.push('/upload')}
+                            onClick={() => router.push('/library')}
                             className="btn-neural"
                         >
                             + Upload File
@@ -257,7 +257,7 @@ export default function DashboardPage() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {[
                             { icon: '📁', label: 'Create Topic', action: () => router.push('/library?action=create') },
-                            { icon: '📤', label: 'Upload Files', action: () => router.push('/upload') },
+                            { icon: '📤', label: 'Upload Files', action: () => router.push('/library') },
                             { icon: '🔍', label: 'Search Graph', action: () => router.push('/library') },
                             { icon: '📊', label: 'Run Analysis', action: () => router.push('/library?view=analytics') },
                         ].map((item) => (

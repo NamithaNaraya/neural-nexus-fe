@@ -28,6 +28,7 @@ import { GraphViewMode } from './types';
 import { useNodeExpansion, useShortestPath } from '@/hooks/useApi';
 import { useDevice, useViewModeLock } from '@/hooks/useDevice';
 import { Loader2, Maximize2, Minimize2, Zap, FolderTree, AlertTriangle } from 'lucide-react';
+import { OnboardingOverlay, useOnboarding } from '@/components/onboarding';
 
 // Dynamic imports for heavy visualization components
 const NeuralSpace3D = dynamic(() => import('./3d/NeuralSpace3D').then(m => ({ default: m.NeuralSpace3D })), {
@@ -83,7 +84,7 @@ function GraphEmptyState({ folderId }: { folderId?: string }) {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <button
-                        onClick={() => router.push(folderId ? `/upload?folder=${folderId}` : '/upload')}
+                        onClick={() => router.push('/library')}
                         className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald text-white rounded-lg hover:bg-emerald-dark transition-colors font-medium"
                     >
                         <Zap className="w-4 h-4" />
@@ -360,9 +361,21 @@ export function GraphContainer({
                     onToggleFilters={() => setShowFilters(prev => !prev)}
                     onToggleLegend={() => setShowLegend(prev => !prev)}
                     onToggleReviewInbox={() => setShowReviewInbox(prev => !prev)}
+                    onResetCamera={() => useGraphStore.getState().resetCamera()}
+                    onCollapseAll={() => {
+                        const state = useGraphStore.getState();
+                        state.expandedNodes.forEach((_, nodeId) => {
+                            state.collapseNode(nodeId);
+                        });
+                    }}
+                    onStartTour={() => { }}
                     showFilters={showFilters}
                     showLegend={showLegend}
                     showReviewInbox={showReviewInbox}
+                    hasExpandedNodes={useGraphStore.getState().expandedNodes.size > 0}
+                    folderId={folderId}
+                    nodeCount={visibleNodes.length}
+                    linkCount={visibleLinks.length}
                 />
             )}
 

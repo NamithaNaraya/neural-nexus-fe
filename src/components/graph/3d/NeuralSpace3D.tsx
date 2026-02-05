@@ -331,8 +331,31 @@ function Scene({
 
 // Exported Component
 export function NeuralSpace3D(props: NeuralSpace3DProps) {
+    // Detect dark mode from document class
+    const [isDark, setIsDark] = useState(true);
+
+    useEffect(() => {
+        const checkDarkMode = () => {
+            setIsDark(document.documentElement.classList.contains('dark'));
+        };
+        checkDarkMode();
+
+        // Watch for theme changes
+        const observer = new MutationObserver(checkDarkMode);
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class']
+        });
+
+        return () => observer.disconnect();
+    }, []);
+
+    // Theme-aware colors
+    const bgColor = isDark ? '#0A0C10' : '#F8FAFC';
+    const fogColor = isDark ? '#0A0C10' : '#F8FAFC';
+
     return (
-        <div className="w-full h-full bg-[#0A0C10]">
+        <div className={`w-full h-full ${isDark ? 'bg-[#0A0C10]' : 'bg-[#F8FAFC]'}`}>
             <Canvas
                 camera={{
                     position: [0, 0, 500],
@@ -347,10 +370,11 @@ export function NeuralSpace3D(props: NeuralSpace3DProps) {
                 }}
                 dpr={[1, 2]}
             >
-                <color attach="background" args={['#0A0C10']} />
-                <fog attach="fog" args={['#0A0C10', 500, 2000]} />
+                <color attach="background" args={[bgColor]} />
+                <fog attach="fog" args={[fogColor, 500, 2000]} />
                 <Scene {...props} />
             </Canvas>
         </div>
     );
 }
+

@@ -103,14 +103,26 @@ export const useAuthStore = create<AuthState>()(
             },
 
             checkAuth: () => {
-                const { token } = get();
+                const state = get();
                 // Check if we have a token in the store OR in localStorage directly
                 const localToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+                const effectiveToken = state.token || localToken;
 
-                if (token || localToken) {
-                    set({ isAuthenticated: true, token: token || localToken });
+                if (effectiveToken) {
+                    // Ensure localStorage is synced
+                    if (localToken !== effectiveToken && effectiveToken) {
+                        localStorage.setItem('access_token', effectiveToken);
+                    }
+
+                    // Restore full auth state
+                    set({
+                        isAuthenticated: true,
+                        token: effectiveToken,
+                        // Keep existing user if available
+                        user: state.user || null,
+                    });
                 } else {
-                    set({ isAuthenticated: false });
+                    set({ isAuthenticated: false, user: null, token: null });
                 }
             },
 

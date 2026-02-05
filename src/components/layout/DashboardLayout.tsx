@@ -2,14 +2,14 @@
  * Dashboard Layout Component
  * 
  * Main layout wrapper for the Neural Nexus dashboard.
- * Provides consistent layout with sidebar and navbar.
+ * Provides consistent layout with sidebar and header.
  */
 'use client';
 
 import React, { useEffect } from 'react';
 import { useUIStore } from '@/store/uiStore';
 import LibrarianSidebar from './LibrarianSidebar';
-import Navbar from './Navbar';
+import { Header } from './Header';
 
 interface Breadcrumb {
     label: string;
@@ -82,8 +82,8 @@ export default function DashboardLayout({
             {/* Sidebar */}
             {showSidebar && !isFullscreen && <LibrarianSidebar />}
 
-            {/* Navbar */}
-            {showNavbar && !isFullscreen && <Navbar breadcrumbs={breadcrumbs} />}
+            {/* Header */}
+            {showNavbar && !isFullscreen && <Header />}
 
             {/* Main Content */}
             <main

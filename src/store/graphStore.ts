@@ -82,6 +82,19 @@ interface GraphState {
     clearSelection: () => void;
     setHoveredNode: (id: string | null) => void;
 
+    // Expanded Nodes (Double-click expansion tracking)
+    expandedNodes: Set<string>;
+    expandNode: (id: string, childIds: string[]) => void;
+    collapseNode: (id: string) => void;
+    isNodeExpanded: (id: string) => boolean;
+    getExpandedChildIds: (id: string) => string[];
+    expandedChildren: Map<string, string[]>;
+
+    // Visual Anchoring (Camera zoom to node)
+    targetNode: string | null;
+    zoomToNode: (nodeId: string) => void;
+    clearZoomTarget: () => void;
+
     // Filtering
     filters: FilterConfig;
     setFilters: (filters: Partial<FilterConfig>) => void;
@@ -199,6 +212,57 @@ export const useGraphStore = create<GraphState>()(
         })),
         clearSelection: () => set({ selectedNodes: [] }),
         setHoveredNode: (id) => set({ hoveredNode: id }),
+
+        // Expanded Nodes (Double-click expansion tracking)
+        expandedNodes: new Set<string>(),
+        expandedChildren: new Map<string, string[]>(),
+        expandNode: (id, childIds) => set((state) => {
+            const newExpanded = new Set(state.expandedNodes);
+            newExpanded.add(id);
+            const newChildren = new Map(state.expandedChildren);
+            newChildren.set(id, childIds);
+            return {
+                expandedNodes: newExpanded,
+                expandedChildren: newChildren,
+            };
+        }),
+        collapseNode: (id) => set((state) => {
+            const newExpanded = new Set(state.expandedNodes);
+            newExpanded.delete(id);
+            const childIds = state.expandedChildren.get(id) || [];
+            const newChildren = new Map(state.expandedChildren);
+            newChildren.delete(id);
+            // Remove the child nodes from the graph
+            const childIdsSet = new Set(childIds);
+            return {
+                expandedNodes: newExpanded,
+                expandedChildren: newChildren,
+                nodes: state.nodes.filter(n => !childIdsSet.has(n.id)),
+                links: state.links.filter(l => !childIdsSet.has(l.source) && !childIdsSet.has(l.target)),
+            };
+        }),
+        isNodeExpanded: (id) => get().expandedNodes.has(id),
+        getExpandedChildIds: (id) => get().expandedChildren.get(id) || [],
+
+        // Visual Anchoring (Camera zoom to node)
+        targetNode: null,
+        zoomToNode: (nodeId) => {
+            const node = get().nodes.find(n => n.id === nodeId);
+            if (node && node.x !== undefined && node.y !== undefined) {
+                // Set target node for camera animation
+                set({
+                    targetNode: nodeId,
+                    selectedNodes: [nodeId],
+                    cameraPosition: {
+                        x: node.x,
+                        y: node.y,
+                        z: (node.z ?? 0) + 150, // Zoom in close
+                        lookAt: { x: node.x, y: node.y, z: node.z ?? 0 },
+                    },
+                });
+            }
+        },
+        clearZoomTarget: () => set({ targetNode: null }),
 
         // Filtering
         filters: defaultFilters,
