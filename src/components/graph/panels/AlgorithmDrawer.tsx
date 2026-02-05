@@ -23,9 +23,7 @@ import {
     BarChart3,
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/shared';
-
-// API base URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+import { api } from '@/lib/api';
 
 // Result types
 interface AlgorithmResultItem {
@@ -63,21 +61,17 @@ interface AlgorithmConfig {
 
 // Helper to fetch algorithm results
 async function fetchAlgorithm(endpoint: string, folderId?: string): Promise<AlgorithmResult> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    // Determine delimiter based on whether endpoint already has query params
+    const delimiter = endpoint.includes('?') ? '&' : '?';
+
+    // Construct URL path relative to API base
     const url = folderId
-        ? `${API_BASE_URL}${endpoint}?folder_id=${folderId}`
-        : `${API_BASE_URL}${endpoint}`;
+        ? `${endpoint}${delimiter}folder_id=${folderId}`
+        : endpoint;
 
-    const response = await fetch(url, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-    });
-
-    if (!response.ok) {
-        throw new Error('Algorithm request failed');
-    }
-
-    return response.json();
+    return api.get<AlgorithmResult>(url);
 }
+
 
 const algorithms: AlgorithmConfig[] = [
     {
