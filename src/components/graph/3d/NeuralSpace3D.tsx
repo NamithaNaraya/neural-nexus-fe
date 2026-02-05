@@ -13,7 +13,7 @@
 
 import React, { useRef, useMemo, useCallback, useState, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Html, Billboard, Text } from '@react-three/drei';
+import { OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { GraphNode, GraphLink } from '@/store/graphStore';
 import { NODE_TYPE_COLORS, RELATIONSHIP_COLORS } from '../types';
@@ -122,19 +122,26 @@ function Node3D({ node, isSelected, isHovered, onClick, onDoubleClick, onHover }
             </mesh>
 
             {/* Label */}
-            <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
-                <Text
-                    position={[0, size + 4, 0]}
-                    fontSize={3}
-                    color="#ffffff"
-                    anchorX="center"
-                    anchorY="bottom"
-                    outlineWidth={0.1}
-                    outlineColor="#000000"
+            <Html
+                position={[0, size + 4, 0]}
+                center
+                distanceFactor={12}
+                zIndexRange={[100, 0]}
+                style={{ pointerEvents: 'none' }}
+            >
+                <div
+                    style={{
+                        color: 'white',
+                        fontSize: '10px',
+                        whiteSpace: 'nowrap',
+                        textShadow: '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000',
+                        fontWeight: 'bold',
+                        userSelect: 'none'
+                    }}
                 >
                     {node.name}
-                </Text>
-            </Billboard>
+                </div>
+            </Html>
         </group>
     );
 }

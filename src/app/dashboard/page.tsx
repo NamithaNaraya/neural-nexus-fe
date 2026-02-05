@@ -44,8 +44,8 @@ export default function DashboardPage() {
                     docAiApi.dashboard.getStats(),
                     docAiApi.dashboard.getActivity(5)
                 ]);
-                setStats(statsData);
-                setRecentActivity(activityData);
+                setStats(statsData as any[]);
+                setRecentActivity(activityData as any[]);
             } catch (error) {
                 console.error('Failed to fetch dashboard data:', error);
             } finally {

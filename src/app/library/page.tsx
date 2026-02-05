@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
 import { useFolders, useCreateFolder } from "@/hooks/useApi";
@@ -50,8 +50,9 @@ function formatRelativeTime(dateString: string): string {
     return date.toLocaleDateString();
 }
 
-export default function LibraryPage() {
+function LibraryContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { user, logout, isAuthenticated, isHydrated } = useAuthStore();
     const [searchQuery, setSearchQuery] = useState("");
     const [isDarkMode, setIsDarkMode] = useState(false);
@@ -62,6 +63,15 @@ export default function LibraryPage() {
     // API hooks
     const { data: folders, isLoading, error, refetch } = useFolders();
     const createFolderMutation = useCreateFolder();
+
+    // Auto-open create modal if action=create param is present
+    useEffect(() => {
+        if (searchParams.get('action') === 'create') {
+            setShowCreateModal(true);
+            // Clear the URL param without reloading
+            window.history.replaceState({}, '', '/library');
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         if (isHydrated && !isAuthenticated) {
@@ -406,5 +416,17 @@ export default function LibraryPage() {
                 )}
             </AnimatePresence>
         </div>
+    );
+}
+
+export default function LibraryPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-emerald animate-spin" />
+            </div>
+        }>
+            <LibraryContent />
+        </Suspense>
     );
 }
