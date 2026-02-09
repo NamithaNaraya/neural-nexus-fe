@@ -31,14 +31,19 @@ export function Header({ showThemeToggle = true, minimal = false }: HeaderProps)
     };
 
     return (
-        <header className="border-b border-border/40 backdrop-blur-sm bg-background/80 sticky top-0 z-50">
+        <header className="border-b border-border/30 backdrop-blur-xl bg-background/90 sticky top-0 z-50 shadow-sm">
             <div className="w-full mx-auto px-6 py-4 flex items-center justify-between">
-                {/* Logo */}
+                {/* Logo - Premium Branding */}
                 <button
                     onClick={() => router.push('/library')}
-                    className="text-xl font-bold text-foreground hover:opacity-80 transition-opacity"
+                    className="group flex items-center gap-2 text-xl font-bold text-foreground hover:opacity-90 transition-all duration-300"
                 >
-                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-orange-500 to-purple-600">Neural</span> Nexus
+                    <span className="font-heading bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-orange-500 to-purple-600 bg-[length:200%_auto] animate-gradient-shift">
+                        Neural
+                    </span>
+                    <span className="font-heading text-foreground group-hover:text-primary transition-colors duration-300">
+                        Nexus
+                    </span>
                 </button>
 
                 {/* Right Section */}
@@ -47,13 +52,13 @@ export function Header({ showThemeToggle = true, minimal = false }: HeaderProps)
                     {showThemeToggle && (
                         <button
                             onClick={toggleTheme}
-                            className="p-2 rounded-lg hover:bg-muted transition-colors"
+                            className="p-2.5 rounded-xl hover:bg-muted/60 hover:shadow-md transition-all duration-300 border border-transparent hover:border-border/50"
                             aria-label="Toggle theme"
                         >
                             {theme === 'dark' ? (
-                                <Sun className="w-5 h-5 text-muted-foreground" />
+                                <Sun className="w-5 h-5 text-muted-foreground hover:text-amber-400 transition-colors" />
                             ) : (
-                                <Moon className="w-5 h-5 text-muted-foreground" />
+                                <Moon className="w-5 h-5 text-muted-foreground hover:text-indigo-500 transition-colors" />
                             )}
                         </button>
                     )}
@@ -62,13 +67,13 @@ export function Header({ showThemeToggle = true, minimal = false }: HeaderProps)
                     {isAuthenticated && (
                         <>
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-500/20 to-purple-600/20 flex items-center justify-center">
-                                    <span className="text-pink-600 font-medium text-sm">
+                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-pink-500/30 via-orange-500/30 to-purple-600/30 flex items-center justify-center border border-primary/20 shadow-lg shadow-primary/10">
+                                    <span className="bg-clip-text text-transparent bg-gradient-to-br from-pink-500 to-purple-600 font-semibold text-sm">
                                         {user?.email?.[0]?.toUpperCase() || "U"}
                                     </span>
                                 </div>
                                 {!minimal && (
-                                    <span className="text-sm text-muted-foreground hidden sm:block">
+                                    <span className="text-sm text-muted-foreground hidden sm:block font-medium">
                                         {user?.email || "user@neuralnexus.ai"}
                                     </span>
                                 )}
@@ -77,7 +82,7 @@ export function Header({ showThemeToggle = true, minimal = false }: HeaderProps)
                             {/* Logout */}
                             <button
                                 onClick={handleLogout}
-                                className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-destructive"
+                                className="p-2.5 rounded-xl hover:bg-destructive/10 transition-all duration-300 text-muted-foreground hover:text-destructive border border-transparent hover:border-destructive/30"
                                 aria-label="Logout"
                             >
                                 <LogOut className="w-5 h-5" />

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -42,6 +42,35 @@
   --neural-glow: rgba(168, 85, 247, 0.3);
   --neural-glow-strong: rgba(236, 72, 153, 0.5);
   --neural-pulse: rgba(249, 115, 22, 0.2);
+
+  /* Premium Accent Colors */
+  --gold: 45 100% 50%;
+  --rose: 340 90% 60%;
+  --sapphire: 220 90% 55%;
+  --emerald-bright: 160 84% 39%;
+
+  /* Beautiful Pastel Palette */
+  --pastel-pink: 350 100% 88%;
+  --pastel-purple: 270 100% 88%;
+  --pastel-blue: 210 100% 88%;
+  --pastel-cyan: 180 100% 88%;
+  --pastel-green: 150 100% 88%;
+  --pastel-yellow: 45 100% 88%;
+  --pastel-orange: 25 100% 88%;
+  --pastel-coral: 10 100% 88%;
+
+  /* Vibrant Accent Colors */
+  --vibrant-pink: 340 95% 60%;
+  --vibrant-purple: 270 95% 65%;
+  --vibrant-blue: 210 100% 55%;
+  --vibrant-cyan: 185 100% 45%;
+  --vibrant-green: 155 85% 45%;
+  --vibrant-orange: 25 100% 55%;
+
+  /* Gradient Stops */
+  --gradient-start: rgba(236, 72, 153, 0.8);
+  --gradient-mid: rgba(249, 115, 22, 0.8);
+  --gradient-end: rgba(168, 85, 247, 0.8);
 }
 
 /* Neural Dark Theme */
@@ -161,6 +190,35 @@ body {
     transform: translateX(-100%);
   }
 
+  /* === Premium Typography === */
+  .heading-premium {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .heading-xl {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+  }
+
+  .heading-lg {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.875rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .text-data {
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 0.875rem;
+    letter-spacing: -0.01em;
+  }
+
   /* Card Hover Effects */
   .card-interactive {
     @apply transition-all duration-300 ease-out;
@@ -171,17 +229,76 @@ body {
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
   }
 
+  .card-premium {
+    @apply transition-all duration-300 ease-out;
+    background: linear-gradient(145deg,
+        rgba(255, 255, 255, 0.08) 0%,
+        rgba(255, 255, 255, 0.02) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-premium::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg,
+        transparent,
+        rgba(255, 255, 255, 0.1),
+        transparent);
+    transition: left 0.5s ease;
+  }
+
+  .card-premium:hover::before {
+    left: 100%;
+  }
+
+  .card-premium:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(168, 85, 247, 0.2);
+    border-color: rgba(168, 85, 247, 0.3);
+  }
+
   /* Button Variants */
   .btn-neural {
     @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
     background: linear-gradient(135deg, #ec4899, #f97316, #a855f7);
-    /* Pink-Orange-Purple Gradient */
+    background-size: 200% 200%;
     color: white;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-neural::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg,
+        transparent,
+        rgba(255, 255, 255, 0.3),
+        transparent);
+    transition: left 0.4s ease;
+  }
+
+  .btn-neural:hover::before {
+    left: 100%;
   }
 
   .btn-neural:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 20px var(--neural-glow);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px var(--neural-glow-strong);
+    animation: gradientShift 3s ease infinite;
+  }
+
+  .btn-neural:active {
+    transform: translateY(0);
   }
 
   .btn-ghost {
@@ -192,6 +309,139 @@ body {
 
   .btn-ghost:hover {
     background: rgba(255, 255, 255, 0.1);
+  }
+
+  .btn-premium {
+    @apply px-5 py-2.5 rounded-lg font-medium transition-all duration-300;
+    background: rgba(168, 85, 247, 0.15);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    color: hsl(var(--foreground));
+    position: relative;
+  }
+
+  .btn-premium:hover {
+    background: rgba(168, 85, 247, 0.25);
+    border-color: rgba(168, 85, 247, 0.5);
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+    transform: translateY(-1px);
+  }
+
+  /* Icon Button */
+  .btn-icon {
+    @apply p-2 rounded-lg transition-all duration-200;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid transparent;
+  }
+
+  .btn-icon:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(168, 85, 247, 0.3);
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.2);
+  }
+
+  /* Colorful Pastel Button Variants */
+  .btn-pastel-cyan {
+    background: linear-gradient(135deg, #67e8f9, #22d3ee, #06b6d4);
+    color: #0e7490;
+    font-weight: 600;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.75rem;
+    border: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 14px rgba(6, 182, 212, 0.3);
+  }
+
+  .btn-pastel-cyan:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(6, 182, 212, 0.4);
+  }
+
+  .btn-pastel-rose {
+    background: linear-gradient(135deg, #fda4af, #fb7185, #f43f5e);
+    color: #9f1239;
+    font-weight: 600;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.75rem;
+    border: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 14px rgba(244, 63, 94, 0.3);
+  }
+
+  .btn-pastel-rose:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(244, 63, 94, 0.4);
+  }
+
+  .btn-pastel-amber {
+    background: linear-gradient(135deg, #fde68a, #fbbf24, #f59e0b);
+    color: #92400e;
+    font-weight: 600;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.75rem;
+    border: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
+  }
+
+  .btn-pastel-amber:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.4);
+  }
+
+  .btn-pastel-emerald {
+    background: linear-gradient(135deg, #6ee7b7, #34d399, #10b981);
+    color: #065f46;
+    font-weight: 600;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.75rem;
+    border: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+  }
+
+  .btn-pastel-emerald:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+  }
+
+  /* Vibrant Gradient Cards */
+  .card-gradient-purple {
+    background: linear-gradient(145deg, rgba(139, 92, 246, 0.15), rgba(168, 85, 247, 0.05));
+    border: 1px solid rgba(168, 85, 247, 0.25);
+    border-radius: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .card-gradient-purple:hover {
+    border-color: rgba(168, 85, 247, 0.5);
+    box-shadow: 0 12px 40px rgba(168, 85, 247, 0.2);
+    transform: translateY(-4px);
+  }
+
+  .card-gradient-pink {
+    background: linear-gradient(145deg, rgba(236, 72, 153, 0.15), rgba(244, 63, 94, 0.05));
+    border: 1px solid rgba(236, 72, 153, 0.25);
+    border-radius: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .card-gradient-pink:hover {
+    border-color: rgba(236, 72, 153, 0.5);
+    box-shadow: 0 12px 40px rgba(236, 72, 153, 0.2);
+    transform: translateY(-4px);
+  }
+
+  .card-gradient-cyan {
+    background: linear-gradient(145deg, rgba(6, 182, 212, 0.15), rgba(34, 211, 238, 0.05));
+    border: 1px solid rgba(6, 182, 212, 0.25);
+    border-radius: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .card-gradient-cyan:hover {
+    border-color: rgba(6, 182, 212, 0.5);
+    box-shadow: 0 12px 40px rgba(6, 182, 212, 0.2);
+    transform: translateY(-4px);
   }
 
   /* Input Styles */

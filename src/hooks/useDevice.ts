@@ -93,12 +93,14 @@ export function useViewModeLock(
 
     useEffect(() => {
         // Force 2D on non-capable devices
+        // We do this in useEffect to avoid "Cannot update a component while rendering a different component"
         if (!is3DCapable && currentViewMode === '3d') {
             setViewMode('2d');
         }
     }, [is3DCapable, currentViewMode, setViewMode]);
 
     const isLocked = !is3DCapable && currentViewMode === '3d';
+    const lockedMode = !is3DCapable && currentViewMode === '3d' ? '2d' : currentViewMode;
 
     let reason: string | undefined;
     if (isMobile) {
@@ -108,7 +110,7 @@ export function useViewModeLock(
     }
 
     return {
-        lockedMode: is3DCapable ? currentViewMode : (currentViewMode === '3d' ? '2d' : currentViewMode),
+        lockedMode,
         isLocked,
         reason,
     };

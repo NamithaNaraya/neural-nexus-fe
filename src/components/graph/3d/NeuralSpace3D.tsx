@@ -6,9 +6,12 @@
  */
 'use client';
 
+
 import React, { useMemo, useState, useEffect } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
+// EffectComposer temporarily disabled due to initialization crash
+// import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { GraphNode, GraphLink } from '@/store/graphStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -19,6 +22,7 @@ import { RelationshipLinks } from './components/Links';
 import { CameraManager } from './components/Camera';
 import { NeuralAtmosphere } from './components/Atmosphere';
 import { IngestionProgressHUD } from './components/HUD';
+import { NODE_TYPE_COLORS } from '../types';
 
 interface NeuralSpace3DProps {
     nodes: GraphNode[];
@@ -35,20 +39,27 @@ interface NeuralSpace3DProps {
     bgColor?: string;
 }
 
-function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry, pulseGeometry: THREE.BufferGeometry }) {
-    const { nodes, links, selectedNodes, hoveredNode, nodeGeometry, pulseGeometry, folderId } = props;
-
-    const wsOptions = useMemo(() => ({ folderId }), [folderId]);
-    const { lastMessage } = useWebSocket(wsOptions);
-
-    useEffect(() => {
-        if (lastMessage?.type === 'node_updated') console.log('[3D Sync] Live update:', lastMessage.payload);
-    }, [lastMessage]);
+// Simplified Scene that includes post-processing for better lifecycle sync
+function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry, pulseGeometry: THREE.BufferGeometry, isMounted: boolean }) {
+    const {
+        nodes = [],
+        links = [],
+        selectedNodes = [],
+        hoveredNode,
+        nodeGeometry,
+        pulseGeometry,
+        folderId,
+        isMounted
+    } = props;
 
     const nodesWithPositions = useMemo(() => {
+        if (!Array.isArray(nodes) || nodes.length === 0) return [];
         const spread = 250;
         const folderGroups = new Map<string, any[]>();
+
+        // Group nodes by folder
         nodes.forEach(n => {
+            if (!n) return;
             const fid = n.folderId || 'global';
             if (!folderGroups.has(fid)) folderGroups.set(fid, []);
             folderGroups.get(fid)!.push(n);
@@ -58,6 +69,9 @@ function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry,
         const islandSpread = 2000;
 
         return groups.flatMap(([fid, groupNodes], gIdx) => {
+            const groupSize = groupNodes.length;
+            if (groupSize === 0) return [];
+
             const angle = (gIdx / Math.max(groups.length, 1)) * Math.PI * 2;
             const islandRadius = groups.length > 1 ? islandSpread * (1.2 + Math.floor(gIdx / 5)) : 0;
             const cx = Math.cos(angle) * islandRadius;
@@ -65,15 +79,27 @@ function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry,
             const cz = Math.sin(angle) * islandRadius;
 
             return groupNodes.map((node, i) => {
-                const phi = Math.acos(1 - 2 * (i + 0.5) / groupNodes.length);
+                // If node already has valid coordinates, use them
+                if (typeof node.x === 'number' && isFinite(node.x) &&
+                    typeof node.y === 'number' && isFinite(node.y) &&
+                    typeof node.z === 'number' && isFinite(node.z)) {
+                    return node;
+                }
+
+                const phiIdx = 1 - 2 * (i + 0.5) / groupSize;
+                const phi = Math.acos(Math.max(-1, Math.min(1, phiIdx)));
                 const theta = Math.PI * (1 + Math.sqrt(5)) * i;
-                const r = spread * (0.5 + Math.sqrt(i / groupNodes.length) * 0.8);
+                const r = spread * (0.5 + Math.sqrt(i / groupSize) * 0.8);
+
+                const x = cx + r * Math.sin(phi) * Math.cos(theta);
+                const y = cy + r * Math.sin(phi) * Math.sin(theta);
+                const z = cz + r * Math.cos(phi);
 
                 return {
                     ...node,
-                    x: cx + r * Math.sin(phi) * Math.cos(theta),
-                    y: cy + r * Math.sin(phi) * Math.sin(theta),
-                    z: cz + r * Math.cos(phi),
+                    x: isFinite(x) ? x : 0,
+                    y: isFinite(y) ? y : 0,
+                    z: isFinite(z) ? z : 0,
                 };
             });
         });
@@ -94,89 +120,147 @@ function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry,
         );
     }, [nodesWithPositions]);
 
-    const focusNodeId = hoveredNode || (selectedNodes.length === 1 ? selectedNodes[0] : null);
+    const focusNodeId = hoveredNode || (Array.isArray(selectedNodes) && selectedNodes.length === 1 ? selectedNodes[0] : null);
 
     return (
         <group onPointerMissed={() => props.onBackgroundClick()}>
             <NeuralAtmosphere isDark={props.isDark ?? true} color={props.bgColor ?? '#0A0C10'} />
             <CameraManager
-                targetNodeId={selectedNodes.length === 1 ? selectedNodes[0] : null}
+                targetNodeId={Array.isArray(selectedNodes) && selectedNodes.length === 1 ? selectedNodes[0] : null}
                 nodeMap={nodeMap}
                 defaultCenter={graphCenter}
             />
-            <OrbitControls makeDefault enableDamping dampingFactor={0.05} minDistance={50} maxDistance={4000} />
-            <RelationshipLinks links={links} nodeMap={nodeMap} focusNodeId={focusNodeId} pulseGeometry={pulseGeometry} />
+
+            <OrbitControls
+                makeDefault
+                enableDamping
+                dampingFactor={0.05}
+                minDistance={50}
+                maxDistance={4000}
+            />
+
+            <RelationshipLinks links={Array.isArray(links) ? links : []} nodeMap={nodeMap} focusNodeId={focusNodeId} pulseGeometry={pulseGeometry} />
             <InstancedNodes
                 nodes={nodesWithPositions}
-                selectedNodes={selectedNodes}
+                selectedNodes={Array.isArray(selectedNodes) ? selectedNodes : []}
                 hoveredNode={hoveredNode}
                 onNodeClick={props.onNodeClick}
                 onNodeHover={props.onNodeHover}
                 nodeGeometry={nodeGeometry}
             />
-            {/* Relationship Labels (Midpoint of lines) */}
-            {links
-                .filter(link => {
-                    const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
-                    const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
-                    // Only show link labels for the focused cluster to avoid clutter
-                    return sourceId === focusNodeId || targetId === focusNodeId || selectedNodes.includes(sourceId) || selectedNodes.includes(targetId);
-                })
+
+            {/* Relationship Labels - ALWAYS show for ALL links in Neo4j style */}
+            {(Array.isArray(links) ? links : [])
                 .map((link, i) => {
+                    if (!link || !link.source || !link.target) return null;
                     const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
                     const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
                     const s = nodeMap.get(sourceId);
                     const t = nodeMap.get(targetId);
                     if (!s || !t) return null;
 
-                    const midpoint: [number, number, number] = [
-                        (s.x + t.x) / 2,
-                        ((s.y + t.y) / 2) + 2,
-                        (s.z + t.z) / 2
-                    ];
-
                     return (
-                        <Html key={`link-label-${i}`} position={midpoint} center distanceFactor={20} style={{ pointerEvents: 'none' }}>
-                            <div className="px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-sm border border-white/10 text-white/90 text-[8px] font-medium whitespace-nowrap uppercase tracking-tighter">
+                        <Html key={`link-label-${i}`} position={[(s.x + t.x) / 2, ((s.y + t.y) / 2), (s.z + t.z) / 2]} center distanceFactor={400} style={{ pointerEvents: 'none' }}>
+                            <div className="px-2 py-0.5 rounded shadow-xl bg-slate-900 border border-white/20 text-[10px] font-bold text-white uppercase tracking-tight whitespace-nowrap">
                                 {link.type}
                             </div>
                         </Html>
                     );
                 })}
 
-            {/* Node Labels */}
-            {nodesWithPositions
-                .filter(n => {
-                    // Show labels for:
-                    // 1. Selected or Hovered nodes (Always)
-                    // 2. High degree nodes (Global context)
-                    // 3. All nodes if the total count is small
-                    return selectedNodes.includes(n.id) || hoveredNode === n.id || (n.degree || 0) > 3 || nodes.length < 50;
-                })
-                .map(node => (
-                    <Html key={`label-${node.id}`} position={[node.x!, node.y! + 12, node.z!]} center distanceFactor={15} style={{ pointerEvents: 'none' }}>
-                        <div className={`px-2 py-1 rounded backdrop-blur-md border text-[10px] font-bold whitespace-nowrap shadow-2xl transition-all duration-300 ${selectedNodes.includes(node.id) || hoveredNode === node.id
-                                ? 'bg-emerald/90 border-emerald text-white scale-110'
-                                : 'bg-background/80 border-border text-foreground opacity-70'
-                            }`}>
-                            {node.name}
+            {/* Neo4j-style Node Circles with Names Inside */}
+            {nodesWithPositions.map(node => {
+                const isSelected = Array.isArray(selectedNodes) && selectedNodes.includes(node.id);
+                const isHovered = hoveredNode === node.id;
+                const nodeColor = NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
+
+                // Scale sizes to match Neo4j vibe
+                const size = isSelected ? 80 : isHovered ? 70 : 60;
+
+                return (
+                    <Html
+                        key={`neo-node-${node.id}`}
+                        position={[node.x!, node.y!, node.z!]}
+                        center
+                        distanceFactor={400}
+                        style={{ pointerEvents: 'auto', zIndex: isSelected || isHovered ? 10 : 1 }}
+                    >
+                        <div
+                            onClick={(e) => { e.stopPropagation(); props.onNodeClick(node.id, e); }}
+                            onDoubleClick={(e) => { e.stopPropagation(); props.onNodeDoubleClick(node.id); }}
+                            onMouseEnter={() => props.onNodeHover(node.id)}
+                            onMouseLeave={() => props.onNodeHover(null)}
+                            className={`
+                                relative flex items-center justify-center rounded-full
+                                border-[4px] shadow-2xl cursor-pointer
+                                transition-all duration-300 ease-out
+                                select-none
+                                ${isSelected ? 'ring-4 ring-white/40 scale-110' : ''}
+                                ${isHovered && !isSelected ? 'ring-2 ring-white/20 scale-105' : ''}
+                            `}
+                            style={{
+                                width: size,
+                                height: size,
+                                backgroundColor: nodeColor,
+                                borderColor: isSelected ? '#ffffff' : 'rgba(255,255,255,0.4)',
+                                boxShadow: isSelected
+                                    ? `0 0 40px ${nodeColor}, inset 0 0 15px rgba(0,0,0,0.2)`
+                                    : `0 8px 16px rgba(0,0,0,0.3), inset 0 0 5px rgba(0,0,0,0.1)`,
+                            }}
+                        >
+                            {/* Inner label */}
+                            <div className="text-white text-center flex flex-col items-center justify-center pointer-events-none px-2 w-full h-full">
+                                <span className="text-[10px] font-black leading-tight tracking-tight drop-shadow-md break-all overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+                                    {node.name}
+                                </span>
+                            </div>
+
+                            {/* Type badge above node on hover */}
+                            {(isHovered || isSelected) && (
+                                <div className="absolute -top-7 px-2 py-0.5 rounded-full bg-slate-900/90 text-[8px] font-bold text-white whitespace-nowrap border border-white/20 shadow-lg">
+                                    {node.type}
+                                </div>
+                            )}
+                        </div>
+                        {/* Type badge below node (Default visible) */}
+                        <div
+                            className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 px-2 py-0.5 rounded-full text-[7px] font-bold uppercase tracking-wide whitespace-nowrap"
+                            style={{
+                                backgroundColor: `${nodeColor}20`,
+                                color: isSelected ? '#fff' : nodeColor,
+                                border: `1px solid ${nodeColor}40`,
+                                backdropFilter: 'blur(4px)'
+                            }}
+                        >
+                            {node.type}
                         </div>
                     </Html>
-                ))}
+                );
+            })}
+            {/* Post-processing temporarily disabled - using enhanced materials instead */}
         </group>
     );
 }
 
 export function NeuralSpace3D(props: NeuralSpace3DProps) {
+    const { nodes = [], links = [], selectedNodes = [] } = props;
     const [isDark, setIsDark] = useState(true);
-    const nodeGeometry = useMemo(() => new THREE.SphereGeometry(1, 16, 16), []);
-    const pulseGeometry = useMemo(() => new THREE.SphereGeometry(0.8, 8, 8), []);
+    const [mounted, setMounted] = useState(false);
+    const nodeGeometry = useMemo(() => new THREE.SphereGeometry(1, 32, 32), []);
+    const pulseGeometry = useMemo(() => new THREE.SphereGeometry(0.8, 16, 16), []);
 
     useEffect(() => {
-        const checkDark = () => setIsDark(document.documentElement.classList.contains('dark'));
+        setMounted(true);
+        const checkDark = () => {
+            if (typeof document !== 'undefined') {
+                setIsDark(document.documentElement.classList.contains('dark'));
+            }
+        };
         checkDark();
         const obs = new MutationObserver(checkDark);
-        obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        if (typeof document !== 'undefined') {
+            obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        }
         return () => {
             obs.disconnect();
             nodeGeometry.dispose();
@@ -184,20 +268,37 @@ export function NeuralSpace3D(props: NeuralSpace3DProps) {
         };
     }, [nodeGeometry, pulseGeometry]);
 
-    const sceneBgColor = isDark ? '#0A0C10' : '#F8FAFC';
-    const glConfig = useMemo(() => ({ antialias: true, alpha: false, powerPreference: 'high-performance' as const }), []);
+    const sceneBgColor = isDark ? '#05070A' : '#F8FAFC';
+    const glConfig = useMemo(() => ({
+        antialias: false,
+        alpha: false,
+        powerPreference: 'high-performance' as const,
+        stencil: false,
+        depth: true,
+        failIfMajorPerformanceCaveat: false
+    }), []);
     const cameraConfig = useMemo(() => ({ position: [0, 100, 1000] as [number, number, number], fov: 60 }), []);
 
     return (
         <div className="w-full h-full relative" style={{ backgroundColor: sceneBgColor }}>
             <IngestionProgressHUD />
-            <Canvas shadows={false} camera={cameraConfig} gl={glConfig} dpr={[1, 2]}>
+            <Canvas shadows={false} camera={cameraConfig} gl={glConfig} dpr={[1, 1.5]}>
                 <color attach="background" args={[sceneBgColor]} />
-                <Scene {...props} isDark={isDark} bgColor={sceneBgColor} nodeGeometry={nodeGeometry} pulseGeometry={pulseGeometry} />
+                <Scene
+                    {...props}
+                    nodes={Array.isArray(nodes) ? nodes : []}
+                    links={Array.isArray(links) ? links : []}
+                    selectedNodes={Array.isArray(selectedNodes) ? selectedNodes : []}
+                    isDark={isDark}
+                    bgColor={sceneBgColor}
+                    nodeGeometry={nodeGeometry}
+                    pulseGeometry={pulseGeometry}
+                    isMounted={mounted}
+                />
             </Canvas>
             <div className="absolute bottom-4 left-4 z-10 p-3 rounded-lg border border-white/5 bg-background/40 backdrop-blur-xl max-w-xs pointer-events-none">
-                <p className="text-[10px] text-emerald uppercase tracking-widest font-bold mb-1">3D Neural Space</p>
-                <p className="text-[11px] text-foreground/70 leading-relaxed">Zoom to explore. Drag to rotate. Grab nodes to move.</p>
+                <p className="text-[10px] text-emerald-500 uppercase tracking-widest font-bold mb-1">3D Neural Space</p>
+                <p className="text-[11px] text-foreground/70 leading-relaxed">Zoom to explore. Drag to rotate. <span className="text-white font-medium">Click & Drag nodes to rearrange.</span></p>
             </div>
         </div>
     );

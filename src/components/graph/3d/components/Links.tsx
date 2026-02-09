@@ -16,22 +16,35 @@ interface LinksProps {
 }
 
 export function RelationshipLinks({
-    links,
-    nodeMap,
-    focusNodeId,
+    links = [],
+    nodeMap = new Map(),
+    focusNodeId = null,
     pulseGeometry
 }: LinksProps) {
     const pulseMeshRef = useRef<THREE.InstancedMesh>(null);
 
     const activeLinks = useMemo(() => {
+        if (!Array.isArray(links) || !nodeMap) return [];
         return links.filter(link => {
+            if (!link || !link.source || !link.target) return false;
+
+            // Extract IDs with fallback to prevent undefined access
             const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
             const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
-            return nodeMap.has(sourceId) && nodeMap.has(targetId);
+
+            // Ensure both endpoints exist in our current node map to prevent line rendering errors
+            return sourceId && targetId && nodeMap.has(sourceId) && nodeMap.has(targetId);
         });
     }, [links, nodeMap]);
 
     const lineGeometry = useMemo(() => {
+        if (!activeLinks || activeLinks.length === 0) {
+            const emptyGeo = new THREE.BufferGeometry();
+            emptyGeo.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
+            emptyGeo.setAttribute('color', new THREE.Float32BufferAttribute([], 3));
+            return emptyGeo;
+        }
+
         const positions: number[] = [];
         const colors: number[] = [];
         const color = new THREE.Color();
@@ -58,16 +71,20 @@ export function RelationshipLinks({
     const targetVec = useMemo(() => new THREE.Vector3(), []);
 
     useFrame((state) => {
-        if (!pulseMeshRef.current || activeLinks.length === 0) return;
+        if (!pulseMeshRef.current || !activeLinks || activeLinks.length === 0) return;
         const time = state.clock.elapsedTime;
         activeLinks.forEach((link, i) => {
+            if (!link) return;
             const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
             const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
-            const source = nodeMap.get(sourceId)!;
-            const target = nodeMap.get(targetId)!;
+            const source = nodeMap.get(sourceId);
+            const target = nodeMap.get(targetId);
+            if (!source || !target) return;
 
             for (let j = 0; j < PARTICLES_PER_LINK; j++) {
                 const idx = i * PARTICLES_PER_LINK + j;
+                if (idx >= (pulseMeshRef.current?.count || 0)) continue;
+
                 const progress = (time * 0.3 + (i * 0.1) + (j / PARTICLES_PER_LINK)) % 1;
                 tempPos.set(source.x, source.y, source.z);
                 targetVec.set(target.x, target.y, target.z).lerp(tempPos, 1 - progress);
@@ -77,16 +94,31 @@ export function RelationshipLinks({
                 pulseMeshRef.current!.setMatrixAt(idx, tempMatrix);
             }
         });
-        pulseMeshRef.current.instanceMatrix.needsUpdate = true;
+        if (pulseMeshRef.current.instanceMatrix) {
+            pulseMeshRef.current.instanceMatrix.needsUpdate = true;
+        }
     });
 
     return (
         <group>
             <lineSegments geometry={lineGeometry}>
-                <lineBasicMaterial vertexColors transparent opacity={focusNodeId ? 0.15 : 0.2} depthWrite={false} linewidth={1.5} />
+                <lineBasicMaterial
+                    vertexColors
+                    transparent
+                    opacity={focusNodeId ? 0.6 : 0.8}
+                    depthWrite={false}
+                    linewidth={3}
+                    toneMapped={false}
+                />
             </lineSegments>
-            <instancedMesh ref={pulseMeshRef} args={[pulseGeometry, undefined, activeLinks.length * PARTICLES_PER_LINK]}>
-                <meshBasicMaterial color="#ffffff" transparent opacity={0.8} blending={THREE.AdditiveBlending} />
+            <instancedMesh ref={pulseMeshRef} args={[pulseGeometry, undefined, (activeLinks?.length ?? 0) * PARTICLES_PER_LINK]}>
+                <meshBasicMaterial
+                    color="#ec4899"
+                    transparent
+                    opacity={0.95}
+                    blending={THREE.AdditiveBlending}
+                    toneMapped={false}
+                />
             </instancedMesh>
         </group>
     );

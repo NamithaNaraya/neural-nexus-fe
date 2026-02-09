@@ -24,6 +24,9 @@ import {
     ChevronDown,
     Shrink,
     PieChart,
+    Link2,
+    Eye,
+    Circle,
 } from 'lucide-react';
 import { AlgorithmDrawer } from './AlgorithmDrawer';
 
@@ -73,10 +76,10 @@ export function GraphToolbar({
 
     return (
         <>
-            <div className="absolute top-0 left-0 right-0 z-40 h-14 px-4 flex items-center justify-between bg-background/80 backdrop-blur-md border-b border-border/40">
+            <div className="absolute top-0 left-0 right-0 z-40 h-14 px-4 flex items-center justify-between bg-background/90 backdrop-blur-xl border-b border-border/30 shadow-lg shadow-black/5">
                 {/* Left Section - View Mode Toggle */}
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center bg-muted/30 rounded-xl p-1 border border-border/50 shadow-sm backdrop-blur-sm">
+                    <div className="flex items-center bg-gradient-to-r from-muted/40 to-muted/20 rounded-xl p-1 border border-border/40 shadow-inner backdrop-blur-sm">
                         <ViewModeButton
                             mode="3d"
                             currentMode={viewMode}
@@ -126,33 +129,29 @@ export function GraphToolbar({
                 {/* Right Section - Stats & Actions */}
                 <div className="flex items-center gap-4">
                     {/* Stats Pill */}
-                    <div className="flex items-center h-9 px-3 bg-background border border-border rounded-full shadow-sm text-sm hidden md:flex">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            <div className="w-2 h-2 rounded-full border border-current" />
-                            <span className="font-medium text-foreground">{nodeCount}</span>
-                            <span className="text-muted-foreground/60">/{totalNodeCount} Nodes</span>
+                    <div className="flex items-center h-9 px-4 bg-gradient-to-r from-slate-800/80 to-slate-900/80 border border-white/10 rounded-full shadow-lg text-sm hidden md:flex backdrop-blur-sm">
+                        <div className="flex items-center gap-2">
+                            <Circle className="w-3 h-3 text-cyan-400" fill="#22D3EE" />
+                            <span className="font-bold bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent">{nodeCount}</span>
+                            <span className="text-white/40">/{totalNodeCount}</span>
+                            <span className="text-white/60">Nodes</span>
                         </div>
 
-                        <div className="w-px h-4 bg-border mx-3" />
+                        <div className="w-px h-4 bg-white/10 mx-3" />
 
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            {/* Link Icon */}
-                            <svg className="w-3.5 h-3.5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                            </svg>
-                            <span className="font-medium text-foreground">{linkCount}</span>
-                            <span className="text-muted-foreground/60">/{totalLinkCount} Links</span>
+                        <div className="flex items-center gap-2">
+                            <Link2 className="w-3.5 h-3.5 text-purple-400" />
+                            <span className="font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">{linkCount}</span>
+                            <span className="text-white/40">/{totalLinkCount}</span>
+                            <span className="text-white/60">Links</span>
                         </div>
 
                         {isFiltered && (
                             <>
-                                <div className="w-px h-4 bg-border mx-3" />
-                                <div className="flex items-center gap-1.5 text-amber-500">
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
-                                    <span className="font-medium text-xs">Filtered</span>
+                                <div className="w-px h-4 bg-white/10 mx-3" />
+                                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30">
+                                    <Eye className="w-3.5 h-3.5 text-amber-400" />
+                                    <span className="font-medium text-xs text-amber-400">Filtered</span>
                                 </div>
                             </>
                         )}
@@ -197,7 +196,7 @@ function ViewModeButton({ mode, currentMode, onClick, icon, label }: ViewModeBut
             onClick={onClick}
             className={`
                 relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold
-                transition-all duration-200 ease-out
+                transition-all duration-300 ease-out
                 ${isActive
                     ? 'text-primary'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -207,7 +206,8 @@ function ViewModeButton({ mode, currentMode, onClick, icon, label }: ViewModeBut
             {isActive && (
                 <motion.div
                     layoutId="viewModeIndicator"
-                    className="absolute inset-0 bg-background rounded-lg shadow-md border border-primary/20"
+                    className="absolute inset-0 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg shadow-lg border border-primary/30"
+                    style={{ boxShadow: '0 0 20px rgba(168, 85, 247, 0.15)' }}
                     transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                 />
             )}
@@ -233,10 +233,11 @@ function ToolbarButton({ onClick, icon, title, isActive = false, className = '',
             onClick={onClick}
             title={title}
             className={`
-                p-2 rounded-lg transition-colors duration-200
+                p-2.5 rounded-xl transition-all duration-300 ease-out
+                border border-transparent
                 ${isActive
-                    ? 'bg-primary/20 text-primary'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    ? 'bg-primary/20 text-primary border-primary/30 shadow-lg shadow-primary/10'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60 hover:border-border/50 hover:shadow-md'
                 }
                 ${className}
             `}

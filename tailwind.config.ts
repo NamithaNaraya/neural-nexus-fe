@@ -81,6 +81,8 @@ const config: Config = {
             },
             fontFamily: {
                 sans: ["Inter", "system-ui", "sans-serif"],
+                heading: ["Playfair Display", "Georgia", "serif"],
+                mono: ["JetBrains Mono", "Consolas", "monospace"],
             },
             backdropBlur: {
                 xs: "2px",
@@ -89,6 +91,8 @@ const config: Config = {
                 "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
                 "glow": "glow 2s ease-in-out infinite alternate",
                 "float": "float 6s ease-in-out infinite",
+                "shimmer": "shimmer 2s linear infinite",
+                "gradient-shift": "gradientShift 8s ease infinite",
             },
             keyframes: {
                 glow: {
@@ -98,6 +102,14 @@ const config: Config = {
                 float: {
                     "0%, 100%": { transform: "translateY(0px)" },
                     "50%": { transform: "translateY(-10px)" },
+                },
+                shimmer: {
+                    "0%": { backgroundPosition: "-200% 0" },
+                    "100%": { backgroundPosition: "200% 0" },
+                },
+                gradientShift: {
+                    "0%, 100%": { backgroundPosition: "0% 50%" },
+                    "50%": { backgroundPosition: "100% 50%" },
                 },
             },
         },

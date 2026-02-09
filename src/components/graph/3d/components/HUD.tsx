@@ -4,10 +4,10 @@ import React from 'react';
 import { useSSE, PHASE_LABELS } from '@/hooks/useSSE';
 
 export function IngestionProgressHUD() {
-    const { ingestionProgress } = useSSE();
-    const activeTasks = Object.values(ingestionProgress).filter((p: any) => p.progress < 100);
+    const { ingestionProgress = {} } = useSSE();
+    const activeTasks = ingestionProgress ? Object.values(ingestionProgress).filter((p: any) => p && p.progress < 100) : [];
 
-    if (activeTasks.length === 0) return null;
+    if (!activeTasks || activeTasks.length === 0) return null;
 
     return (
         <div className="absolute top-20 right-4 flex flex-col gap-2 pointer-events-auto z-50">

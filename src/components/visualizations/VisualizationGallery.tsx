@@ -401,7 +401,7 @@ export function VisualizationGallery({
     return (
         <div className={`flex flex-col h-full ${className}`}>
             {/* Search */}
-            <div className="p-4 border-b border-border">
+            <div className="p-4 border-b border-border/50">
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input
@@ -409,14 +409,14 @@ export function VisualizationGallery({
                         placeholder="Search visualizations..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-muted/50 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald/50"
+                        className="w-full pl-10 pr-4 py-2.5 bg-muted/30 border border-border/50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all duration-300"
                     />
                 </div>
             </div>
 
             <div className="flex flex-1 min-h-0">
                 {/* Category List */}
-                <div className="w-64 border-r border-border overflow-y-auto">
+                <div className="w-64 border-r border-border/50 overflow-y-auto bg-gradient-to-b from-transparent to-muted/10">
                     {filteredCategories.map((category) => {
                         const Icon = category.icon;
                         const isActive = selectedCategory === category.id;
@@ -426,31 +426,31 @@ export function VisualizationGallery({
                                 key={category.id}
                                 onClick={() => setSelectedCategory(isActive ? null : category.id)}
                                 className={`
-                                    w-full flex items-center gap-3 p-4 text-left transition-all
+                                    w-full flex items-center gap-3 p-4 text-left transition-all duration-300
                                     ${isActive
-                                        ? 'bg-emerald/10 border-l-2 border-emerald'
-                                        : 'hover:bg-muted/50 border-l-2 border-transparent'
+                                        ? 'bg-gradient-to-r from-primary/15 to-primary/5 border-l-2 border-primary shadow-sm'
+                                        : 'hover:bg-muted/50 border-l-2 border-transparent hover:border-muted-foreground/30'
                                     }
                                 `}
                             >
                                 <div
                                     className={`
-                                        p-2 rounded-lg
-                                        ${isActive ? 'bg-emerald/10' : 'bg-muted'}
+                                        p-2 rounded-xl transition-all duration-300
+                                        ${isActive ? 'bg-gradient-to-br from-primary/20 to-primary/5 shadow-lg shadow-primary/10' : 'bg-muted'}
                                     `}
                                 >
                                     <Icon
-                                        className={`w-4 h-4 ${isActive ? 'text-emerald' : 'text-muted-foreground'}`}
+                                        className={`w-4 h-4 transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
                                     />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="font-medium text-foreground">{category.name}</div>
+                                    <div className={`font-medium transition-colors ${isActive ? 'text-primary' : 'text-foreground'}`}>{category.name}</div>
                                     <div className="text-xs text-muted-foreground truncate">
                                         {category.visualizations.length} types
                                     </div>
                                 </div>
                                 <ChevronRight
-                                    className={`w-4 h-4 text-muted-foreground transition-transform ${isActive ? 'rotate-90' : ''}`}
+                                    className={`w-4 h-4 text-muted-foreground transition-transform duration-300 ${isActive ? 'rotate-90 text-primary' : ''}`}
                                 />
                             </button>
                         );
@@ -481,20 +481,22 @@ export function VisualizationGallery({
                                     {activeCategory.visualizations.map((viz) => (
                                         <motion.button
                                             key={viz.id}
-                                            whileHover={{ scale: 1.02 }}
+                                            whileHover={{ scale: 1.02, y: -2 }}
                                             whileTap={{ scale: 0.98 }}
                                             onClick={() => onSelect?.(viz)}
-                                            className="p-4 bg-muted/30 border border-border rounded-xl text-left hover:border-emerald/50 hover:bg-emerald/5 transition-all"
+                                            className="group p-4 bg-gradient-to-br from-muted/40 to-muted/20 border border-border/50 rounded-xl text-left hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10 transition-all duration-300 relative overflow-hidden"
                                         >
-                                            <h4 className="font-medium text-foreground">{viz.name}</h4>
-                                            <p className="text-sm text-muted-foreground mt-1">
+                                            {/* Shimmer effect on hover */}
+                                            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+                                            <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors relative z-10">{viz.name}</h4>
+                                            <p className="text-sm text-muted-foreground mt-1 relative z-10">
                                                 {viz.description}
                                             </p>
-                                            <div className="flex flex-wrap gap-1 mt-2">
+                                            <div className="flex flex-wrap gap-1.5 mt-3 relative z-10">
                                                 {viz.bestFor.slice(0, 2).map((tag) => (
                                                     <span
                                                         key={tag}
-                                                        className="px-2 py-0.5 bg-muted rounded text-xs text-muted-foreground"
+                                                        className="px-2 py-0.5 bg-primary/10 border border-primary/20 rounded-md text-xs text-primary/80"
                                                     >
                                                         {tag}
                                                     </span>
