@@ -43,7 +43,11 @@ class APIClient {
         if (params) {
             const searchParams = new URLSearchParams();
             Object.entries(params).forEach(([key, value]) => {
-                searchParams.append(key, String(value));
+                if (Array.isArray(value)) {
+                    value.forEach(v => searchParams.append(key, String(v)));
+                } else {
+                    searchParams.append(key, String(value));
+                }
             });
             url += `?${searchParams.toString()}`;
         }

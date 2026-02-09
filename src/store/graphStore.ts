@@ -80,6 +80,7 @@ interface GraphState {
     selectNode: (id: string, multi?: boolean) => void;
     deselectNode: (id: string) => void;
     clearSelection: () => void;
+    setSelectedNodes: (ids: string[]) => void;
     setHoveredNode: (id: string | null) => void;
 
     // Expanded Nodes (Double-click expansion tracking)
@@ -93,6 +94,7 @@ interface GraphState {
     // Visual Anchoring (Camera zoom to node)
     targetNode: string | null;
     zoomToNode: (nodeId: string) => void;
+    setCameraFocus: (nodeId: string) => void;
     clearZoomTarget: () => void;
 
     // Filtering
@@ -212,6 +214,7 @@ export const useGraphStore = create<GraphState>()(
             selectedNodes: state.selectedNodes.filter((n) => n !== id),
         })),
         clearSelection: () => set({ selectedNodes: [] }),
+        setSelectedNodes: (ids) => set({ selectedNodes: ids }),
         setHoveredNode: (id) => set({ hoveredNode: id }),
 
         // Expanded Nodes (Double-click expansion tracking)
@@ -262,6 +265,9 @@ export const useGraphStore = create<GraphState>()(
                     },
                 });
             }
+        },
+        setCameraFocus: (nodeId) => {
+            get().zoomToNode(nodeId);
         },
         clearZoomTarget: () => set({ targetNode: null }),
 

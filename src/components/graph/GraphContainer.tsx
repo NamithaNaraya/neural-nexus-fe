@@ -22,6 +22,7 @@ import { GraphStats } from './shared/GraphStats';
 import { NodeDetailPanel } from './panels/NodeDetailPanel';
 import { DataCanvas } from '../../visualizations/DataCanvas';
 import { FileScopePanel } from './panels/FileScopePanel';
+import { ChatAssistant } from './panels/ChatAssistant';
 import { GraphViewMode } from './types';
 import { useNodeExpansion, useShortestPath } from '@/hooks/useApi';
 import { useDevice, useViewModeLock } from '@/hooks/useDevice';
@@ -634,6 +635,9 @@ export function GraphContainer({
                 message={`Are you sure you want to delete "${deleteTargetNode?.name}"? This will also remove all relationships connected to this entity.`}
                 itemName={deleteTargetNode?.name}
             />
+
+            {/* AI Assistant Overlay */}
+            <ChatAssistant />
         </div>
 
     );

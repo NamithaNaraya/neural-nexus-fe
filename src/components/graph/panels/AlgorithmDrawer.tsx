@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/shared';
 import { api } from '@/lib/api';
+import { useGraphStore } from '@/store/graphStore';
 
 // Result types
 interface AlgorithmResultItem {
@@ -60,16 +61,12 @@ interface AlgorithmConfig {
 }
 
 // Helper to fetch algorithm results
-async function fetchAlgorithm(endpoint: string, folderId?: string): Promise<AlgorithmResult> {
-    // Determine delimiter based on whether endpoint already has query params
-    const delimiter = endpoint.includes('?') ? '&' : '?';
+async function fetchAlgorithm(endpoint: string, folderId?: string, nodeIds?: string[]): Promise<AlgorithmResult> {
+    const params: Record<string, any> = {};
+    if (folderId) params.folder_id = folderId;
+    if (nodeIds && nodeIds.length > 0) params.node_ids = nodeIds;
 
-    // Construct URL path relative to API base
-    const url = folderId
-        ? `${endpoint}${delimiter}folder_id=${folderId}`
-        : endpoint;
-
-    return api.get<AlgorithmResult>(url);
+    return api.get<AlgorithmResult>(endpoint, params);
 }
 
 
@@ -164,9 +161,12 @@ const categoryLabels: Record<AlgorithmCategory, { label: string; icon: React.Rea
 };
 
 export function AlgorithmDrawer({ isOpen, onClose, folderId }: AlgorithmDrawerProps) {
+    const selectedNodes = useGraphStore(state => state.selectedNodes);
+
     const [activeCategory, setActiveCategory] = useState<AlgorithmCategory>('centrality');
     const [selectedAlgorithm, setSelectedAlgorithm] = useState<string | null>(null);
     const [result, setResult] = useState<AlgorithmResult | null>(null);
+    const [runOnSelection, setRunOnSelection] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -177,14 +177,15 @@ export function AlgorithmDrawer({ isOpen, onClose, folderId }: AlgorithmDrawerPr
         setResult(null);
 
         try {
-            const data = await fetchAlgorithm(config.endpoint, folderId);
+            const nodeIds = runOnSelection && selectedNodes.length > 0 ? selectedNodes : undefined;
+            const data = await fetchAlgorithm(config.endpoint, folderId, nodeIds);
             setResult(data);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Algorithm failed');
         } finally {
             setIsLoading(false);
         }
-    }, [folderId]);
+    }, [folderId, runOnSelection, selectedNodes]);
 
     const filteredAlgorithms = algorithms.filter(a => a.category === activeCategory);
 
@@ -235,30 +236,71 @@ export function AlgorithmDrawer({ isOpen, onClose, folderId }: AlgorithmDrawerPr
                     ))}
                 </div>
 
+                {/* Algorithm Selection Filtering */}
+                <div className="px-4 py-3 bg-muted/30 border-b border-border">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Target className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm font-medium">Execution Scope</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {selectedNodes.length > 0 && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold border border-primary/20 animate-in fade-in zoom-in">
+                                    {selectedNodes.length} Selected
+                                </span>
+                            )}
+                            <button
+                                onClick={() => setRunOnSelection(!runOnSelection)}
+                                disabled={selectedNodes.length === 0}
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${runOnSelection && selectedNodes.length > 0 ? 'bg-primary' : 'bg-muted'
+                                    } ${selectedNodes.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                                <span className="sr-only">Run on selected nodes only</span>
+                                <span
+                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${runOnSelection && selectedNodes.length > 0 ? 'translate-x-5' : 'translate-x-1'
+                                        }`}
+                                />
+                            </button>
+                        </div>
+                    </div>
+                    {selectedNodes.length === 0 && (
+                        <p className="text-[10px] text-muted-foreground mt-1 italic">
+                            Select nodes in the graph to enable subset analysis
+                        </p>
+                    )}
+                    {selectedNodes.length > 0 && (
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                            {runOnSelection ? "Running on selected nodes only" : "Running on full graph/folder"}
+                        </p>
+                    )}
+                </div>
+
                 {/* Algorithm List */}
-                <div className="p-4 space-y-2 max-h-[40vh] overflow-y-auto">
+                <div className="p-4 space-y-2 max-h-[35vh] overflow-y-auto">
                     {filteredAlgorithms.map(algo => (
                         <button
                             key={algo.key}
                             onClick={() => runAlgorithm(algo)}
                             disabled={isLoading}
-                            className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all ${selectedAlgorithm === algo.key
-                                ? 'border-primary bg-primary/5'
-                                : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all duration-200 ${selectedAlgorithm === algo.key
+                                ? 'border-primary bg-primary/5 shadow-inner'
+                                : 'border-border hover:border-primary/40 hover:bg-muted/50'
                                 }`}
                         >
-                            <div className={`p-2 rounded-lg ${selectedAlgorithm === algo.key
+                            <div className={`p-2.5 rounded-lg shadow-sm transition-colors ${selectedAlgorithm === algo.key
                                 ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted'
+                                : 'bg-muted border border-border/50'
                                 }`}>
                                 {algo.icon}
                             </div>
                             <div className="flex-1 text-left">
-                                <div className="font-medium text-sm">{algo.name}</div>
-                                <div className="text-xs text-muted-foreground">{algo.description}</div>
+                                <div className="font-semibold text-sm leading-none mb-1">{algo.name}</div>
+                                <div className="text-[10px] text-muted-foreground line-clamp-1">{algo.description}</div>
                             </div>
-                            {isLoading && selectedAlgorithm === algo.key && (
+                            {isLoading && selectedAlgorithm === algo.key ? (
                                 <LoadingSpinner size="sm" />
+                            ) : (
+                                <Zap className={`w-3.5 h-3.5 transition-opacity ${selectedAlgorithm === algo.key ? 'opacity-100' : 'opacity-0'}`} />
                             )}
                         </button>
                     ))}

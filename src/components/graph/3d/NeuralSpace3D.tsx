@@ -54,6 +54,16 @@ function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry,
 
     const nodesWithPositions = useMemo(() => {
         if (!Array.isArray(nodes) || nodes.length === 0) return [];
+
+        // Calculate degrees first
+        const degreeMap = new Map<string, number>();
+        links.forEach(link => {
+            const s = typeof link.source === 'object' ? (link.source as any).id : link.source;
+            const t = typeof link.target === 'object' ? (link.target as any).id : link.target;
+            degreeMap.set(s, (degreeMap.get(s) || 0) + 1);
+            degreeMap.set(t, (degreeMap.get(t) || 0) + 1);
+        });
+
         const spread = 250;
         const folderGroups = new Map<string, any[]>();
 
@@ -61,7 +71,7 @@ function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry,
         nodes.forEach(n => {
             if (!n) return;
             const fid = n.folderId || 'global';
-            if (!folderGroups.has(fid)) folderGroups.set(fid, []);
+            if (!folderGroups.get(fid)) folderGroups.set(fid, []);
             folderGroups.get(fid)!.push(n);
         });
 
@@ -79,31 +89,34 @@ function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry,
             const cz = Math.sin(angle) * islandRadius;
 
             return groupNodes.map((node, i) => {
+                const degree = degreeMap.get(node.id) || 0;
+
                 // If node already has valid coordinates, use them
-                if (typeof node.x === 'number' && isFinite(node.x) &&
+                let baseNode = node;
+                if (!(typeof node.x === 'number' && isFinite(node.x) &&
                     typeof node.y === 'number' && isFinite(node.y) &&
-                    typeof node.z === 'number' && isFinite(node.z)) {
-                    return node;
+                    typeof node.z === 'number' && isFinite(node.z))) {
+                    const phiIdx = 1 - 2 * (i + 0.5) / groupSize;
+                    const phi = Math.acos(Math.max(-1, Math.min(1, phiIdx)));
+                    const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+                    const r = spread * (0.5 + Math.sqrt(i / groupSize) * 0.8);
+
+                    const x = cx + r * Math.sin(phi) * Math.cos(theta);
+                    const y = cy + r * Math.sin(phi) * Math.sin(theta);
+                    const z = cz + r * Math.cos(phi);
+
+                    baseNode = {
+                        ...node,
+                        x: isFinite(x) ? x : 0,
+                        y: isFinite(y) ? y : 0,
+                        z: isFinite(z) ? z : 0,
+                    };
                 }
 
-                const phiIdx = 1 - 2 * (i + 0.5) / groupSize;
-                const phi = Math.acos(Math.max(-1, Math.min(1, phiIdx)));
-                const theta = Math.PI * (1 + Math.sqrt(5)) * i;
-                const r = spread * (0.5 + Math.sqrt(i / groupSize) * 0.8);
-
-                const x = cx + r * Math.sin(phi) * Math.cos(theta);
-                const y = cy + r * Math.sin(phi) * Math.sin(theta);
-                const z = cz + r * Math.cos(phi);
-
-                return {
-                    ...node,
-                    x: isFinite(x) ? x : 0,
-                    y: isFinite(y) ? y : 0,
-                    z: isFinite(z) ? z : 0,
-                };
+                return { ...baseNode, degree };
             });
         });
-    }, [nodes]);
+    }, [nodes, links]);
 
     const nodeMap = useMemo(() => new Map(nodesWithPositions.map(n => [n.id, n])), [nodesWithPositions]);
 
@@ -149,8 +162,8 @@ function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry,
                 nodeGeometry={nodeGeometry}
             />
 
-            {/* Relationship Labels - ALWAYS show for ALL links in Neo4j style */}
-            {(Array.isArray(links) ? links : [])
+            {/* Relationship Labels - ALWAYS show for ALL links in Neo4j style (Optimized for Large Graphs) */}
+            {nodesWithPositions.length < 500 && (Array.isArray(links) ? links : [])
                 .map((link, i) => {
                     if (!link || !link.source || !link.target) return null;
                     const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
@@ -160,22 +173,38 @@ function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry,
                     if (!s || !t) return null;
 
                     return (
-                        <Html key={`link-label-${i}`} position={[(s.x + t.x) / 2, ((s.y + t.y) / 2), (s.z + t.z) / 2]} center distanceFactor={400} style={{ pointerEvents: 'none' }}>
-                            <div className="px-2 py-0.5 rounded shadow-xl bg-slate-900 border border-white/20 text-[10px] font-bold text-white uppercase tracking-tight whitespace-nowrap">
+                        <Html
+                            key={`link-label-${i}`}
+                            position={[(s.x + t.x) / 2, ((s.y + t.y) / 2), (s.z + t.z) / 2]}
+                            center
+                            distanceFactor={400}
+                            style={{
+                                pointerEvents: 'none',
+                                display: nodesWithPositions.length > 200 ? 'none' : 'block' // Auto-hide link labels in dense clusters
+                            }}
+                        >
+                            <div className="px-2 py-0.5 rounded shadow-xl bg-slate-900 border border-white/20 text-[10px] font-bold text-white uppercase tracking-tight whitespace-nowrap opacity-80">
                                 {link.type}
                             </div>
                         </Html>
                     );
                 })}
 
-            {/* Neo4j-style Node Circles with Names Inside */}
+            {/* Neo4j-style Node Circles with Names Inside (Performance Optimized) */}
             {nodesWithPositions.map(node => {
                 const isSelected = Array.isArray(selectedNodes) && selectedNodes.includes(node.id);
                 const isHovered = hoveredNode === node.id;
                 const nodeColor = NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
 
-                // Scale sizes to match Neo4j vibe
-                const size = isSelected ? 80 : isHovered ? 70 : 60;
+                // Scale sizes based on degree + Neo4j vibe
+                const degreeBonus = Math.min((node.degree || 0) * 2, 40);
+                const size = (isSelected ? 80 : isHovered ? 70 : 60) + degreeBonus;
+                const isLargeGraph = nodesWithPositions.length > 100;
+
+                // LOD: Only show labels for high-degree nodes or if interacted
+                const showLabel = isSelected || isHovered || (node.degree || 0) > 3 || !isLargeGraph;
+
+                if (!showLabel) return null;
 
                 return (
                     <Html
@@ -183,7 +212,12 @@ function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry,
                         position={[node.x!, node.y!, node.z!]}
                         center
                         distanceFactor={400}
-                        style={{ pointerEvents: 'auto', zIndex: isSelected || isHovered ? 10 : 1 }}
+                        style={{
+                            pointerEvents: 'auto',
+                            zIndex: isSelected || isHovered ? 10 : 1,
+                            // Performance: Disable transitions for large node counts
+                            transition: isLargeGraph ? 'none' : 'all 0.3s ease-out'
+                        }}
                     >
                         <div
                             onClick={(e) => { e.stopPropagation(); props.onNodeClick(node.id, e); }}
@@ -193,8 +227,8 @@ function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry,
                             className={`
                                 relative flex items-center justify-center rounded-full
                                 border-[4px] shadow-2xl cursor-pointer
-                                transition-all duration-300 ease-out
                                 select-none
+                                ${!isLargeGraph ? 'transition-transform duration-300' : ''}
                                 ${isSelected ? 'ring-4 ring-white/40 scale-110' : ''}
                                 ${isHovered && !isSelected ? 'ring-2 ring-white/20 scale-105' : ''}
                             `}
@@ -217,23 +251,25 @@ function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry,
 
                             {/* Type badge above node on hover */}
                             {(isHovered || isSelected) && (
-                                <div className="absolute -top-7 px-2 py-0.5 rounded-full bg-slate-900/90 text-[8px] font-bold text-white whitespace-nowrap border border-white/20 shadow-lg">
+                                <div className="absolute -top-7 px-2 py-0.5 rounded-full bg-slate-900/90 text-[8px] font-bold text-white whitespace-nowrap border border-white/20 shadow-lg z-50">
                                     {node.type}
                                 </div>
                             )}
                         </div>
-                        {/* Type badge below node (Default visible) */}
-                        <div
-                            className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 px-2 py-0.5 rounded-full text-[7px] font-bold uppercase tracking-wide whitespace-nowrap"
-                            style={{
-                                backgroundColor: `${nodeColor}20`,
-                                color: isSelected ? '#fff' : nodeColor,
-                                border: `1px solid ${nodeColor}40`,
-                                backdropFilter: 'blur(4px)'
-                            }}
-                        >
-                            {node.type}
-                        </div>
+                        {/* Type badge below node (Default visible only for smaller graphs or if selected) */}
+                        {(!isLargeGraph || isSelected || isHovered) && (
+                            <div
+                                className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 px-2 py-0.5 rounded-full text-[7px] font-bold uppercase tracking-wide whitespace-nowrap"
+                                style={{
+                                    backgroundColor: `${nodeColor}20`,
+                                    color: isSelected ? '#fff' : nodeColor,
+                                    border: `1px solid ${nodeColor}40`,
+                                    backdropFilter: 'blur(4px)'
+                                }}
+                            >
+                                {node.type}
+                            </div>
+                        )}
                     </Html>
                 );
             })}
@@ -246,8 +282,9 @@ export function NeuralSpace3D(props: NeuralSpace3DProps) {
     const { nodes = [], links = [], selectedNodes = [] } = props;
     const [isDark, setIsDark] = useState(true);
     const [mounted, setMounted] = useState(false);
-    const nodeGeometry = useMemo(() => new THREE.SphereGeometry(1, 32, 32), []);
-    const pulseGeometry = useMemo(() => new THREE.SphereGeometry(0.8, 16, 16), []);
+    // Performance: Reduced sphere segments for large graph rendering
+    const nodeGeometry = useMemo(() => new THREE.SphereGeometry(1, 16, 12), []);
+    const pulseGeometry = useMemo(() => new THREE.SphereGeometry(0.8, 12, 8), []);
 
     useEffect(() => {
         setMounted(true);

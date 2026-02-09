@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GraphLink } from '@/store/graphStore';
@@ -48,6 +48,8 @@ export function RelationshipLinks({
         const positions: number[] = [];
         const colors: number[] = [];
         const color = new THREE.Color();
+        const pairCount = new Map<string, number>();
+
         activeLinks.forEach(link => {
             const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
             const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
@@ -55,7 +57,34 @@ export function RelationshipLinks({
             const target = nodeMap.get(targetId);
             if (!source || !target) return;
 
-            positions.push(source.x, source.y, source.z, target.x, target.y, target.z);
+            // Compute sibling link offset
+            const pairId = [sourceId, targetId].sort().join('-');
+            const index = pairCount.get(pairId) || 0;
+            pairCount.set(pairId, index + 1);
+
+            let sx = source.x, sy = source.y, sz = source.z;
+            let tx = target.x, ty = target.y, tz = target.z;
+
+            // If sibling links exist, apply a small perpendicular offset
+            if (index > 0) {
+                const dx = tx - sx;
+                const dy = ty - sy;
+                const dz = tz - sz;
+
+                // Vector perpendicular to the link (simple cross product with Y or Z)
+                const offsetDir = new THREE.Vector3(dy, -dx, 0).normalize();
+                if (offsetDir.lengthSq() < 0.1) offsetDir.set(0, dz, -dy).normalize();
+
+                const offsetScale = index * 5; // 5 units offset per sibling
+                sx += offsetDir.x * offsetScale;
+                sy += offsetDir.y * offsetScale;
+                sz += offsetDir.z * offsetScale;
+                tx += offsetDir.x * offsetScale;
+                ty += offsetDir.y * offsetScale;
+                tz += offsetDir.z * offsetScale;
+            }
+
+            positions.push(sx, sy, sz, tx, ty, tz);
             const linkColor = RELATIONSHIP_COLORS[link.type] || RELATIONSHIP_COLORS.default;
             color.set(linkColor);
             colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
@@ -70,11 +99,12 @@ export function RelationshipLinks({
     const tempPos = useMemo(() => new THREE.Vector3(), []);
     const targetVec = useMemo(() => new THREE.Vector3(), []);
 
-    useFrame((state) => {
+    // Performance Optimization: Disabled CPU-side pulse animation loop
+    // High-frequency matrix updates on the main thread for many links cause significant UI lag.
+    useEffect(() => {
         if (!pulseMeshRef.current || !activeLinks || activeLinks.length === 0) return;
-        const time = state.clock.elapsedTime;
+
         activeLinks.forEach((link, i) => {
-            if (!link) return;
             const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
             const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
             const source = nodeMap.get(sourceId);
@@ -85,10 +115,10 @@ export function RelationshipLinks({
                 const idx = i * PARTICLES_PER_LINK + j;
                 if (idx >= (pulseMeshRef.current?.count || 0)) continue;
 
-                const progress = (time * 0.3 + (i * 0.1) + (j / PARTICLES_PER_LINK)) % 1;
+                const progress = (j / PARTICLES_PER_LINK);
                 tempPos.set(source.x, source.y, source.z);
                 targetVec.set(target.x, target.y, target.z).lerp(tempPos, 1 - progress);
-                const scale = Math.sin(progress * Math.PI) * 1.5;
+                const scale = 0.8;
                 tempMatrix.makeScale(scale, scale, scale);
                 tempMatrix.setPosition(targetVec);
                 pulseMeshRef.current!.setMatrixAt(idx, tempMatrix);
@@ -97,7 +127,7 @@ export function RelationshipLinks({
         if (pulseMeshRef.current.instanceMatrix) {
             pulseMeshRef.current.instanceMatrix.needsUpdate = true;
         }
-    });
+    }, [activeLinks, nodeMap, tempMatrix, tempPos, targetVec]);
 
     return (
         <group>

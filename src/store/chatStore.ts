@@ -56,7 +56,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
     contextWindow: 5, // Last 5 Q&A pairs for sliding window
 
     createSession: () => {
-        const sessionId = `session-${Date.now()}`;
+        // Fallback for crypto.randomUUID if not available (e.g. non-secure context)
+        const generateUUID = () => {
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                return crypto.randomUUID();
+            }
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                const r = (Math.random() * 16) | 0;
+                const v = c === 'x' ? r : (r & 0x3) | 0x8;
+                return v.toString(16);
+            });
+        };
+
+        const sessionId = generateUUID();
         const newSession: ChatSession = {
             id: sessionId,
             title: "New Chat",

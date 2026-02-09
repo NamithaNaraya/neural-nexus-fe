@@ -46,7 +46,9 @@ export function InstancedNodes({
             const isHovered = hoveredNode === node.id;
 
             // Size matching the Html labels in NeuralSpace3D for easier raycasting
-            const sizeScalar = isSelected ? 15 : isHovered ? 12 : 10;
+            // Include degree bonus to match visual scaling
+            const degreeBonus = Math.min((node.degree || 0) * 2, 40);
+            const sizeScalar = (isSelected ? 15 : isHovered ? 12 : 10) + (degreeBonus / 5);
 
             tempObject.position.set(x, y, z);
             tempObject.scale.setScalar(sizeScalar);
