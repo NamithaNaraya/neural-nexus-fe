@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import { GraphLink } from '@/store/graphStore';
 import { RELATIONSHIP_COLORS } from '../../types';
 
-const PARTICLES_PER_LINK = 2;
+const PARTICLES_PER_LINK = 3;
+const CURVE_SUBDIVISIONS = 8;
 
 interface LinksProps {
     links: GraphLink[];
@@ -14,6 +15,8 @@ interface LinksProps {
     focusNodeId: string | null;
     pulseGeometry: THREE.BufferGeometry;
 }
+
+import { Segments, Segment } from '@react-three/drei';
 
 export function RelationshipLinks({
     links = [],
@@ -23,129 +26,113 @@ export function RelationshipLinks({
 }: LinksProps) {
     const pulseMeshRef = useRef<THREE.InstancedMesh>(null);
 
-    const activeLinks = useMemo(() => {
+    const activeLinksData = useMemo(() => {
         if (!Array.isArray(links) || !nodeMap) return [];
-        return links.filter(link => {
-            if (!link || !link.source || !link.target) return false;
 
-            // Extract IDs with fallback to prevent undefined access
-            const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
-            const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
+        const result: any[] = [];
+        links.forEach((link, i) => {
+            if (!link || !link.source || !link.target) return;
 
-            // Ensure both endpoints exist in our current node map to prevent line rendering errors
-            return sourceId && targetId && nodeMap.has(sourceId) && nodeMap.has(targetId);
-        });
-    }, [links, nodeMap]);
-
-    const lineGeometry = useMemo(() => {
-        if (!activeLinks || activeLinks.length === 0) {
-            const emptyGeo = new THREE.BufferGeometry();
-            emptyGeo.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
-            emptyGeo.setAttribute('color', new THREE.Float32BufferAttribute([], 3));
-            return emptyGeo;
-        }
-
-        const positions: number[] = [];
-        const colors: number[] = [];
-        const color = new THREE.Color();
-        const pairCount = new Map<string, number>();
-
-        activeLinks.forEach(link => {
             const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
             const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
             const source = nodeMap.get(sourceId);
             const target = nodeMap.get(targetId);
-            if (!source || !target) return;
 
-            // Compute sibling link offset
-            const pairId = [sourceId, targetId].sort().join('-');
-            const index = pairCount.get(pairId) || 0;
-            pairCount.set(pairId, index + 1);
+            if (sourceId && targetId && source && target) {
+                const linkColor = RELATIONSHIP_COLORS[link.type] || RELATIONSHIP_COLORS.default;
+                const linkId = (link as any).id || `${sourceId}-${targetId}-${i}`;
 
-            let sx = source.x, sy = source.y, sz = source.z;
-            let tx = target.x, ty = target.y, tz = target.z;
+                // Create Curved Path Points
+                const start = new THREE.Vector3(source.x, source.y, source.z);
+                const end = new THREE.Vector3(target.x, target.y, target.z);
 
-            // If sibling links exist, apply a small perpendicular offset
-            if (index > 0) {
-                const dx = tx - sx;
-                const dy = ty - sy;
-                const dz = tz - sz;
+                // Calculate control point (midpoint + offset)
+                const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+                const distance = start.distanceTo(end);
 
-                // Vector perpendicular to the link (simple cross product with Y or Z)
-                const offsetDir = new THREE.Vector3(dy, -dx, 0).normalize();
-                if (offsetDir.lengthSq() < 0.1) offsetDir.set(0, dz, -dy).normalize();
+                // Push control point "outward" or "upward" for an organic look
+                // For a "flowy" feel, we push it slightly away from the center or use a consistent bias
+                const offset = mid.clone().normalize().multiplyScalar(distance * 0.15);
+                const control = mid.clone().add(offset).add(new THREE.Vector3(0, distance * 0.1, 0));
 
-                const offsetScale = index * 5; // 5 units offset per sibling
-                sx += offsetDir.x * offsetScale;
-                sy += offsetDir.y * offsetScale;
-                sz += offsetDir.z * offsetScale;
-                tx += offsetDir.x * offsetScale;
-                ty += offsetDir.y * offsetScale;
-                tz += offsetDir.z * offsetScale;
+                const curve = new THREE.QuadraticBezierCurve3(start, control, end);
+                const points = curve.getPoints(CURVE_SUBDIVISIONS);
+
+                // Pre-calculate segments for the <Segments> component
+                const segments: any[] = [];
+                for (let i = 0; i < points.length - 1; i++) {
+                    segments.push({
+                        start: [points[i].x, points[i].y, points[i].z],
+                        end: [points[i + 1].x, points[i + 1].y, points[i + 1].z]
+                    });
+                }
+
+                result.push({
+                    id: linkId,
+                    segments,
+                    curve, // Store curve for particle lerping
+                    color: linkColor,
+                    opacity: focusNodeId ? (sourceId === focusNodeId || targetId === focusNodeId ? 0.8 : 0.05) : 0.6
+                });
             }
-
-            positions.push(sx, sy, sz, tx, ty, tz);
-            const linkColor = RELATIONSHIP_COLORS[link.type] || RELATIONSHIP_COLORS.default;
-            color.set(linkColor);
-            colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
         });
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-        return geo;
-    }, [activeLinks, nodeMap]);
+        return result;
+    }, [links, nodeMap, focusNodeId]);
 
     const tempMatrix = useMemo(() => new THREE.Matrix4(), []);
     const tempPos = useMemo(() => new THREE.Vector3(), []);
-    const targetVec = useMemo(() => new THREE.Vector3(), []);
 
-    // Performance Optimization: Disabled CPU-side pulse animation loop
-    // High-frequency matrix updates on the main thread for many links cause significant UI lag.
-    useEffect(() => {
-        if (!pulseMeshRef.current || !activeLinks || activeLinks.length === 0) return;
+    // Animate Pulses along the Curved Paths
+    useFrame((state) => {
+        if (!pulseMeshRef.current || activeLinksData.length === 0) return;
 
-        activeLinks.forEach((link, i) => {
-            const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
-            const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
-            const source = nodeMap.get(sourceId);
-            const target = nodeMap.get(targetId);
-            if (!source || !target) return;
+        const time = state.clock.getElapsedTime();
+
+        activeLinksData.forEach((linkData, i) => {
+            const curve = linkData.curve as THREE.QuadraticBezierCurve3;
 
             for (let j = 0; j < PARTICLES_PER_LINK; j++) {
                 const idx = i * PARTICLES_PER_LINK + j;
                 if (idx >= (pulseMeshRef.current?.count || 0)) continue;
 
-                const progress = (j / PARTICLES_PER_LINK);
-                tempPos.set(source.x, source.y, source.z);
-                targetVec.set(target.x, target.y, target.z).lerp(tempPos, 1 - progress);
-                const scale = 0.8;
+                // Staggered flow animation
+                const flowOffset = (j / PARTICLES_PER_LINK);
+                const progress = (time * 0.4 + flowOffset) % 1.0;
+
+                // Get point on curve
+                curve.getPoint(progress, tempPos);
+
+                const scale = 0.6 + Math.sin(time * 3 + j) * 0.1;
                 tempMatrix.makeScale(scale, scale, scale);
-                tempMatrix.setPosition(targetVec);
+                tempMatrix.setPosition(tempPos);
                 pulseMeshRef.current!.setMatrixAt(idx, tempMatrix);
             }
         });
-        if (pulseMeshRef.current.instanceMatrix) {
-            pulseMeshRef.current.instanceMatrix.needsUpdate = true;
-        }
-    }, [activeLinks, nodeMap, tempMatrix, tempPos, targetVec]);
+
+        pulseMeshRef.current.instanceMatrix.needsUpdate = true;
+    });
 
     return (
         <group>
-            <lineSegments geometry={lineGeometry}>
-                <lineBasicMaterial
-                    vertexColors
-                    transparent
-                    opacity={focusNodeId ? 0.6 : 0.8}
-                    depthWrite={false}
-                    linewidth={3}
-                    toneMapped={false}
-                />
-            </lineSegments>
-            <instancedMesh ref={pulseMeshRef} args={[pulseGeometry, undefined, (activeLinks?.length ?? 0) * PARTICLES_PER_LINK]}>
+            {/* Render curved segments */}
+            <Segments limit={activeLinksData.length * CURVE_SUBDIVISIONS} lineWidth={2.5}>
+                {activeLinksData.flatMap((link) =>
+                    link.segments.map((seg: any, sIdx: number) => (
+                        <Segment
+                            key={`${link.id}-${sIdx}`}
+                            start={seg.start}
+                            end={seg.end}
+                            color={link.color}
+                        />
+                    ))
+                )}
+            </Segments>
+
+            <instancedMesh ref={pulseMeshRef} args={[pulseGeometry, undefined, activeLinksData.length * PARTICLES_PER_LINK]}>
                 <meshBasicMaterial
-                    color="#ec4899"
+                    color="#ffffff"
                     transparent
-                    opacity={0.95}
+                    opacity={0.8}
                     blending={THREE.AdditiveBlending}
                     toneMapped={false}
                 />

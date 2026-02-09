@@ -114,82 +114,100 @@ export function FileScopePanel({
 
     return (
         <motion.div
-            initial={{ x: -20, opacity: 0 }}
+            initial={{ x: -400, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -20, opacity: 0 }}
-            className="bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-xl overflow-hidden flex flex-col h-full"
+            exit={{ x: -400, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="absolute left-6 top-6 bottom-6 w-[400px] glass-strong z-30 flex flex-col rounded-[2rem] border border-white/10 shadow-[20px_0_60px_rgba(0,0,0,0.3)] overflow-hidden"
         >
             {/* Header */}
-            <div className="p-4 border-b border-border flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-emerald" />
-                    <h3 className="font-semibold text-foreground">View Scope</h3>
+            <div className="p-6 border-b border-white/10 bg-white/5">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="p-2.5 rounded-2xl bg-emerald-500/20 text-emerald-400 shadow-lg shadow-emerald-500/10 border border-emerald-500/30">
+                            <Layers className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold tracking-tight text-foreground">Discovery Scope</h3>
+                            <p className="text-[10px] text-emerald-500/60 font-black uppercase tracking-[0.2em]">Librarian Protocol</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2.5 rounded-2xl hover:bg-white/10 transition-all duration-300 text-muted-foreground hover:text-foreground border border-transparent hover:border-white/10"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
                 </div>
-                <button
-                    onClick={onClose}
-                    className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
-                >
-                    <X className="w-4 h-4" />
-                </button>
             </div>
 
             {/* Quick Actions */}
-            <div className="p-3 border-b border-border space-y-2">
+            <div className="p-6 border-b border-white/5 space-y-4">
                 <button
                     onClick={showAll}
                     className={`
-                        w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors
+                        w-full flex items-center gap-4 px-5 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-500 relative overflow-hidden group
                         ${isAllShown
-                            ? 'bg-emerald/10 text-emerald border border-emerald/30'
-                            : 'bg-muted hover:bg-muted/80 text-foreground'
+                            ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]'
+                            : 'bg-white/5 hover:bg-white/10 text-foreground/80 hover:text-foreground border border-white/5 hover:border-white/20'
                         }
                     `}
                 >
-                    <Eye className="w-4 h-4" />
-                    <span>Show All Files</span>
-                    <span className="ml-auto text-xs text-muted-foreground">
-                        {totalFiles} files
+                    <Eye className={`w-4 h-4 ${isAllShown ? 'animate-pulse' : ''}`} />
+                    <span className="relative z-10">Global Synchronization</span>
+                    <span className={`ml-auto px-2 py-0.5 rounded-lg text-[9px] font-black ${isAllShown ? 'bg-black/20 text-white' : 'bg-white/5 text-muted-foreground'}`}>
+                        {totalFiles} OBJECTS
                     </span>
+                    {isAllShown && (
+                        <motion.div
+                            layoutId="active-bg"
+                            className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-500"
+                        />
+                    )}
                 </button>
             </div>
 
             {/* Folder Tree */}
-            <div className="flex-1 overflow-y-auto p-3">
-                <div className="space-y-1">
-                    {folders.map(folder => (
-                        <FolderNode
-                            key={folder.id}
-                            folder={folder}
-                            isExpanded={expandedFolders.has(folder.id)}
-                            selectedFileIds={selectedFileIds}
-                            isCurrent={folder.id === currentFolderId}
-                            onToggleFolder={() => toggleFolder(folder.id)}
-                            onToggleFile={toggleFile}
-                            onSelectAll={() => selectAllInFolder(folder)}
-                        />
-                    ))}
-                </div>
+            <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-white/5 space-y-2">
+                {folders.map(folder => (
+                    <FolderNode
+                        key={folder.id}
+                        folder={folder}
+                        isExpanded={expandedFolders.has(folder.id)}
+                        selectedFileIds={selectedFileIds}
+                        isCurrent={folder.id === currentFolderId}
+                        onToggleFolder={() => toggleFolder(folder.id)}
+                        onToggleFile={toggleFile}
+                        onSelectAll={() => selectAllInFolder(folder)}
+                    />
+                ))}
 
                 {folders.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                        No folders available
-                    </p>
+                    <div className="flex flex-col items-center justify-center py-20 opacity-20">
+                        <Folder className="w-12 h-12 mb-4" />
+                        <p className="text-[10px] font-black tracking-[0.3em] uppercase">NO DATA STREAMS FOUND</p>
+                    </div>
                 )}
             </div>
 
             {/* Footer */}
             {selectedFileIds.size > 0 && (
-                <div className="p-3 border-t border-border bg-muted/30">
-                    <p className="text-xs text-muted-foreground">
-                        Showing nodes from {selectedFileIds.size} selected file(s)
-                    </p>
+                <div className="p-5 border-t border-white/10 bg-white/5">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest opacity-60">
+                            Active Focal Point
+                        </p>
+                        <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
+                            {selectedFileIds.size} FILES
+                        </span>
+                    </div>
                 </div>
             )}
         </motion.div>
     );
 }
 
-// Folder Node Component
+// Properties Interfaces
 interface FolderNodeProps {
     folder: FolderItem;
     isExpanded: boolean;
@@ -200,6 +218,13 @@ interface FolderNodeProps {
     onSelectAll: () => void;
 }
 
+interface FileNodeProps {
+    file: FileItem;
+    isSelected: boolean;
+    onToggle: () => void;
+}
+
+// Folder Node Component
 function FolderNode({
     folder,
     isExpanded,
@@ -210,38 +235,43 @@ function FolderNode({
     onSelectAll,
 }: FolderNodeProps) {
     const fileCount = folder.files.length;
-    const selectedCount = folder.files.filter(f => selectedFileIds.has(f.id)).length;
+    const selectedCount = folder.files.filter((f: FileItem) => selectedFileIds.has(f.id)).length;
     const allSelected = selectedCount === fileCount && fileCount > 0;
     const someSelected = selectedCount > 0 && selectedCount < fileCount;
 
     return (
-        <div className="space-y-1">
+        <div className="space-y-1.5 p-1">
             {/* Folder Header */}
             <div
                 className={`
-                    flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors
-                    ${isCurrent ? 'bg-emerald/10' : 'hover:bg-muted/50'}
+                    flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-all duration-300 border
+                    ${isCurrent
+                        ? 'bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.05)]'
+                        : 'bg-white/5 border-transparent hover:border-white/10 hover:bg-white/10'
+                    }
                 `}
+                onClick={onToggleFolder}
             >
-                <button
-                    onClick={onToggleFolder}
-                    className="p-0.5 hover:bg-muted rounded"
-                >
+                <div className="p-1 rounded-lg hover:bg-white/10 transition-colors">
                     {isExpanded ? (
-                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        <ChevronDown className="w-4 h-4 text-primary" />
                     ) : (
                         <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     )}
-                </button>
+                </div>
 
-                <Folder className={`w-4 h-4 ${isCurrent ? 'text-emerald' : 'text-amber-500'}`} />
+                <div className={`p-2 rounded-xl ${isCurrent ? 'bg-emerald-500/20' : 'bg-black/20'}`}>
+                    <Folder className={`w-4 h-4 ${isCurrent ? 'text-emerald-400' : 'text-amber-400'}`} />
+                </div>
 
-                <span
-                    className="flex-1 text-sm font-medium text-foreground truncate"
-                    onClick={onToggleFolder}
-                >
-                    {folder.name}
-                </span>
+                <div className="flex-1 min-w-0">
+                    <span className="text-xs font-bold text-foreground truncate block">
+                        {folder.name}
+                    </span>
+                    <span className="text-[9px] text-muted-foreground/60 font-black uppercase tracking-widest">
+                        {fileCount} DOCUMENTS
+                    </span>
+                </div>
 
                 {/* Select all checkbox */}
                 <button
@@ -250,18 +280,17 @@ function FolderNode({
                         onSelectAll();
                     }}
                     className={`
-                        w-5 h-5 rounded border-2 flex items-center justify-center transition-all
+                        w-6 h-6 rounded-xl border flex items-center justify-center transition-all duration-300
                         ${allSelected
-                            ? 'bg-emerald border-emerald'
+                            ? 'bg-emerald-500 border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]'
                             : someSelected
-                                ? 'bg-emerald/30 border-emerald'
-                                : 'border-muted-foreground/30 hover:border-muted-foreground'
+                                ? 'bg-emerald-500/20 border-emerald-500/40'
+                                : 'border-white/10 hover:border-white/30 bg-black/20'
                         }
                     `}
                 >
-                    {(allSelected || someSelected) && (
-                        <Check className="w-3 h-3 text-white" />
-                    )}
+                    {allSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                    {someSelected && <div className="w-2 h-0.5 bg-emerald-500 rounded-full" />}
                 </button>
             </div>
 
@@ -271,9 +300,10 @@ function FolderNode({
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    className="ml-6 space-y-0.5"
+                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                    className="ml-8 space-y-1.5 py-1"
                 >
-                    {folder.files.map(file => (
+                    {folder.files.map((file: FileItem) => (
                         <FileNode
                             key={file.id}
                             file={file}
@@ -288,39 +318,37 @@ function FolderNode({
 }
 
 // File Node Component
-interface FileNodeProps {
-    file: FileItem;
-    isSelected: boolean;
-    onToggle: () => void;
-}
-
 function FileNode({ file, isSelected, onToggle }: FileNodeProps) {
     return (
         <button
             onClick={onToggle}
             className={`
-                w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors text-left
+                w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 text-left border group
                 ${isSelected
-                    ? 'bg-emerald/10 text-emerald'
-                    : 'hover:bg-muted/50 text-foreground'
+                    ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/20'
+                    : 'bg-transparent border-transparent hover:bg-white/5 text-foreground/70 hover:text-foreground'
                 }
             `}
         >
-            <File className={`w-4 h-4 ${isSelected ? 'text-emerald' : 'text-muted-foreground'}`} />
-            <span className="flex-1 text-sm truncate">{file.name}</span>
+            <div className={`p-1.5 rounded-lg ${isSelected ? 'bg-emerald-500/20' : 'bg-black/20 group-hover:bg-white/5'}`}>
+                <File className={`w-3.5 h-3.5 ${isSelected ? 'text-emerald-400' : 'text-muted-foreground/60'}`} />
+            </div>
 
-            {file.nodeCount !== undefined && (
-                <span className="text-xs text-muted-foreground">
-                    {file.nodeCount} nodes
-                </span>
-            )}
+            <div className="flex-1 min-w-0">
+                <span className="text-xs font-bold truncate block tracking-tight">{file.name}</span>
+                {file.nodeCount !== undefined && (
+                    <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest opacity-40">
+                        {file.nodeCount} FRAGMENTS
+                    </span>
+                )}
+            </div>
 
             <div
                 className={`
-                    w-5 h-5 rounded border-2 flex items-center justify-center transition-all
+                    w-5 h-5 rounded-lg border flex items-center justify-center transition-all duration-300
                     ${isSelected
-                        ? 'bg-emerald border-emerald'
-                        : 'border-muted-foreground/30'
+                        ? 'bg-emerald-500 border-emerald-500 shadow-sm'
+                        : 'border-white/5 bg-black/20 group-hover:border-white/20'
                     }
                 `}
             >

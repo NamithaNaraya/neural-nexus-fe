@@ -9,9 +9,10 @@
 export { GraphContainer } from './GraphContainer';
 
 // 3D Components
-export { NeuralSpace3D } from './3d/NeuralSpace3D';
-export { InstancedNodes } from './3d/InstancedNodes';
-export { InstancedLinks } from './3d/InstancedLinks';
+// 3D Components are dynamically imported in GraphContainer to prevent SSR worker errors
+// export { NeuralSpace3D } from './3d/NeuralSpace3D';
+// export { InstancedNodes } from './3d/InstancedNodes';
+// export { InstancedLinks } from './3d/InstancedLinks';
 
 // 2D Components
 export { ForceGraph2D } from './2d/ForceGraph2D';

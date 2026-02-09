@@ -282,11 +282,7 @@ export function ChatAssistant() {
                     }`}
             >
                 {isMinimized ? (
-                    <>
-                        <MessageSquare size={24} />
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-primary animate-ping" />
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-primary scale-75" />
-                    </>
+                    <MessageSquare size={24} />
                 ) : (
                     <X size={24} />
                 )}

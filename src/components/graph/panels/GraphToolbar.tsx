@@ -76,10 +76,11 @@ export function GraphToolbar({
 
     return (
         <>
-            <div className="absolute top-0 left-0 right-0 z-40 h-14 px-4 flex items-center justify-between bg-background/90 backdrop-blur-xl border-b border-border/30 shadow-lg shadow-black/5">
-                {/* Left Section - View Mode Toggle */}
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center bg-gradient-to-r from-muted/40 to-muted/20 rounded-xl p-1 border border-border/40 shadow-inner backdrop-blur-sm">
+            <div className="absolute top-6 left-6 right-6 z-40 h-16 px-6 flex items-center glass-strong rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-white/20 transition-all duration-500 hover:shadow-[0_12px_48px_rgba(168,85,247,0.15)] group/toolbar">
+                {/* Left Section: View Modes & Filters */}
+                <div className="flex items-center gap-4">
+                    {/* View Mode Toggle - Horizontal */}
+                    <div className="flex items-center gap-1 bg-muted/20 p-1 rounded-full border border-white/5">
                         <ViewModeButton
                             mode="3d"
                             currentMode={viewMode}
@@ -103,69 +104,74 @@ export function GraphToolbar({
                         />
                     </div>
 
-                    <div className="w-px h-6 bg-border/50 mx-2" />
+                    <div className="w-px h-8 bg-border/20" />
 
-                    {/* Core Actions */}
+                    <div className="flex items-center gap-2">
+                        <ToolbarButton
+                            onClick={onToggleFilters}
+                            isActive={showFilters}
+                            icon={<Filter className="w-4 h-4" />}
+                            title="Toggle Filters"
+                        />
 
-                    <ToolbarButton
-                        onClick={onToggleFilters}
-                        isActive={showFilters}
-                        icon={<Filter className="w-4 h-4" />}
-                        title="Toggle Filters"
-                    />
-
-                    {/* Algorithm Drawer Toggle */}
-                    <ToolbarButton
-                        onClick={() => setShowAlgorithmDrawer(true)}
-                        icon={<Zap className="w-4 h-4" />}
-                        title="Graph Algorithms"
-                        data-tour="algorithm-drawer"
-                        className="text-amber-500"
-                    />
+                        <ToolbarButton
+                            onClick={() => setShowAlgorithmDrawer(true)}
+                            icon={<Zap className="w-4 h-4" />}
+                            title="Graph Algorithms"
+                            className="text-amber-500 hover:bg-amber-500/10"
+                        />
+                    </div>
                 </div>
 
+                {/* Spacer to push everything else to the right */}
+                <div className="flex-1" />
 
-
-                {/* Right Section - Stats & Actions */}
+                {/* Right Section: Utilities & Stats */}
                 <div className="flex items-center gap-4">
-                    {/* Stats Pill */}
-                    <div className="flex items-center h-9 px-4 bg-gradient-to-r from-slate-800/80 to-slate-900/80 border border-white/10 rounded-full shadow-lg text-sm hidden md:flex backdrop-blur-sm">
-                        <div className="flex items-center gap-2">
-                            <Circle className="w-3 h-3 text-cyan-400" fill="#22D3EE" />
-                            <span className="font-bold bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent">{nodeCount}</span>
-                            <span className="text-white/40">/{totalNodeCount}</span>
-                            <span className="text-white/60">Nodes</span>
-                        </div>
-
-                        <div className="w-px h-4 bg-white/10 mx-3" />
-
-                        <div className="flex items-center gap-2">
-                            <Link2 className="w-3.5 h-3.5 text-purple-400" />
-                            <span className="font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">{linkCount}</span>
-                            <span className="text-white/40">/{totalLinkCount}</span>
-                            <span className="text-white/60">Links</span>
-                        </div>
-
-                        {isFiltered && (
-                            <>
-                                <div className="w-px h-4 bg-white/10 mx-3" />
-                                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30">
-                                    <Eye className="w-3.5 h-3.5 text-amber-400" />
-                                    <span className="font-medium text-xs text-amber-400">Filtered</span>
-                                </div>
-                            </>
+                    <div className="flex items-center gap-2">
+                        {onResetCamera && (
+                            <ToolbarButton
+                                onClick={onResetCamera}
+                                icon={<RotateCcw className="w-4 h-4" />}
+                                title="Reset Camera"
+                            />
                         )}
+
+                        {hasExpandedNodes && onCollapseAll && (
+                            <ToolbarButton
+                                onClick={onCollapseAll}
+                                icon={<Shrink className="w-4 h-4" />}
+                                title="Collapse All"
+                                className="text-orange-500 hover:bg-orange-500/10"
+                            />
+                        )}
+
+                        <ToolbarButton
+                            onClick={onToggleImmersive}
+                            icon={isImmersive ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                            title={isImmersive ? "Exit Immersive" : "Go Immersive"}
+                        />
                     </div>
 
-                    {/* Collapse All - Only visible when nodes are expanded */}
-                    {hasExpandedNodes && onCollapseAll && (
-                        <ToolbarButton
-                            onClick={onCollapseAll}
-                            icon={<Shrink className="w-4 h-4" />}
-                            title="Collapse All Expanded Nodes"
-                            className="text-orange-500"
-                        />
-                    )}
+                    <div className="w-px h-8 bg-border/20" />
+
+                    {/* Horizontal Statistics Indicator */}
+                    <div className="flex items-center gap-6 px-2">
+                        <div className="flex items-center gap-2 group/stats">
+                            <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.6)] animate-pulse" />
+                            <div className="flex flex-col -gap-1">
+                                <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest leading-none">nodes</span>
+                                <span className="text-sm font-bold text-white leading-none">{nodeCount}</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 group/stats">
+                            <div className="w-2 h-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.6)] animate-pulse" />
+                            <div className="flex flex-col -gap-1">
+                                <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest leading-none">links</span>
+                                <span className="text-sm font-bold text-white leading-none">{linkCount}</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

@@ -31,63 +31,68 @@ export function Header({ showThemeToggle = true, minimal = false }: HeaderProps)
     };
 
     return (
-        <header className="border-b border-border/30 backdrop-blur-xl bg-background/90 sticky top-0 z-50 shadow-sm">
-            <div className="w-full mx-auto px-6 py-4 flex items-center justify-between">
+        <header className="glass-strong sticky top-0 z-50 border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.05)] h-20 flex items-center">
+            <div className="w-full mx-auto px-8 flex items-center justify-between">
                 {/* Logo - Premium Branding */}
                 <button
                     onClick={() => router.push('/library')}
-                    className="group flex items-center gap-2 text-xl font-bold text-foreground hover:opacity-90 transition-all duration-300"
+                    className="group flex items-center gap-3 text-2xl font-black text-foreground hover:opacity-90 transition-all duration-300"
                 >
-                    <span className="font-heading bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-orange-500 to-purple-600 bg-[length:200%_auto] animate-gradient-shift">
-                        Neural
-                    </span>
-                    <span className="font-heading text-foreground group-hover:text-primary transition-colors duration-300">
-                        Nexus
-                    </span>
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary via-orange-500 to-rose-500 flex items-center justify-center shadow-lg shadow-primary/20 group-hover:rotate-12 transition-transform duration-500">
+                        <span className="text-white text-xl">N</span>
+                    </div>
+                    <div className="flex flex-col items-start leading-none">
+                        <span className="font-heading bg-clip-text text-transparent bg-gradient-to-r from-primary to-orange-500 bg-[length:200%_auto] animate-gradient-shift uppercase tracking-tighter">
+                            Neural
+                        </span>
+                        <span className="font-heading text-foreground/40 text-[10px] uppercase tracking-[0.2em] font-bold">
+                            Nexus
+                        </span>
+                    </div>
                 </button>
 
                 {/* Right Section */}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-6">
                     {/* Theme Toggle */}
                     {showThemeToggle && (
                         <button
                             onClick={toggleTheme}
-                            className="p-2.5 rounded-xl hover:bg-muted/60 hover:shadow-md transition-all duration-300 border border-transparent hover:border-border/50"
+                            className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 border border-white/5 hover:border-white/20 group/theme"
                             aria-label="Toggle theme"
                         >
                             {theme === 'dark' ? (
-                                <Sun className="w-5 h-5 text-muted-foreground hover:text-amber-400 transition-colors" />
+                                <Sun className="w-5 h-5 text-muted-foreground group-hover:text-amber-400 group-hover:rotate-45 transition-all duration-500" />
                             ) : (
-                                <Moon className="w-5 h-5 text-muted-foreground hover:text-indigo-500 transition-colors" />
+                                <Moon className="w-5 h-5 text-muted-foreground group-hover:text-indigo-500 group-hover:-rotate-12 transition-all duration-500" />
                             )}
                         </button>
                     )}
 
                     {/* User Info */}
                     {isAuthenticated && (
-                        <>
-                            <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-pink-500/30 via-orange-500/30 to-purple-600/30 flex items-center justify-center border border-primary/20 shadow-lg shadow-primary/10">
-                                    <span className="bg-clip-text text-transparent bg-gradient-to-br from-pink-500 to-purple-600 font-semibold text-sm">
+                        <div className="flex items-center gap-4 pl-6 border-l border-white/10">
+                            <div className="flex flex-col items-end leading-none hidden md:flex">
+                                <span className="text-xs font-bold text-foreground/80">{user?.email?.split('@')[0]}</span>
+                                <span className="text-[10px] text-primary font-black uppercase tracking-widest opacity-60">Architect</span>
+                            </div>
+                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-[1px] shadow-xl group/user cursor-pointer">
+                                <div className="w-full h-full rounded-2xl bg-background flex items-center justify-center border border-white/10 overflow-hidden relative">
+                                    <span className="bg-clip-text text-transparent bg-gradient-to-br from-primary to-rose-500 font-black text-lg">
                                         {user?.email?.[0]?.toUpperCase() || "U"}
                                     </span>
+                                    <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover/user:opacity-100 transition-opacity duration-300" />
                                 </div>
-                                {!minimal && (
-                                    <span className="text-sm text-muted-foreground hidden sm:block font-medium">
-                                        {user?.email || "user@neuralnexus.ai"}
-                                    </span>
-                                )}
                             </div>
 
                             {/* Logout */}
                             <button
                                 onClick={handleLogout}
-                                className="p-2.5 rounded-xl hover:bg-destructive/10 transition-all duration-300 text-muted-foreground hover:text-destructive border border-transparent hover:border-destructive/30"
+                                className="p-3 rounded-2xl bg-destructive/5 hover:bg-destructive/10 transition-all duration-300 text-muted-foreground hover:text-destructive border border-transparent hover:border-destructive/20"
                                 aria-label="Logout"
                             >
                                 <LogOut className="w-5 h-5" />
                             </button>
-                        </>
+                        </div>
                     )}
                 </div>
             </div>

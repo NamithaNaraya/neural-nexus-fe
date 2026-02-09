@@ -9,7 +9,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Html } from '@react-three/drei';
+import { OrbitControls, Html, Billboard, Text } from '@react-three/drei';
 // EffectComposer temporarily disabled due to initialization crash
 // import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
@@ -40,7 +40,17 @@ interface NeuralSpace3DProps {
 }
 
 // Simplified Scene that includes post-processing for better lifecycle sync
-function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry, pulseGeometry: THREE.BufferGeometry, isMounted: boolean }) {
+interface SceneProps extends NeuralSpace3DProps {
+    nodeGeometry: THREE.BufferGeometry;
+    pulseGeometry: THREE.BufferGeometry;
+    isMounted: boolean;
+    setOrbitEnabled: (enabled: boolean) => void;
+    orbitEnabled: boolean;
+    d3AlphaDecay?: number;
+    d3VelocityDecay?: number;
+}
+
+function Scene(props: SceneProps) {
     const {
         nodes = [],
         links = [],
@@ -49,7 +59,9 @@ function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry,
         nodeGeometry,
         pulseGeometry,
         folderId,
-        isMounted
+        isMounted,
+        setOrbitEnabled,
+        orbitEnabled
     } = props;
 
     const nodesWithPositions = useMemo(() => {
@@ -146,6 +158,7 @@ function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry,
 
             <OrbitControls
                 makeDefault
+                enabled={orbitEnabled}
                 enableDamping
                 dampingFactor={0.05}
                 minDistance={50}
@@ -160,120 +173,42 @@ function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry,
                 onNodeClick={props.onNodeClick}
                 onNodeHover={props.onNodeHover}
                 nodeGeometry={nodeGeometry}
+                onDragStart={() => setOrbitEnabled(false)}
+                onDragEnd={() => setOrbitEnabled(true)}
             />
 
-            {/* Relationship Labels - ALWAYS show for ALL links in Neo4j style (Optimized for Large Graphs) */}
-            {nodesWithPositions.length < 500 && (Array.isArray(links) ? links : [])
-                .map((link, i) => {
-                    if (!link || !link.source || !link.target) return null;
-                    const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
-                    const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
-                    const s = nodeMap.get(sourceId);
-                    const t = nodeMap.get(targetId);
-                    if (!s || !t) return null;
-
-                    return (
-                        <Html
-                            key={`link-label-${i}`}
-                            position={[(s.x + t.x) / 2, ((s.y + t.y) / 2), (s.z + t.z) / 2]}
-                            center
-                            distanceFactor={400}
-                            style={{
-                                pointerEvents: 'none',
-                                display: nodesWithPositions.length > 200 ? 'none' : 'block' // Auto-hide link labels in dense clusters
-                            }}
-                        >
-                            <div className="px-2 py-0.5 rounded shadow-xl bg-slate-900 border border-white/20 text-[10px] font-bold text-white uppercase tracking-tight whitespace-nowrap opacity-80">
-                                {link.type}
-                            </div>
-                        </Html>
-                    );
-                })}
-
-            {/* Neo4j-style Node Circles with Names Inside (Performance Optimized) */}
+            {/* High Performance Labels - Switched to Html for stability */}
             {nodesWithPositions.map(node => {
                 const isSelected = Array.isArray(selectedNodes) && selectedNodes.includes(node.id);
                 const isHovered = hoveredNode === node.id;
-                const nodeColor = NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
 
-                // Scale sizes based on degree + Neo4j vibe
-                const degreeBonus = Math.min((node.degree || 0) * 2, 40);
-                const size = (isSelected ? 80 : isHovered ? 70 : 60) + degreeBonus;
-                const isLargeGraph = nodesWithPositions.length > 100;
-
-                // LOD: Only show labels for high-degree nodes or if interacted
-                const showLabel = isSelected || isHovered || (node.degree || 0) > 3 || !isLargeGraph;
+                // LOD: Only show labels for important nodes or if interacted
+                const isLargeGraph = nodesWithPositions.length > 80;
+                const showLabel = isSelected || isHovered || (node.degree || 0) > (isLargeGraph ? 8 : 1);
 
                 if (!showLabel) return null;
 
                 return (
                     <Html
-                        key={`neo-node-${node.id}`}
-                        position={[node.x!, node.y!, node.z!]}
+                        key={`label-${node.id}`}
+                        position={[node.x!, node.y! + 12, node.z!]}
                         center
-                        distanceFactor={400}
+                        distanceFactor={400} // Perspective scaling
                         style={{
-                            pointerEvents: 'auto',
-                            zIndex: isSelected || isHovered ? 10 : 1,
-                            // Performance: Disable transitions for large node counts
-                            transition: isLargeGraph ? 'none' : 'all 0.3s ease-out'
+                            pointerEvents: 'none',
+                            userSelect: 'none',
                         }}
                     >
-                        <div
-                            onClick={(e) => { e.stopPropagation(); props.onNodeClick(node.id, e); }}
-                            onDoubleClick={(e) => { e.stopPropagation(); props.onNodeDoubleClick(node.id); }}
-                            onMouseEnter={() => props.onNodeHover(node.id)}
-                            onMouseLeave={() => props.onNodeHover(null)}
-                            className={`
-                                relative flex items-center justify-center rounded-full
-                                border-[4px] shadow-2xl cursor-pointer
-                                select-none
-                                ${!isLargeGraph ? 'transition-transform duration-300' : ''}
-                                ${isSelected ? 'ring-4 ring-white/40 scale-110' : ''}
-                                ${isHovered && !isSelected ? 'ring-2 ring-white/20 scale-105' : ''}
-                            `}
-                            style={{
-                                width: size,
-                                height: size,
-                                backgroundColor: nodeColor,
-                                borderColor: isSelected ? '#ffffff' : 'rgba(255,255,255,0.4)',
-                                boxShadow: isSelected
-                                    ? `0 0 40px ${nodeColor}, inset 0 0 15px rgba(0,0,0,0.2)`
-                                    : `0 8px 16px rgba(0,0,0,0.3), inset 0 0 5px rgba(0,0,0,0.1)`,
-                            }}
-                        >
-                            {/* Inner label */}
-                            <div className="text-white text-center flex flex-col items-center justify-center pointer-events-none px-2 w-full h-full">
-                                <span className="text-[10px] font-black leading-tight tracking-tight drop-shadow-md break-all overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
-                                    {node.name}
-                                </span>
-                            </div>
-
-                            {/* Type badge above node on hover */}
-                            {(isHovered || isSelected) && (
-                                <div className="absolute -top-7 px-2 py-0.5 rounded-full bg-slate-900/90 text-[8px] font-bold text-white whitespace-nowrap border border-white/20 shadow-lg z-50">
-                                    {node.type}
-                                </div>
-                            )}
+                        <div className={`
+                            px-3 py-1 rounded-full border border-white/20 backdrop-blur-md font-bold text-[11px] whitespace-nowrap
+                            ${isSelected ? 'bg-primary text-white scale-110 shadow-lg shadow-primary/20' : 'bg-black/60 text-white/90'}
+                            transition-all duration-300
+                        `}>
+                            {node.name}
                         </div>
-                        {/* Type badge below node (Default visible only for smaller graphs or if selected) */}
-                        {(!isLargeGraph || isSelected || isHovered) && (
-                            <div
-                                className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 px-2 py-0.5 rounded-full text-[7px] font-bold uppercase tracking-wide whitespace-nowrap"
-                                style={{
-                                    backgroundColor: `${nodeColor}20`,
-                                    color: isSelected ? '#fff' : nodeColor,
-                                    border: `1px solid ${nodeColor}40`,
-                                    backdropFilter: 'blur(4px)'
-                                }}
-                            >
-                                {node.type}
-                            </div>
-                        )}
                     </Html>
                 );
             })}
-            {/* Post-processing temporarily disabled - using enhanced materials instead */}
         </group>
     );
 }
@@ -282,9 +217,16 @@ export function NeuralSpace3D(props: NeuralSpace3DProps) {
     const { nodes = [], links = [], selectedNodes = [] } = props;
     const [isDark, setIsDark] = useState(true);
     const [mounted, setMounted] = useState(false);
-    // Performance: Reduced sphere segments for large graph rendering
-    const nodeGeometry = useMemo(() => new THREE.SphereGeometry(1, 16, 12), []);
-    const pulseGeometry = useMemo(() => new THREE.SphereGeometry(0.8, 12, 8), []);
+    const [orbitEnabled, setOrbitEnabled] = useState(true);
+
+    // SSR Guard: Prevent any execution during server-side rendering
+    if (typeof window === 'undefined') {
+        return <div className="w-full h-full bg-[#05070A]" />;
+    }
+
+    // Higher fidelity geometries for "Super Shape" look
+    const nodeGeometry = useMemo(() => new THREE.SphereGeometry(1, 32, 32), []);
+    const pulseGeometry = useMemo(() => new THREE.SphereGeometry(0.8, 24, 24), []);
 
     useEffect(() => {
         setMounted(true);
@@ -307,19 +249,25 @@ export function NeuralSpace3D(props: NeuralSpace3DProps) {
 
     const sceneBgColor = isDark ? '#05070A' : '#F8FAFC';
     const glConfig = useMemo(() => ({
-        antialias: false,
+        antialias: true,
         alpha: false,
         powerPreference: 'high-performance' as const,
         stencil: false,
         depth: true,
-        failIfMajorPerformanceCaveat: false
+        failIfMajorPerformanceCaveat: false,
+        precision: 'highp' as const
     }), []);
     const cameraConfig = useMemo(() => ({ position: [0, 100, 1000] as [number, number, number], fov: 60 }), []);
 
     return (
         <div className="w-full h-full relative" style={{ backgroundColor: sceneBgColor }}>
             <IngestionProgressHUD />
-            <Canvas shadows={false} camera={cameraConfig} gl={glConfig} dpr={[1, 1.5]}>
+            <Canvas
+                shadows={false}
+                camera={cameraConfig}
+                gl={glConfig}
+                dpr={[1, 2]}
+            >
                 <color attach="background" args={[sceneBgColor]} />
                 <Scene
                     {...props}
@@ -331,6 +279,10 @@ export function NeuralSpace3D(props: NeuralSpace3DProps) {
                     nodeGeometry={nodeGeometry}
                     pulseGeometry={pulseGeometry}
                     isMounted={mounted}
+                    setOrbitEnabled={setOrbitEnabled}
+                    orbitEnabled={orbitEnabled}
+                    d3AlphaDecay={0.05}
+                    d3VelocityDecay={0.6}
                 />
             </Canvas>
             <div className="absolute bottom-4 left-4 z-10 p-3 rounded-lg border border-white/5 bg-background/40 backdrop-blur-xl max-w-xs pointer-events-none">

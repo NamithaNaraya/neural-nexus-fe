@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     X,
     Activity,
@@ -192,176 +193,202 @@ export function AlgorithmDrawer({ isOpen, onClose, folderId }: AlgorithmDrawerPr
     return (
         <>
             {/* Backdrop */}
-            {isOpen && (
-                <div
-                    className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
-                    onClick={onClose}
-                />
-            )}
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+                        onClick={onClose}
+                    />
+                )}
+            </AnimatePresence>
 
             {/* Drawer */}
-            <div
-                data-tour="algorithm-drawer"
-                className={`fixed top-0 right-0 h-full w-96 bg-card border-l border-border shadow-2xl z-50 transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
-                    }`}
-            >
-                {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-border">
-                    <div className="flex items-center gap-2">
-                        <Zap className="w-5 h-5 text-primary" />
-                        <h2 className="font-semibold">Graph Algorithms</h2>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ translateX: '-100%' }}
+                        animate={{ translateX: 0 }}
+                        exit={{ translateX: '-100%' }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                        data-tour="algorithm-drawer"
+                        className="fixed top-0 left-0 h-full w-[400px] glass-strong z-50 border-r border-white/10 shadow-[20px_0_60px_rgba(0,0,0,0.3)] flex flex-col"
                     >
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-
-                {/* Category Tabs */}
-                <div className="flex border-b border-border overflow-x-auto">
-                    {Object.entries(categoryLabels).map(([key, { label, icon }]) => (
-                        <button
-                            key={key}
-                            onClick={() => setActiveCategory(key as AlgorithmCategory)}
-                            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm whitespace-nowrap border-b-2 transition-colors ${activeCategory === key
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-muted-foreground hover:text-foreground'
-                                }`}
-                        >
-                            {icon}
-                            {label}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Algorithm Selection Filtering */}
-                <div className="px-4 py-3 bg-muted/30 border-b border-border">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Target className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">Execution Scope</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {selectedNodes.length > 0 && (
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold border border-primary/20 animate-in fade-in zoom-in">
-                                    {selectedNodes.length} Selected
-                                </span>
-                            )}
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-white/10">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-primary/20 text-primary">
+                                    <Zap className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold tracking-tight">Graph Intelligence</h2>
+                                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest opacity-60">Advanced Analytics</p>
+                                </div>
+                            </div>
                             <button
-                                onClick={() => setRunOnSelection(!runOnSelection)}
-                                disabled={selectedNodes.length === 0}
-                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${runOnSelection && selectedNodes.length > 0 ? 'bg-primary' : 'bg-muted'
-                                    } ${selectedNodes.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                onClick={onClose}
+                                className="p-2 rounded-xl hover:bg-white/10 transition-colors text-muted-foreground hover:text-foreground"
                             >
-                                <span className="sr-only">Run on selected nodes only</span>
-                                <span
-                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${runOnSelection && selectedNodes.length > 0 ? 'translate-x-5' : 'translate-x-1'
-                                        }`}
-                                />
+                                <X className="w-5 h-5" />
                             </button>
                         </div>
-                    </div>
-                    {selectedNodes.length === 0 && (
-                        <p className="text-[10px] text-muted-foreground mt-1 italic">
-                            Select nodes in the graph to enable subset analysis
-                        </p>
-                    )}
-                    {selectedNodes.length > 0 && (
-                        <p className="text-[10px] text-muted-foreground mt-1">
-                            {runOnSelection ? "Running on selected nodes only" : "Running on full graph/folder"}
-                        </p>
-                    )}
-                </div>
 
-                {/* Algorithm List */}
-                <div className="p-4 space-y-2 max-h-[35vh] overflow-y-auto">
-                    {filteredAlgorithms.map(algo => (
-                        <button
-                            key={algo.key}
-                            onClick={() => runAlgorithm(algo)}
-                            disabled={isLoading}
-                            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all duration-200 ${selectedAlgorithm === algo.key
-                                ? 'border-primary bg-primary/5 shadow-inner'
-                                : 'border-border hover:border-primary/40 hover:bg-muted/50'
-                                }`}
-                        >
-                            <div className={`p-2.5 rounded-lg shadow-sm transition-colors ${selectedAlgorithm === algo.key
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted border border-border/50'
-                                }`}>
-                                {algo.icon}
-                            </div>
-                            <div className="flex-1 text-left">
-                                <div className="font-semibold text-sm leading-none mb-1">{algo.name}</div>
-                                <div className="text-[10px] text-muted-foreground line-clamp-1">{algo.description}</div>
-                            </div>
-                            {isLoading && selectedAlgorithm === algo.key ? (
-                                <LoadingSpinner size="sm" />
-                            ) : (
-                                <Zap className={`w-3.5 h-3.5 transition-opacity ${selectedAlgorithm === algo.key ? 'opacity-100' : 'opacity-0'}`} />
-                            )}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Results Panel */}
-                <div className="flex-1 p-4 border-t border-border overflow-y-auto">
-                    {error && (
-                        <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-                            {error}
+                        {/* Category Tabs */}
+                        <div className="flex px-4 pt-4 gap-1 overflow-x-auto scrollbar-none">
+                            {Object.entries(categoryLabels).map(([key, { label, icon }]) => (
+                                <button
+                                    key={key}
+                                    onClick={() => setActiveCategory(key as AlgorithmCategory)}
+                                    className={`
+                                        flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-full transition-all duration-300
+                                        ${activeCategory === key
+                                            ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                                            : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
+                                        }
+                                    `}
+                                >
+                                    {icon}
+                                    {label}
+                                </button>
+                            ))}
                         </div>
-                    )}
 
-                    {result && !isLoading && (
-                        <div className="space-y-4">
+                        {/* Algorithm Selection Filtering */}
+                        <div className="m-4 p-4 rounded-2xl bg-white/5 border border-white/5">
                             <div className="flex items-center justify-between">
-                                <h3 className="font-medium capitalize">{result.algorithm}</h3>
-                                <span className="text-xs text-muted-foreground">
-                                    {result.results?.length || 0} results
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <Target className="w-4 h-4 text-primary/80" />
+                                    <span className="text-xs font-bold uppercase tracking-wider opacity-80">Execution Scope</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    {selectedNodes.length > 0 && (
+                                        <span className="text-[10px] px-2.5 py-1 rounded-full bg-primary/20 text-primary font-black border border-primary/20">
+                                            {selectedNodes.length} SELECTED
+                                        </span>
+                                    )}
+                                    <button
+                                        onClick={() => setRunOnSelection(!runOnSelection)}
+                                        disabled={selectedNodes.length === 0}
+                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-500 focus:outline-none ${runOnSelection && selectedNodes.length > 0 ? 'bg-primary shadow-[0_0_12px_rgba(168,85,247,0.4)]' : 'bg-white/10'
+                                            } ${selectedNodes.length === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                    >
+                                        <span
+                                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-300 ${runOnSelection && selectedNodes.length > 0 ? 'translate-x-6' : 'translate-x-1'
+                                                }`}
+                                        />
+                                    </button>
+                                </div>
                             </div>
+                            <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed italic opacity-80">
+                                {selectedNodes.length === 0
+                                    ? "Select nodes in the graph to enable targeted subset analysis."
+                                    : (runOnSelection ? "Running on selected nodes only for precise insights." : "Running on full graph context.")}
+                            </p>
+                        </div>
 
-                            {/* Insight */}
-                            {result.insight && (
-                                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
-                                    <p className="text-sm leading-relaxed">{result.insight}</p>
+                        {/* Algorithm List */}
+                        <div className="px-4 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/5 max-h-[30vh]">
+                            {filteredAlgorithms.map(algo => (
+                                <button
+                                    key={algo.key}
+                                    onClick={() => runAlgorithm(algo)}
+                                    disabled={isLoading}
+                                    className={`
+                                        w-full flex items-center gap-4 p-3.5 rounded-2xl border transition-all duration-300 group
+                                        ${selectedAlgorithm === algo.key
+                                            ? 'border-primary bg-primary/10 shadow-[0_0_20px_rgba(168,85,247,0.1)]'
+                                            : 'border-white/5 bg-white/2 hover:border-white/20 hover:bg-white/5'
+                                        }
+                                    `}
+                                >
+                                    <div className={`
+                                        p-3 rounded-xl shadow-lg transition-all duration-500 group-hover:scale-110
+                                        ${selectedAlgorithm === algo.key
+                                            ? 'bg-primary text-primary-foreground rotate-6'
+                                            : 'bg-white/5 text-muted-foreground'
+                                        }
+                                    `}>
+                                        {algo.icon}
+                                    </div>
+                                    <div className="flex-1 text-left">
+                                        <div className="font-bold text-sm tracking-tight mb-0.5">{algo.name}</div>
+                                        <div className="text-[10px] text-muted-foreground/80 font-medium">{algo.description}</div>
+                                    </div>
+                                    {isLoading && selectedAlgorithm === algo.key ? (
+                                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
+                                    ) : (
+                                        <Zap className={`w-3.5 h-3.5 transition-all duration-500 ${selectedAlgorithm === algo.key ? 'opacity-100 text-primary scale-125' : 'opacity-0'}`} />
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Results Panel */}
+                        <div className="flex-1 m-4 p-5 rounded-3xl bg-black/20 border border-white/5 overflow-hidden flex flex-col">
+                            {error && (
+                                <div className="p-4 rounded-xl bg-destructive/10 text-destructive text-xs font-bold border border-destructive/20 animate-in fade-in slide-in-from-top-2">
+                                    {error}
                                 </div>
                             )}
 
-                            {/* Results List */}
-                            <div className="space-y-2 max-h-60 overflow-y-auto">
-                                {result.results?.slice(0, 10).map((item: AlgorithmResultItem, i: number) => (
-                                    <div
-                                        key={item.id || i}
-                                        className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
-                                    >
-                                        <div>
-                                            <div className="font-medium text-sm">{item.name}</div>
-                                            {item.type && (
-                                                <div className="text-xs text-muted-foreground">{item.type}</div>
-                                            )}
+                            {result && !isLoading && (
+                                <div className="space-y-4 flex-1 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="font-bold text-xs uppercase tracking-widest text-primary/80">{result.algorithm} RESULTS</h3>
+                                        <div className="px-2 py-0.5 rounded-md bg-white/5 text-[10px] font-bold text-muted-foreground">
+                                            {result.results?.length || 0} TOTAL
                                         </div>
-                                        {item.score !== undefined && (
-                                            <span className="text-sm font-mono">
-                                                {item.score.toFixed(4)}
-                                            </span>
-                                        )}
                                     </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
 
-                    {!result && !isLoading && !error && (
-                        <div className="text-center text-muted-foreground py-8">
-                            <Zap className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">Select an algorithm to run</p>
+                                    {/* Insight - Flowy Glass Container */}
+                                    {result.insight && (
+                                        <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 shadow-inner">
+                                            <p className="text-[13px] leading-relaxed font-medium text-foreground/90 italic">"{result.insight}"</p>
+                                        </div>
+                                    )}
+
+                                    {/* Results List */}
+                                    <div className="flex-1 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 pr-2">
+                                        {result.results?.slice(0, 15).map((item: AlgorithmResultItem, i: number) => (
+                                            <motion.div
+                                                initial={{ opacity: 0, x: 10 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: i * 0.05 }}
+                                                key={item.id || i}
+                                                className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 hover:bg-white/8 transition-all duration-300"
+                                            >
+                                                <div className="min-w-0 flex-1 mr-4">
+                                                    <div className="font-bold text-xs truncate">{item.name}</div>
+                                                    {item.type && (
+                                                        <div className="text-[9px] uppercase tracking-tighter text-muted-foreground font-black mt-0.5">{item.type}</div>
+                                                    )}
+                                                </div>
+                                                {item.score !== undefined && (
+                                                    <div className="px-2 py-1 rounded-md bg-black/40 text-[11px] font-mono text-cyan-400 font-bold border border-cyan-400/20">
+                                                        {item.score.toFixed(4)}
+                                                    </div>
+                                                )}
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {!result && !isLoading && !error && (
+                                <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40">
+                                    <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/10 group-hover:scale-110 transition-transform duration-700">
+                                        <Zap className="w-8 h-8 text-muted-foreground" />
+                                    </div>
+                                    <h4 className="text-sm font-bold mb-1 tracking-tight">Ready for Discovery</h4>
+                                    <p className="text-[10px] font-medium max-w-[180px]">Select an algorithm above to reveal hidden patterns in your graph engine.</p>
+                                </div>
+                            )}
                         </div>
-                    )}
-                </div>
-            </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </>
     );
 }

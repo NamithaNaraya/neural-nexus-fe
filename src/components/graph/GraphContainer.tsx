@@ -57,10 +57,13 @@ interface GraphContainerProps {
 // Loading state component
 function GraphLoadingState({ message }: { message: string }) {
     return (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-            <div className="text-center">
-                <Loader2 className="w-8 h-8 text-emerald animate-spin mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">{message}</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-black/5 backdrop-blur-xl z-50">
+            <div className="text-center group">
+                <div className="relative mb-6">
+                    <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full group-hover:bg-primary/40 transition-all duration-1000" />
+                    <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto relative z-10" />
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-primary/80 animate-pulse">{message}</p>
             </div>
         </div>
     );
@@ -71,37 +74,32 @@ function GraphEmptyState({ folderId }: { folderId?: string }) {
     const router = useRouter();
 
     return (
-        <div className="absolute inset-0 flex items-center justify-center bg-background">
-            <div className="text-center max-w-md px-6">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald/20 to-cyan-500/20 flex items-center justify-center">
-                    <svg className="w-10 h-10 text-emerald" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                    </svg>
+        <div className="absolute inset-0 flex items-center justify-center bg-transparent overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-rose-500/5 opacity-50" />
+            <div className="text-center max-w-lg px-8 py-12 glass-strong rounded-[3rem] border border-white/10 shadow-2xl relative z-10">
+                <div className="w-24 h-24 mx-auto mb-8 rounded-3xl bg-gradient-to-br from-primary via-orange-500 to-rose-500 flex items-center justify-center shadow-2xl shadow-primary/20 hover:rotate-6 transition-transform duration-500">
+                    <Zap className="w-10 h-10 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">No Knowledge Graph Yet</h3>
-                <p className="text-sm text-muted-foreground mb-6">
-                    Upload documents to this folder to automatically extract entities and relationships.
-                    Your knowledge graph will appear here once processing is complete.
+                <h3 className="text-2xl font-black text-foreground mb-4 tracking-tighter uppercase font-heading">Void Detected</h3>
+                <p className="text-sm text-muted-foreground/80 mb-8 font-medium leading-relaxed italic">
+                    The neural pathways are currently dark. Synchronize data streams to begin knowledge extraction.
                 </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <button
                         onClick={() => router.push('/library')}
-                        className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald text-white rounded-lg hover:bg-emerald-dark transition-colors font-medium"
+                        className="flex items-center justify-center gap-3 px-8 py-4 bg-primary text-white rounded-2xl hover:bg-primary/90 transition-all font-black text-[11px] uppercase tracking-widest shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-1"
                     >
                         <Zap className="w-4 h-4" />
-                        Upload Documents
+                        Initialize Ingestion
                     </button>
                     <button
                         onClick={() => router.push('/library')}
-                        className="flex items-center justify-center gap-2 px-5 py-2.5 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors"
+                        className="flex items-center justify-center gap-3 px-8 py-4 glass hover:bg-white/10 text-foreground rounded-2xl transition-all font-black text-[11px] uppercase tracking-widest border border-white/10 hover:-translate-y-1"
                     >
                         <FolderTree className="w-4 h-4" />
-                        Browse Library
+                        Sync Librarian
                     </button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-6">
-                    Supported formats: PDF, CSV, TXT, MD, DOCX
-                </p>
             </div>
         </div>
     );
@@ -128,18 +126,22 @@ class GraphErrorBoundary extends React.Component<
     render() {
         if (this.state.hasError) {
             return (
-                <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-                    <AlertTriangle className="w-12 h-12 text-destructive mb-4" />
-                    <h3 className="text-lg font-semibold text-foreground">Visualization Error</h3>
-                    <p className="text-sm text-muted-foreground mb-4 max-w-md">
-                        {this.state.error?.message || "An unexpected error occurred while rendering the graph."}
-                    </p>
-                    <button
-                        onClick={() => this.setState({ hasError: false })}
-                        className="px-4 py-2 bg-emerald text-white rounded-lg hover:bg-emerald-dark"
-                    >
-                        Try Again
-                    </button>
+                <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-md">
+                    <div className="text-center p-12 glass-strong rounded-[2rem] border border-destructive/20 max-w-md shadow-2xl">
+                        <div className="w-16 h-16 bg-destructive/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <AlertTriangle className="w-8 h-8 text-destructive" />
+                        </div>
+                        <h3 className="text-lg font-black text-foreground uppercase tracking-tight mb-2">Protocol Failure</h3>
+                        <p className="text-sm text-muted-foreground mb-6 font-medium italic">
+                            {this.state.error?.message || "Dimensional rendering collapsed unexpectedly."}
+                        </p>
+                        <button
+                            onClick={() => this.setState({ hasError: false })}
+                            className="px-8 py-3 bg-destructive/10 text-destructive border border-destructive/20 rounded-xl hover:bg-destructive/20 transition-all font-black text-[10px] uppercase tracking-widest"
+                        >
+                            REBOOT RENDERER
+                        </button>
+                    </div>
                 </div>
             );
         }
@@ -448,13 +450,8 @@ export function GraphContainer({
                 />
             )}
 
-            {/* Search Bar */}
-            <div className="absolute top-16 left-4 z-30 w-[360px]">
-                <GraphSearch />
-            </div>
-
             {/* Main Visualization Area */}
-            <div className={`absolute inset-0 pt-14 transition-all duration-300 ease-in-out ${showFilters ? 'pl-[380px]' : 'pl-0'}`}>
+            <div className="absolute inset-0 pt-0 flex items-center justify-center">
                 {isGraphLoading ? (
                     <GraphLoadingState message="Loading graph data..." />
                 ) : !hasData ? (
@@ -525,29 +522,29 @@ export function GraphContainer({
                 )}
             </div>
 
+            {/* Floating Tools UI Layer - Unified Left Alignment */}
+            <div className="absolute inset-0 pointer-events-none z-40">
+                {/* Search Bar */}
+                <div className="absolute top-24 left-6 w-[360px] pointer-events-auto">
+                    <GraphSearch />
+                </div>
 
+                {/* Filters Panel - Stacked/Floating on the left */}
+                <AnimatePresence>
+                    {showFilters && (
+                        <motion.div
+                            initial={{ x: -400, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: -400, opacity: 0 }}
+                            className="absolute left-6 top-40 bottom-6 w-[360px] pointer-events-auto"
+                        >
+                            <GraphFilters onClose={() => setShowFilters(false)} />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
 
-            {/* Filters Panel */}
-            <AnimatePresence>
-                {showFilters && (
-                    <motion.div
-                        initial={{ x: -360, opacity: 0 }}
-                        animate={{ x: 0, opacity: 1 }}
-                        exit={{ x: -360, opacity: 0 }}
-                        className="absolute left-4 top-32 bottom-4 w-[360px] z-20"
-                    >
-                        <GraphFilters onClose={() => setShowFilters(false)} />
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-
-
-            {/* Node Detail Panel removed - user prefers clean interface */}
-
-            {/* Tooltip removed - user prefers clean interface without description box */}
-
-            {/* Node Detail Sidebar */}
+            {/* Node Detail Sidebar - Primary left panel when active */}
             <AnimatePresence>
                 {showNodeDetail && selectedNodeForDetail && (
                     <NodeDetailPanel
@@ -561,7 +558,6 @@ export function GraphContainer({
                         onExpand={handleNodeDoubleClick}
                         onFocus={(id) => zoomToNode?.(id)}
                         onInitiateAnalysis={(node) => {
-                            // Trigger deep analysis logic - this could open the analysis panel
                             console.log('Initiating analysis for node:', node.name);
                         }}
                     />
