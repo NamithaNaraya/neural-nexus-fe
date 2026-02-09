@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
+import { useUIStore } from "@/store/uiStore";
 import { Sun, Moon, LogOut } from "lucide-react";
 
 interface HeaderProps {
@@ -22,22 +23,7 @@ export function Header({ showThemeToggle = true, minimal = false }: HeaderProps)
     const router = useRouter();
     const pathname = usePathname();
     const { user, logout, isAuthenticated } = useAuthStore();
-    const [isDarkMode, setIsDarkMode] = useState(true);
-
-    // Sync with document theme
-    useEffect(() => {
-        setIsDarkMode(document.documentElement.classList.contains('dark'));
-    }, []);
-
-    const toggleTheme = () => {
-        const newMode = !isDarkMode;
-        setIsDarkMode(newMode);
-        if (newMode) {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-    };
+    const { theme, toggleTheme } = useUIStore();
 
     const handleLogout = () => {
         logout();
@@ -64,7 +50,7 @@ export function Header({ showThemeToggle = true, minimal = false }: HeaderProps)
                             className="p-2 rounded-lg hover:bg-muted transition-colors"
                             aria-label="Toggle theme"
                         >
-                            {isDarkMode ? (
+                            {theme === 'dark' ? (
                                 <Sun className="w-5 h-5 text-muted-foreground" />
                             ) : (
                                 <Moon className="w-5 h-5 text-muted-foreground" />

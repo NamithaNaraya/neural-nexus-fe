@@ -286,8 +286,9 @@ export const docAiApi = {
                 include_clustering?: boolean;
                 include_ghost_lines?: boolean;
                 include_health?: boolean;
+                entity_types?: string[]; // Filter by entity types
             }
-        ) => api.get(endpoints.graph.export(folderId), options),
+        ) => api.get(endpoints.graph.export(folderId), options as any),
 
         // Get layout
         getLayout: (
@@ -410,4 +411,9 @@ export const docAiApi = {
 };
 
 export default api;
+
+// Re-export modular API components for compatibility
+export { graphApi } from './api/graph';
+export { analyticsApi } from './api/analytics';
+export { authApi } from './api/auth';
 

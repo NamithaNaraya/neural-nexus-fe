@@ -129,6 +129,7 @@ interface GraphState {
     updateNode: (id: string, updates: Partial<GraphNode>) => void;
     removeNode: (id: string) => void;
     addLink: (link: GraphLink) => void;
+    addNodesAndLinks: (nodes: GraphNode[], links: GraphLink[]) => void;
     removeLink: (source: string, target: string) => void;
 
     // Layout
@@ -372,6 +373,29 @@ export const useGraphStore = create<GraphState>()(
                 nodes: [...state.nodes, node],
                 nodeCount: state.nodeCount + 1,
                 nodeTypes: Array.from(new Set([...state.nodeTypes, node.type])),
+            };
+        }),
+
+        // Atomic addition of multiple nodes and links
+        addNodesAndLinks: (newNodes, newLinks) => set((state) => {
+            const existingNodeIds = new Set(state.nodes.map(n => n.id));
+            const existingLinkKeys = new Set(state.links.map(l => `${l.source}-${l.target}-${l.type}`));
+
+            const nodesToAdd = newNodes.filter(n => !existingNodeIds.has(n.id));
+            const linksToAdd = newLinks.filter(l => !existingLinkKeys.has(`${l.source}-${l.target}-${l.type}`));
+
+            if (nodesToAdd.length === 0 && linksToAdd.length === 0) return state;
+
+            const updatedNodes = [...state.nodes, ...nodesToAdd];
+            const updatedLinks = [...state.links, ...linksToAdd];
+
+            return {
+                nodes: updatedNodes,
+                links: updatedLinks,
+                nodeCount: updatedNodes.length,
+                linkCount: updatedLinks.length,
+                nodeTypes: Array.from(new Set(updatedNodes.map(n => n.type))),
+                linkTypes: Array.from(new Set(updatedLinks.map(l => l.type))),
             };
         }),
 

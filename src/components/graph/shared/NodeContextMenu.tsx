@@ -22,6 +22,7 @@ import {
     Expand,
     EyeOff,
     Share2,
+    X,
 } from 'lucide-react';
 
 export interface ContextMenuAction {
@@ -152,14 +153,47 @@ export function NodeContextMenu({
             label: 'Copy Details',
             icon: <Copy className="w-4 h-4" />,
             onClick: () => {
-                // Copy node details to clipboard
+                // Copy node details to clipboard with fallback for non-secure contexts
                 const details = `Node: ${nodeName}\nID: ${nodeId}`;
-                navigator.clipboard.writeText(details);
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(details).catch(err => {
+                        console.error('Failed to copy: ', err);
+                        fallbackCopyTextToClipboard(details);
+                    });
+                } else {
+                    fallbackCopyTextToClipboard(details);
+                }
+
                 onCopyDetails?.();
                 onClose();
             },
         },
     ];
+
+    // Fallback for copy when navigator.clipboard is not available (non-secure context)
+    function fallbackCopyTextToClipboard(text: string) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+
+        // Ensure textarea is not visible
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+
+        textArea.focus();
+        textArea.select();
+
+        try {
+            const successful = document.execCommand('copy');
+            if (!successful) console.error('Fallback copy was unsuccessful');
+        } catch (err) {
+            console.error('Fallback copy failed', err);
+        }
+
+        document.body.removeChild(textArea);
+    }
 
     // Destructive actions (shown at bottom with separator)
     const destructiveActions: ContextMenuAction[] = [
@@ -197,11 +231,20 @@ export function NodeContextMenu({
             }}
         >
             {/* Header */}
-            <div className="px-3 py-2 border-b border-border bg-muted/50">
-                <p className="text-xs text-muted-foreground">Node</p>
-                <p className="text-sm font-medium text-foreground truncate max-w-[180px]">
-                    {nodeName}
-                </p>
+            <div className="px-3 py-2 border-b border-border bg-muted/50 flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground">Node</p>
+                    <p className="text-sm font-medium text-foreground truncate">
+                        {nodeName}
+                    </p>
+                </div>
+                <button
+                    onClick={onClose}
+                    className="p-1 ml-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+                    aria-label="Close menu"
+                >
+                    <X className="w-4 h-4" />
+                </button>
             </div>
 
             {/* Actions */}

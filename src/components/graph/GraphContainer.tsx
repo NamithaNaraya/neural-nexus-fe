@@ -16,12 +16,10 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGraphStore, GraphNode, GraphLink } from '@/store/graphStore';
 import { GraphToolbar } from './panels/GraphToolbar';
-import { NodeDetailPanel } from './panels/NodeDetailPanel';
-import { NodeTooltip } from './panels/NodeTooltip';
 import { GraphSearch } from './shared/GraphSearch';
 import { GraphFilters } from './shared/GraphFilters';
 import { GraphStats } from './shared/GraphStats';
-import { NodeContextMenu, initialContextMenuState } from './shared/NodeContextMenu';
+import { NodeDetailPanel } from './panels/NodeDetailPanel';
 import { DataCanvas } from '../../visualizations/DataCanvas';
 import { FileScopePanel } from './panels/FileScopePanel';
 import { GraphViewMode } from './types';
@@ -30,7 +28,7 @@ import { useDevice, useViewModeLock } from '@/hooks/useDevice';
 import { Loader2, Maximize2, Minimize2, Zap, FolderTree, AlertTriangle } from 'lucide-react';
 import { OnboardingOverlay, useOnboarding } from '@/components/onboarding';
 import { NodeEditorModal, RelationshipEditorModal, DeleteConfirmModal } from './modals';
-import { graphApi } from '@/lib/api';
+import { api } from '@/lib/api';
 
 // Dynamic imports for heavy visualization components
 const NeuralSpace3D = dynamic(() => import('./3d/NeuralSpace3D').then(m => ({ default: m.NeuralSpace3D })), {
@@ -156,7 +154,7 @@ class GraphErrorBoundary extends React.Component<
 export function GraphContainer({
     folderId,
     fileId,
-    initialMode = '3d',
+    initialMode = '2d',
     className = '',
     showToolbar = true,
     showSidebar = true,
@@ -168,10 +166,11 @@ export function GraphContainer({
     // State
     const [viewMode, setViewMode] = useState<GraphViewMode>(initialMode);
     const [isImmersive, setIsImmersive] = useState(initialImmersive);
-    const [showFilters, setShowFilters] = useState(false);
+    const [showFilters, setShowFilters] = useState(true);
 
     const [showFileScope, setShowFileScope] = useState(false);
-    const [contextMenu, setContextMenu] = useState(initialContextMenuState);
+    const [showNodeDetail, setShowNodeDetail] = useState(false);
+    const [selectedNodeForDetail, setSelectedNodeForDetail] = useState<GraphNode | null>(null);
 
     // CRUD Modal states
     const [showNodeEditor, setShowNodeEditor] = useState(false);
@@ -208,6 +207,8 @@ export function GraphContainer({
         filteredNodes,
         filteredLinks,
         filters,
+        zoomToNode,
+        resetCamera,
     } = useGraphStore();
 
     // Get filtered data
@@ -259,79 +260,68 @@ export function GraphContainer({
     const pathMutation = useShortestPath();
 
     // Handlers
-    // Left-click: Show CRUD context menu (Edit, Delete, Add Relationship)
-    const handleNodeClick = useCallback(async (nodeId: string, event?: React.MouseEvent) => {
-        const isMultiSelect = event?.shiftKey || event?.ctrlKey || event?.metaKey;
-        selectNode(nodeId, isMultiSelect);
-
-        // Show CRUD context menu on left-click (single node selection)
-        if (!isMultiSelect) {
-            const node = nodes.find(n => n.id === nodeId);
-            if (node && event) {
-                setContextMenu({
-                    isOpen: true,
-                    x: event.clientX,
-                    y: event.clientY,
-                    nodeId,
-                    nodeName: node.name,
-                });
-            }
-        }
-
-        // If we now have two nodes selected, offer to find path
-        const nextState = useGraphStore.getState();
-        if (nextState.selectedNodes.length === 2) {
-            console.log('Finding path between:', nextState.selectedNodes);
-            try {
-                const result = await pathMutation.mutateAsync({
-                    sourceId: nextState.selectedNodes[0],
-                    targetId: nextState.selectedNodes[1]
-                });
-
-                if (result.path_exists) {
-                    console.log('Path found:', result.node_ids);
-                    // TODO: Highlight path in visualization
-                }
-            } catch (err) {
-                console.error('Path finding failed:', err);
-            }
-        }
-    }, [selectNode, pathMutation, nodes]);
-
-
     const handleNodeDoubleClick = useCallback(async (nodeId: string) => {
         console.log('Expanding node:', nodeId);
         try {
             const data = await expandMutation.mutateAsync({ nodeId });
-            if (data.nodes) {
-                // Add new nodes and links to the store
-                const { addNode, addLink } = useGraphStore.getState();
+            console.log('Expansion result:', data);
 
-                data.nodes.forEach(node => {
-                    addNode({
-                        id: node.id,
-                        name: node.name,
-                        type: node.type,
-                        description: node.description,
-                        properties: node.properties,
-                        degree: node.degree
-                    });
-                });
+            if (data.nodes && data.nodes.length > 0) {
+                // Prepare nodes and links for atomic store update
+                const newNodes: GraphNode[] = data.nodes.map(node => ({
+                    id: node.id,
+                    name: node.name,
+                    type: node.type,
+                    description: node.description,
+                    properties: node.properties,
+                    degree: node.degree
+                }));
 
                 const relationships = data.relationships || data.links || [];
-                relationships.forEach(link => {
-                    addLink({
-                        source: link.source,
-                        target: link.target,
-                        type: link.type,
-                        strength: link.strength
-                    });
-                });
+                const newLinks: GraphLink[] = relationships.map(link => ({
+                    source: link.source,
+                    target: link.target,
+                    type: link.type,
+                    strength: link.strength
+                }));
+
+                console.log(`Adding ${newNodes.length} nodes and ${newLinks.length} relations to graph`);
+
+                const { addNodesAndLinks } = useGraphStore.getState();
+                addNodesAndLinks(newNodes, newLinks);
+            } else {
+                console.warn('Expansion returned no new nodes');
             }
         } catch (err) {
             console.error('Expansion failed:', err);
         }
     }, [expandMutation]);
+
+    // Unified Click (Left or Right): Expand + Show Detail Sidebar
+    const handleNodeAction = useCallback(async (nodeId: string, event?: any) => {
+        // Prevent default browser context menu if it's a right click
+        if (event?.preventDefault) event.preventDefault();
+        if (event?.stopPropagation) event.stopPropagation();
+
+        console.log('Node Action Triggered:', nodeId);
+
+        // 1. Select the node
+        selectNode(nodeId, false);
+
+        // 2. Open Sidebar Detail
+        const node = nodes.find(n => n.id === nodeId);
+        if (node) {
+            setSelectedNodeForDetail(node);
+            setShowNodeDetail(true);
+        }
+
+        // 3. Trigger Expansion (First layer)
+        handleNodeDoubleClick(nodeId);
+    }, [selectNode, nodes, handleNodeDoubleClick]);
+
+    // Keep handleNodeClick for API compatibility with visualization components
+    const handleNodeClick = handleNodeAction;
+    const handleNodeRightClick = handleNodeAction;
 
     const handleNodeHover = useCallback((nodeId: string | null) => {
         setHoveredNode(nodeId);
@@ -339,19 +329,9 @@ export function GraphContainer({
 
     const handleBackgroundClick = useCallback(() => {
         clearSelection();
-        setContextMenu(initialContextMenuState);
+        setShowNodeDetail(false);
+        setSelectedNodeForDetail(null);
     }, [clearSelection]);
-
-    // Right-click: Progressive Expansion (Neo4j Browser Style)
-    const handleNodeRightClick = useCallback((nodeId: string, _x: number, _y: number) => {
-        // Right-click triggers expansion (Neo4j Browser style)
-        console.log('Right-click expanding node:', nodeId);
-        handleNodeDoubleClick(nodeId); // Reuse the expansion logic
-    }, [handleNodeDoubleClick]);
-
-    const closeContextMenu = useCallback(() => {
-        setContextMenu(initialContextMenuState);
-    }, []);
 
     // CRUD Handlers
     const handleEditNode = useCallback((nodeId: string) => {
@@ -361,8 +341,7 @@ export function GraphContainer({
             setNodeEditorMode('edit');
             setShowNodeEditor(true);
         }
-        closeContextMenu();
-    }, [nodes, closeContextMenu]);
+    }, [nodes]);
 
     const handleAddRelationship = useCallback((nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
@@ -370,8 +349,7 @@ export function GraphContainer({
             setRelationshipSourceNode(node);
             setShowRelationshipEditor(true);
         }
-        closeContextMenu();
-    }, [nodes, closeContextMenu]);
+    }, [nodes]);
 
     const handleDeleteNode = useCallback((nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
@@ -379,8 +357,7 @@ export function GraphContainer({
             setDeleteTargetNode(node);
             setShowDeleteConfirm(true);
         }
-        closeContextMenu();
-    }, [nodes, closeContextMenu]);
+    }, [nodes]);
 
     const handleNodeCreated = useCallback((newNode: any) => {
         const { addNode } = useGraphStore.getState();
@@ -411,7 +388,8 @@ export function GraphContainer({
 
     const confirmDeleteNode = useCallback(async () => {
         if (!deleteTargetNode) return;
-        await graphApi.deleteNode(deleteTargetNode.id);
+        // Use the base api client for node deletion
+        await api.delete(`/graph/node/${deleteTargetNode.id}`);
         const { removeNode } = useGraphStore.getState();
         removeNode(deleteTargetNode.id);
     }, [deleteTargetNode]);
@@ -470,12 +448,12 @@ export function GraphContainer({
             )}
 
             {/* Search Bar */}
-            <div className="absolute top-16 left-4 z-30 w-72">
+            <div className="absolute top-16 left-4 z-30 w-[360px]">
                 <GraphSearch />
             </div>
 
             {/* Main Visualization Area */}
-            <div className="absolute inset-0 pt-14">
+            <div className={`absolute inset-0 pt-14 transition-all duration-300 ease-in-out ${showFilters ? 'pl-[380px]' : 'pl-0'}`}>
                 {isGraphLoading ? (
                     <GraphLoadingState message="Loading graph data..." />
                 ) : !hasData ? (
@@ -495,6 +473,7 @@ export function GraphContainer({
                                         <NeuralSpace3D
                                             nodes={visibleNodes}
                                             links={visibleLinks}
+                                            folderId={folderId}
                                             selectedNodes={selectedNodes}
                                             hoveredNode={hoveredNode}
                                             onNodeClick={handleNodeClick}
@@ -517,6 +496,7 @@ export function GraphContainer({
                                         <ForceGraph2D
                                             nodes={visibleNodes}
                                             links={visibleLinks}
+                                            folderId={folderId}
                                             selectedNodes={selectedNodes}
                                             hoveredNode={hoveredNode}
                                             onNodeClick={handleNodeClick}
@@ -550,10 +530,10 @@ export function GraphContainer({
             <AnimatePresence>
                 {showFilters && (
                     <motion.div
-                        initial={{ x: -320, opacity: 0 }}
+                        initial={{ x: -360, opacity: 0 }}
                         animate={{ x: 0, opacity: 1 }}
-                        exit={{ x: -320, opacity: 0 }}
-                        className="absolute left-4 top-28 bottom-4 w-72 z-20"
+                        exit={{ x: -360, opacity: 0 }}
+                        className="absolute left-4 top-32 bottom-4 w-[360px] z-20"
                     >
                         <GraphFilters onClose={() => setShowFilters(false)} />
                     </motion.div>
@@ -562,36 +542,27 @@ export function GraphContainer({
 
 
 
-            {/* Node Detail Panel */}
-            {showSidebar && selectedNode && (
-                <NodeDetailPanel
-                    node={selectedNode}
-                    onClose={clearSelection}
-                />
-            )}
+            {/* Node Detail Panel removed - user prefers clean interface */}
 
-            {/* Tooltip - Show on Click (Selection) as requested */}
-            {selectedNode && (
-                <NodeTooltip node={selectedNode} />
-            )}
+            {/* Tooltip removed - user prefers clean interface without description box */}
 
-            {/* Context Menu */}
+            {/* Node Detail Sidebar */}
             <AnimatePresence>
-                {contextMenu.isOpen && contextMenu.nodeId && contextMenu.nodeName && (
-                    <NodeContextMenu
-                        x={contextMenu.x}
-                        y={contextMenu.y}
-                        nodeId={contextMenu.nodeId}
-                        nodeName={contextMenu.nodeName}
-                        onClose={closeContextMenu}
-                        onExpand={() => handleNodeDoubleClick(contextMenu.nodeId!)}
-                        onFindConnected={() => {
-                            selectNode(contextMenu.nodeId!);
-                            closeContextMenu();
+                {showNodeDetail && selectedNodeForDetail && (
+                    <NodeDetailPanel
+                        node={selectedNodeForDetail}
+                        onClose={() => {
+                            setShowNodeDetail(false);
+                            setSelectedNodeForDetail(null);
                         }}
-                        onEdit={() => handleEditNode(contextMenu.nodeId!)}
-                        onAddRelationship={() => handleAddRelationship(contextMenu.nodeId!)}
-                        onDelete={() => handleDeleteNode(contextMenu.nodeId!)}
+                        onEdit={() => handleEditNode(selectedNodeForDetail.id)}
+                        onDelete={() => handleDeleteNode(selectedNodeForDetail.id)}
+                        onExpand={handleNodeDoubleClick}
+                        onFocus={(id) => zoomToNode?.(id)}
+                        onInitiateAnalysis={(node) => {
+                            // Trigger deep analysis logic - this could open the analysis panel
+                            console.log('Initiating analysis for node:', node.name);
+                        }}
                     />
                 )}
             </AnimatePresence>

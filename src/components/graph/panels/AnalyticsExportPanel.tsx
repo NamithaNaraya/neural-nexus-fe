@@ -23,6 +23,7 @@ import {
     ChevronDown,
 } from 'lucide-react';
 import { docAiApi } from '@/lib/api';
+import { EntityTypeFilter } from '../controls/EntityTypeFilter';
 
 type ExportFormat = 'pdf' | 'json' | 'csv';
 
@@ -82,6 +83,7 @@ export function AnalyticsExportPanel({
     const [isExporting, setIsExporting] = useState(false);
     const [exportResult, setExportResult] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
+    const [entityTypes, setEntityTypes] = useState<string[]>([]); // Empty = no filter
 
     // Run export
     const handleExport = useCallback(async () => {
@@ -96,6 +98,7 @@ export function AnalyticsExportPanel({
                 include_clustering: config.includeClustering,
                 include_ghost_lines: config.includeGhostLines,
                 include_health: config.includeHealth,
+                entity_types: entityTypes.length > 0 ? entityTypes : undefined,
             }) as {
                 error?: string;
                 data?: unknown;
@@ -122,7 +125,7 @@ export function AnalyticsExportPanel({
         } finally {
             setIsExporting(false);
         }
-    }, [folderId, format, config]);
+    }, [folderId, format, config, entityTypes]);
 
 
     // Download helpers
@@ -229,6 +232,14 @@ export function AnalyticsExportPanel({
                             ))}
                         </div>
                     </div>
+
+                    {/* Entity Type Filter */}
+                    <EntityTypeFilter
+                        selectedTypes={entityTypes}
+                        onSelectionChange={setEntityTypes}
+                        label="Filter by Entity Types"
+                        placeholder="All types (no filter)"
+                    />
 
                     {/* Include Options */}
                     <div>

@@ -14,7 +14,7 @@ import React, { useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useGraphStore } from '@/store/graphStore';
 import { NODE_TYPE_COLORS, RELATIONSHIP_COLORS } from '../types';
-import { X, Circle, ArrowRight, Filter, RotateCcw } from 'lucide-react';
+import { X, Circle, ArrowRight, Filter, RotateCcw, Search, CheckSquare, Square } from 'lucide-react';
 
 interface GraphFiltersProps {
     onClose: () => void;
@@ -28,24 +28,54 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
         setFilters,
         resetFilters,
     } = useGraphStore();
+    const [nodeSearch, setNodeSearch] = React.useState('');
+    const [linkSearch, setLinkSearch] = React.useState('');
 
     // Toggle node type filter
     const toggleNodeType = useCallback((type: string) => {
         const current = filters.nodeTypes;
-        const updated = current.includes(type)
-            ? current.filter(t => t !== type)
-            : [...current, type];
-        setFilters({ nodeTypes: updated });
-    }, [filters.nodeTypes, setFilters]);
+        let updated;
+
+        if (current.length === 0) {
+            // If all were selected (empty means all), unchecking one means all but that one
+            updated = nodeTypes.filter(t => t !== type);
+        } else {
+            updated = current.includes(type)
+                ? current.filter(t => t !== type)
+                : [...current, type];
+        }
+
+        // If we just unchecked everything, set to a sentinel or handle appropriately
+        if (updated.length === 0) {
+            setFilters({ nodeTypes: ['__NONE__'] });
+        } else if (updated.length === nodeTypes.length) {
+            setFilters({ nodeTypes: [] }); // Store as all-selected (empty)
+        } else {
+            setFilters({ nodeTypes: updated });
+        }
+    }, [filters.nodeTypes, nodeTypes, setFilters]);
 
     // Toggle relationship type filter
     const toggleRelationshipType = useCallback((type: string) => {
         const current = filters.relationshipTypes;
-        const updated = current.includes(type)
-            ? current.filter(t => t !== type)
-            : [...current, type];
-        setFilters({ relationshipTypes: updated });
-    }, [filters.relationshipTypes, setFilters]);
+        let updated;
+
+        if (current.length === 0) {
+            updated = linkTypes.filter(t => t !== type);
+        } else {
+            updated = current.includes(type)
+                ? current.filter(t => t !== type)
+                : [...current, type];
+        }
+
+        if (updated.length === 0) {
+            setFilters({ relationshipTypes: ['__NONE__'] });
+        } else if (updated.length === linkTypes.length) {
+            setFilters({ relationshipTypes: [] });
+        } else {
+            setFilters({ relationshipTypes: updated });
+        }
+    }, [filters.relationshipTypes, linkTypes, setFilters]);
 
     // Handle minimum degree change
     const handleMinDegreeChange = useCallback((value: number) => {
@@ -56,6 +86,26 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
     const toggleShowOrphans = useCallback(() => {
         setFilters({ showOrphans: !filters.showOrphans });
     }, [filters.showOrphans, setFilters]);
+
+    // Bulk select handlers
+    const selectAllNodeTypes = useCallback(() => {
+        setFilters({ nodeTypes: [] }); // Empty array means all selected in our logic
+    }, [setFilters]);
+
+    const deselectAllNodeTypes = useCallback(() => {
+        setFilters({ nodeTypes: ['__NONE__'] });
+    }, [setFilters]);
+
+    const selectAllRelTypes = useCallback(() => {
+        setFilters({ relationshipTypes: [] });
+    }, [setFilters]);
+
+    const deselectAllRelTypes = useCallback(() => {
+        setFilters({ relationshipTypes: ['__NONE__'] });
+    }, [setFilters]);
+
+    const filteredNodeTypes = nodeTypes.filter((t: string) => t.toLowerCase().includes(nodeSearch.toLowerCase()));
+    const filteredLinkTypes = linkTypes.filter((t: string) => t.toLowerCase().includes(linkSearch.toLowerCase()));
 
     return (
         <div
@@ -87,13 +137,42 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
                 {/* Node Types */}
-                <div>
-                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-                        Node Types
-                    </h4>
-                    <div className="space-y-2">
-                        {nodeTypes.length > 0 ? (
-                            nodeTypes.map(type => (
+                <div className="pt-2">
+                    <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                            Node Types
+                        </h4>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={selectAllNodeTypes}
+                                className="text-[10px] font-bold text-primary hover:text-primary/80 transition-colors"
+                            >
+                                Select All
+                            </button>
+                            <span className="w-px h-2.5 bg-border/50" />
+                            <button
+                                onClick={deselectAllNodeTypes}
+                                className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                Deselect All
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="relative mb-3">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                        <input
+                            type="text"
+                            placeholder="Search types..."
+                            value={nodeSearch}
+                            onChange={(e) => setNodeSearch(e.target.value)}
+                            className="w-full bg-muted/50 border border-border/50 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                    </div>
+
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {filteredNodeTypes.length > 0 ? (
+                            filteredNodeTypes.map(type => (
                                 <FilterCheckbox
                                     key={type}
                                     label={type}
@@ -103,19 +182,48 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
                                 />
                             ))
                         ) : (
-                            <p className="text-sm text-muted-foreground">No node types available</p>
+                            <p className="text-xs text-muted-foreground italic">No types found</p>
                         )}
                     </div>
                 </div>
 
                 {/* Relationship Types */}
                 <div>
-                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-                        Relationship Types
-                    </h4>
-                    <div className="space-y-2">
-                        {linkTypes.length > 0 ? (
-                            linkTypes.map(type => (
+                    <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                            Relationship Types
+                        </h4>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={selectAllRelTypes}
+                                className="text-[10px] font-bold text-primary hover:text-primary/80 transition-colors"
+                            >
+                                Select All
+                            </button>
+                            <span className="w-px h-2.5 bg-border/50" />
+                            <button
+                                onClick={deselectAllRelTypes}
+                                className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                Deselect All
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="relative mb-3">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                        <input
+                            type="text"
+                            placeholder="Search types..."
+                            value={linkSearch}
+                            onChange={(e) => setLinkSearch(e.target.value)}
+                            className="w-full bg-muted/50 border border-border/50 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                    </div>
+
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {filteredLinkTypes.length > 0 ? (
+                            filteredLinkTypes.map(type => (
                                 <FilterCheckbox
                                     key={type}
                                     label={type.replace(/_/g, ' ')}
@@ -126,7 +234,7 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
                                 />
                             ))
                         ) : (
-                            <p className="text-sm text-muted-foreground">No relationship types available</p>
+                            <p className="text-xs text-muted-foreground italic">No types found</p>
                         )}
                     </div>
                 </div>
@@ -167,7 +275,7 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
                     />
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 

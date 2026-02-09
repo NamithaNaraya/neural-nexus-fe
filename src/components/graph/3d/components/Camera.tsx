@@ -1,0 +1,62 @@
+'use client';
+
+import React, { useRef } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import * as THREE from 'three';
+
+interface CameraProps {
+    targetNodeId: string | null;
+    nodeMap: Map<string, any>;
+    defaultCenter: THREE.Vector3;
+}
+
+export function CameraManager({ targetNodeId, nodeMap, defaultCenter }: CameraProps) {
+    const { camera, controls } = useThree();
+    const targetVec = useRef(new THREE.Vector3(0, 0, 0));
+    const isFirstLoad = useRef(true);
+    const lastTargetId = useRef<string | null>(null);
+
+    useFrame((state) => {
+        let focusPos: THREE.Vector3;
+
+        if (targetNodeId && nodeMap.has(targetNodeId)) {
+            const node = nodeMap.get(targetNodeId);
+            focusPos = new THREE.Vector3(node.x, node.y, node.z);
+        } else {
+            focusPos = defaultCenter;
+        }
+
+        // 1. Target Following: Always smoothly move the pivot point to the focused node/center
+        // This allows the user to rotate around the node even while it moves.
+        targetVec.current.lerp(focusPos, 0.08);
+
+        if (controls) {
+            // @ts-ignore
+            if (controls.target) {
+                // @ts-ignore
+                controls.target.lerp(targetVec.current, 0.08);
+            }
+
+            // 2. Position Auto-Focus: Only "jump" the camera position when selection changes
+            // or on initial load. This prevents fighting with manual rotation.
+            if (isFirstLoad.current || targetNodeId !== lastTargetId.current) {
+                const idealPos = focusPos.clone().add(new THREE.Vector3(0, 50, 600));
+                camera.position.lerp(idealPos, 0.05);
+
+                // Once we are close enough to the target, stop forcing the position
+                if (camera.position.distanceTo(idealPos) < 1) {
+                    isFirstLoad.current = false;
+                    lastTargetId.current = targetNodeId;
+                }
+            }
+
+            // @ts-ignore
+            if (typeof controls.update === 'function') {
+                // @ts-ignore
+                controls.update();
+            }
+        }
+    });
+
+    return null;
+}

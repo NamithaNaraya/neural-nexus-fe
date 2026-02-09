@@ -2,398 +2,203 @@
  * 3D Neural Space Visualization
  * 
  * Immersive 3D graph visualization using Three.js via react-three-fiber.
- * Features:
- * - Instanced rendering for 100k+ nodes
- * - Orbital camera controls
- * - Node glow effects
- * - Animated connections
- * - Progressive LOD (Level of Detail)
+ * Modular architecture with separated components for Nodes, Links, and Camera logic.
  */
 'use client';
 
-import React, { useRef, useMemo, useCallback, useState, useEffect } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { GraphNode, GraphLink } from '@/store/graphStore';
-import { NODE_TYPE_COLORS, RELATIONSHIP_COLORS } from '../types';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
-// Props
+// Modular Components
+import { InstancedNodes } from './components/Nodes';
+import { RelationshipLinks } from './components/Links';
+import { CameraManager } from './components/Camera';
+import { NeuralAtmosphere } from './components/Atmosphere';
+import { IngestionProgressHUD } from './components/HUD';
+
 interface NeuralSpace3DProps {
     nodes: GraphNode[];
     links: GraphLink[];
     selectedNodes: string[];
     hoveredNode: string | null;
-    onNodeClick: (nodeId: string, event?: React.MouseEvent) => void;
+    onNodeClick: (nodeId: string, event?: any) => void;
     onNodeDoubleClick: (nodeId: string) => void;
     onNodeHover: (nodeId: string | null) => void;
     onBackgroundClick: () => void;
     onNodeContextMenu?: (nodeId: string, x: number, y: number) => void;
+    folderId?: string;
+    isDark?: boolean;
+    bgColor?: string;
 }
 
-// Individual 3D Node Component
-interface Node3DProps {
-    node: GraphNode;
-    isSelected: boolean;
-    isHovered: boolean;
-    onClick: (nodeId: string) => void;
-    onDoubleClick: (nodeId: string) => void;
-    onHover: (nodeId: string | null) => void;
-    onContextMenu?: (nodeId: string, x: number, y: number) => void;
-}
+function Scene(props: NeuralSpace3DProps & { nodeGeometry: THREE.BufferGeometry, pulseGeometry: THREE.BufferGeometry }) {
+    const { nodes, links, selectedNodes, hoveredNode, nodeGeometry, pulseGeometry, folderId } = props;
 
-function Node3D({ node, isSelected, isHovered, onClick, onDoubleClick, onHover, onContextMenu }: Node3DProps) {
-    const meshRef = useRef<THREE.Mesh>(null);
-    const glowRef = useRef<THREE.Mesh>(null);
-    const [lastClickTime, setLastClickTime] = useState(0);
+    const wsOptions = useMemo(() => ({ folderId }), [folderId]);
+    const { lastMessage } = useWebSocket(wsOptions);
 
-    // Get node color from type
-    const color = NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
+    useEffect(() => {
+        if (lastMessage?.type === 'node_updated') console.log('[3D Sync] Live update:', lastMessage.payload);
+    }, [lastMessage]);
 
-    // Calculate size based on degree/centrality
-    const baseSize = 4;
-    const size = baseSize + (node.degree || 0) * 0.3;
+    const nodesWithPositions = useMemo(() => {
+        const spread = 250;
+        const folderGroups = new Map<string, any[]>();
+        nodes.forEach(n => {
+            const fid = n.folderId || 'global';
+            if (!folderGroups.has(fid)) folderGroups.set(fid, []);
+            folderGroups.get(fid)!.push(n);
+        });
 
-    // Position (use pre-calculated or random)
-    const position: [number, number, number] = [
-        node.x ?? (Math.random() - 0.5) * 400,
-        node.y ?? (Math.random() - 0.5) * 400,
-        node.z ?? (Math.random() - 0.5) * 400,
-    ];
+        const groups = Array.from(folderGroups.entries());
+        const islandSpread = 2000;
 
-    // Animation
-    useFrame((state) => {
-        if (meshRef.current) {
-            // Pulse effect for selected nodes
-            if (isSelected) {
-                const scale = 1 + Math.sin(state.clock.elapsedTime * 3) * 0.1;
-                meshRef.current.scale.setScalar(scale);
-            } else {
-                meshRef.current.scale.setScalar(1);
-            }
-        }
+        return groups.flatMap(([fid, groupNodes], gIdx) => {
+            const angle = (gIdx / Math.max(groups.length, 1)) * Math.PI * 2;
+            const islandRadius = groups.length > 1 ? islandSpread * (1.2 + Math.floor(gIdx / 5)) : 0;
+            const cx = Math.cos(angle) * islandRadius;
+            const cy = groups.length > 1 ? (gIdx % 3 - 1) * spread * 2 : 0;
+            const cz = Math.sin(angle) * islandRadius;
 
-        // Glow animation
-        if (glowRef.current && (isSelected || isHovered)) {
-            glowRef.current.scale.setScalar(1.5 + Math.sin(state.clock.elapsedTime * 2) * 0.2);
-        }
-    });
+            return groupNodes.map((node, i) => {
+                const phi = Math.acos(1 - 2 * (i + 0.5) / groupNodes.length);
+                const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+                const r = spread * (0.5 + Math.sqrt(i / groupNodes.length) * 0.8);
 
-    // Handle click with double-click detection
-    const handleClick = useCallback((event: { stopPropagation?: () => void }) => {
-        if (event.stopPropagation) event.stopPropagation();
+                return {
+                    ...node,
+                    x: cx + r * Math.sin(phi) * Math.cos(theta),
+                    y: cy + r * Math.sin(phi) * Math.sin(theta),
+                    z: cz + r * Math.cos(phi),
+                };
+            });
+        });
+    }, [nodes]);
 
-        const now = Date.now();
-        if (now - lastClickTime < 300) {
-            onDoubleClick(node.id);
-        } else {
-            onClick(node.id);
-        }
-        setLastClickTime(now);
-    }, [node.id, onClick, onDoubleClick, lastClickTime]);
+    const nodeMap = useMemo(() => new Map(nodesWithPositions.map(n => [n.id, n])), [nodesWithPositions]);
 
-    const handleContextMenu = useCallback((event: { clientX: number, clientY: number, stopPropagation?: () => void, preventDefault?: () => void }) => {
-        if (event.stopPropagation) event.stopPropagation();
-        // Prevent browser context menu - though R3F events might be slightly different wrappers
-        // calling preventDefault on the native event if accessible is often needed, 
-        // but often R3F onContextMenu event args might differ. 
-        // Checking basic ThreeEvent structure usually has nativeEvent.
+    const graphCenter = useMemo(() => {
+        if (nodesWithPositions.length === 0) return new THREE.Vector3(0, 0, 0);
+        const sum = nodesWithPositions.reduce((acc, n) => {
+            acc.x += n.x!; acc.y += n.y!; acc.z += n.z!;
+            return acc;
+        }, { x: 0, y: 0, z: 0 });
+        return new THREE.Vector3(
+            sum.x / nodesWithPositions.length,
+            sum.y / nodesWithPositions.length,
+            sum.z / nodesWithPositions.length
+        );
+    }, [nodesWithPositions]);
 
-        // However, for consistency with standard React events, let's treat it safely
-
-        if (onContextMenu) {
-            onContextMenu(node.id, event.clientX, event.clientY);
-        }
-    }, [node.id, onContextMenu]);
+    const focusNodeId = hoveredNode || (selectedNodes.length === 1 ? selectedNodes[0] : null);
 
     return (
-        <group position={position}>
-            {/* Glow effect for selected/hovered */}
-            {(isSelected || isHovered) && (
-                <mesh ref={glowRef}>
-                    <sphereGeometry args={[size * 1.5, 16, 16]} />
-                    <meshBasicMaterial
-                        color={color}
-                        transparent
-                        opacity={0.2}
-                    />
-                </mesh>
-            )}
+        <group onPointerMissed={() => props.onBackgroundClick()}>
+            <NeuralAtmosphere isDark={props.isDark ?? true} color={props.bgColor ?? '#0A0C10'} />
+            <CameraManager
+                targetNodeId={selectedNodes.length === 1 ? selectedNodes[0] : null}
+                nodeMap={nodeMap}
+                defaultCenter={graphCenter}
+            />
+            <OrbitControls makeDefault enableDamping dampingFactor={0.05} minDistance={50} maxDistance={4000} />
+            <RelationshipLinks links={links} nodeMap={nodeMap} focusNodeId={focusNodeId} pulseGeometry={pulseGeometry} />
+            <InstancedNodes
+                nodes={nodesWithPositions}
+                selectedNodes={selectedNodes}
+                hoveredNode={hoveredNode}
+                onNodeClick={props.onNodeClick}
+                onNodeHover={props.onNodeHover}
+                nodeGeometry={nodeGeometry}
+            />
+            {/* Relationship Labels (Midpoint of lines) */}
+            {links
+                .filter(link => {
+                    const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
+                    const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
+                    // Only show link labels for the focused cluster to avoid clutter
+                    return sourceId === focusNodeId || targetId === focusNodeId || selectedNodes.includes(sourceId) || selectedNodes.includes(targetId);
+                })
+                .map((link, i) => {
+                    const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
+                    const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
+                    const s = nodeMap.get(sourceId);
+                    const t = nodeMap.get(targetId);
+                    if (!s || !t) return null;
 
-            {/* Main node sphere */}
-            <mesh
-                ref={meshRef}
-                onClick={handleClick}
-                onContextMenu={handleContextMenu}
-                onPointerOver={() => onHover(node.id)}
-                onPointerOut={() => onHover(null)}
-            >
-                <sphereGeometry args={[size, 32, 32]} />
-                <meshStandardMaterial
-                    color={color}
-                    emissive={color}
-                    emissiveIntensity={isSelected ? 0.5 : isHovered ? 0.3 : 0.1}
-                    metalness={0.3}
-                    roughness={0.7}
-                />
-            </mesh>
+                    const midpoint: [number, number, number] = [
+                        (s.x + t.x) / 2,
+                        ((s.y + t.y) / 2) + 2,
+                        (s.z + t.z) / 2
+                    ];
 
-            {/* Label */}
-            <Html
-                position={[0, size + 4, 0]}
-                center
-                distanceFactor={12}
-                zIndexRange={[100, 0]}
-                style={{ pointerEvents: 'none' }}
-            >
-                <div
-                    style={{
-                        color: 'white',
-                        fontSize: '10px',
-                        whiteSpace: 'nowrap',
-                        textShadow: '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000',
-                        fontWeight: 'bold',
-                        userSelect: 'none'
-                    }}
-                >
-                    {node.name}
-                </div>
-            </Html>
+                    return (
+                        <Html key={`link-label-${i}`} position={midpoint} center distanceFactor={20} style={{ pointerEvents: 'none' }}>
+                            <div className="px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-sm border border-white/10 text-white/90 text-[8px] font-medium whitespace-nowrap uppercase tracking-tighter">
+                                {link.type}
+                            </div>
+                        </Html>
+                    );
+                })}
+
+            {/* Node Labels */}
+            {nodesWithPositions
+                .filter(n => {
+                    // Show labels for:
+                    // 1. Selected or Hovered nodes (Always)
+                    // 2. High degree nodes (Global context)
+                    // 3. All nodes if the total count is small
+                    return selectedNodes.includes(n.id) || hoveredNode === n.id || (n.degree || 0) > 3 || nodes.length < 50;
+                })
+                .map(node => (
+                    <Html key={`label-${node.id}`} position={[node.x!, node.y! + 12, node.z!]} center distanceFactor={15} style={{ pointerEvents: 'none' }}>
+                        <div className={`px-2 py-1 rounded backdrop-blur-md border text-[10px] font-bold whitespace-nowrap shadow-2xl transition-all duration-300 ${selectedNodes.includes(node.id) || hoveredNode === node.id
+                                ? 'bg-emerald/90 border-emerald text-white scale-110'
+                                : 'bg-background/80 border-border text-foreground opacity-70'
+                            }`}>
+                            {node.name}
+                        </div>
+                    </Html>
+                ))}
         </group>
     );
 }
 
-// 3D Link Component
-interface Link3DProps {
-    link: GraphLink;
-    sourceNode: GraphNode | undefined;
-    targetNode: GraphNode | undefined;
-    isHighlighted: boolean;
-}
-
-function Link3D({ link, sourceNode, targetNode, isHighlighted }: Link3DProps) {
-    const ref = useRef<THREE.Line>(null);
-
-    // Calculate positions
-    const points = useMemo(() => {
-        if (!sourceNode || !targetNode) return [];
-
-        const start = new THREE.Vector3(
-            sourceNode.x ?? 0,
-            sourceNode.y ?? 0,
-            sourceNode.z ?? 0
-        );
-        const end = new THREE.Vector3(
-            targetNode.x ?? 0,
-            targetNode.y ?? 0,
-            targetNode.z ?? 0
-        );
-
-        return [start, end];
-    }, [sourceNode, targetNode]);
-
-    // Get color
-    const color = RELATIONSHIP_COLORS[link.type] || RELATIONSHIP_COLORS.default;
-
-    if (points.length === 0) return null;
-
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const material = new THREE.LineBasicMaterial({
-        color,
-        opacity: isHighlighted ? 1 : 0.3,
-        transparent: true,
-    });
-    const lineObj = new THREE.Line(geometry, material);
-
-    return <primitive object={lineObj} />;
-}
-
-// Camera Controls Component
-function CameraController() {
-    return (
-        <OrbitControls
-            enableDamping
-            dampingFactor={0.05}
-            minDistance={50}
-            maxDistance={2000}
-            enablePan
-            panSpeed={0.5}
-            rotateSpeed={0.5}
-            zoomSpeed={0.8}
-        />
-    );
-}
-
-// Scene Lighting
-function SceneLighting() {
-    return (
-        <>
-            <ambientLight intensity={0.4} />
-            <pointLight position={[100, 100, 100]} intensity={0.8} />
-            <pointLight position={[-100, -100, -100]} intensity={0.4} color="#3B82F6" />
-            <pointLight position={[0, 200, 0]} intensity={0.3} color="#10B981" />
-        </>
-    );
-}
-
-// Background Stars/Particles
-function BackgroundParticles() {
-    const count = 500;
-
-    const positions = useMemo(() => {
-        const pos = new Float32Array(count * 3);
-        for (let i = 0; i < count; i++) {
-            pos[i * 3] = (Math.random() - 0.5) * 2000;
-            pos[i * 3 + 1] = (Math.random() - 0.5) * 2000;
-            pos[i * 3 + 2] = (Math.random() - 0.5) * 2000;
-        }
-        return pos;
-    }, []);
-
-    return (
-        <points>
-            <bufferGeometry>
-                <bufferAttribute
-                    attach="attributes-position"
-                    count={count}
-                    array={positions}
-                    itemSize={3}
-                />
-            </bufferGeometry>
-            <pointsMaterial
-                size={1}
-                color="#4B5563"
-                transparent
-                opacity={0.5}
-                sizeAttenuation
-            />
-        </points>
-    );
-}
-
-// Main 3D Scene
-function Scene({
-    nodes,
-    links,
-    selectedNodes,
-    hoveredNode,
-    onNodeClick,
-    onNodeDoubleClick,
-    onNodeHover,
-    onBackgroundClick,
-    onNodeContextMenu,
-}: NeuralSpace3DProps) {
-    // Create node lookup map
-    const nodeMap = useMemo(() => {
-        return new Map(nodes.map(n => [n.id, n]));
-    }, [nodes]);
-
-    // Determine highlighted links
-    const highlightedLinks = useMemo(() => {
-        const selectedSet = new Set(selectedNodes);
-        if (selectedSet.size === 0 && !hoveredNode) return new Set<string>();
-
-        return new Set(
-            links
-                .filter(l =>
-                    selectedSet.has(l.source) ||
-                    selectedSet.has(l.target) ||
-                    l.source === hoveredNode ||
-                    l.target === hoveredNode
-                )
-                .map(l => `${l.source}-${l.target}`)
-        );
-    }, [links, selectedNodes, hoveredNode]);
-
-    return (
-        <>
-            <SceneLighting />
-            <CameraController />
-            <BackgroundParticles />
-
-            {/* Background click handler */}
-            <mesh
-                position={[0, 0, -1000]}
-                onClick={onBackgroundClick}
-            >
-                <planeGeometry args={[5000, 5000]} />
-                <meshBasicMaterial transparent opacity={0} />
-            </mesh>
-
-            {/* Links */}
-            {links.map(link => (
-                <Link3D
-                    key={`${link.source}-${link.target}-${link.type}`}
-                    link={link}
-                    sourceNode={nodeMap.get(link.source)}
-                    targetNode={nodeMap.get(link.target)}
-                    isHighlighted={highlightedLinks.has(`${link.source}-${link.target}`)}
-                />
-            ))}
-
-            {/* Nodes */}
-            {nodes.map(node => (
-                <Node3D
-                    key={node.id}
-                    node={node}
-                    isSelected={selectedNodes.includes(node.id)}
-                    isHovered={hoveredNode === node.id}
-                    onClick={onNodeClick}
-                    onDoubleClick={onNodeDoubleClick}
-                    onHover={onNodeHover}
-                    onContextMenu={onNodeContextMenu}
-                />
-            ))}
-        </>
-    );
-}
-
-// Exported Component
 export function NeuralSpace3D(props: NeuralSpace3DProps) {
-    // Detect dark mode from document class
     const [isDark, setIsDark] = useState(true);
+    const nodeGeometry = useMemo(() => new THREE.SphereGeometry(1, 16, 16), []);
+    const pulseGeometry = useMemo(() => new THREE.SphereGeometry(0.8, 8, 8), []);
 
     useEffect(() => {
-        const checkDarkMode = () => {
-            setIsDark(document.documentElement.classList.contains('dark'));
+        const checkDark = () => setIsDark(document.documentElement.classList.contains('dark'));
+        checkDark();
+        const obs = new MutationObserver(checkDark);
+        obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        return () => {
+            obs.disconnect();
+            nodeGeometry.dispose();
+            pulseGeometry.dispose();
         };
-        checkDarkMode();
+    }, [nodeGeometry, pulseGeometry]);
 
-        // Watch for theme changes
-        const observer = new MutationObserver(checkDarkMode);
-        observer.observe(document.documentElement, {
-            attributes: true,
-            attributeFilter: ['class']
-        });
-
-        return () => observer.disconnect();
-    }, []);
-
-    // Theme-aware colors
-    const bgColor = isDark ? '#0A0C10' : '#F8FAFC';
-    const fogColor = isDark ? '#0A0C10' : '#F8FAFC';
+    const sceneBgColor = isDark ? '#0A0C10' : '#F8FAFC';
+    const glConfig = useMemo(() => ({ antialias: true, alpha: false, powerPreference: 'high-performance' as const }), []);
+    const cameraConfig = useMemo(() => ({ position: [0, 100, 1000] as [number, number, number], fov: 60 }), []);
 
     return (
-        <div className={`w-full h-full ${isDark ? 'bg-[#0A0C10]' : 'bg-[#F8FAFC]'}`}>
-            <Canvas
-                camera={{
-                    position: [0, 0, 500],
-                    fov: 60,
-                    near: 1,
-                    far: 5000,
-                }}
-                gl={{
-                    antialias: true,
-                    alpha: false,
-                    powerPreference: 'high-performance',
-                }}
-                dpr={[1, 2]}
-            >
-                <color attach="background" args={[bgColor]} />
-                <fog attach="fog" args={[fogColor, 500, 2000]} />
-                <Scene {...props} />
+        <div className="w-full h-full relative" style={{ backgroundColor: sceneBgColor }}>
+            <IngestionProgressHUD />
+            <Canvas shadows={false} camera={cameraConfig} gl={glConfig} dpr={[1, 2]}>
+                <color attach="background" args={[sceneBgColor]} />
+                <Scene {...props} isDark={isDark} bgColor={sceneBgColor} nodeGeometry={nodeGeometry} pulseGeometry={pulseGeometry} />
             </Canvas>
+            <div className="absolute bottom-4 left-4 z-10 p-3 rounded-lg border border-white/5 bg-background/40 backdrop-blur-xl max-w-xs pointer-events-none">
+                <p className="text-[10px] text-emerald uppercase tracking-widest font-bold mb-1">3D Neural Space</p>
+                <p className="text-[11px] text-foreground/70 leading-relaxed">Zoom to explore. Drag to rotate. Grab nodes to move.</p>
+            </div>
         </div>
     );
 }
-

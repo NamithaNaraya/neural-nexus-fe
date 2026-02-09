@@ -12,6 +12,9 @@ export const metadata: Metadata = {
     description: 'Enterprise-grade knowledge extraction and visualization platform',
     keywords: ['knowledge graph', 'AI', 'data visualization', 'graph database'],
     authors: [{ name: 'Neural Nexus Team' }],
+    icons: {
+        icon: '/favicon.svg',
+    },
 };
 
 export const viewport: Viewport = {

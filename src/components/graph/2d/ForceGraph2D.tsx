@@ -15,6 +15,8 @@ import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react'
 import * as d3 from 'd3';
 import { GraphNode, GraphLink } from '@/store/graphStore';
 import { NODE_TYPE_COLORS, RELATIONSHIP_COLORS } from '../types';
+import { useSSE, PHASE_LABELS } from '@/hooks/useSSE';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 // Props
 interface ForceGraph2DProps {
@@ -27,6 +29,7 @@ interface ForceGraph2DProps {
     onNodeHover: (nodeId: string | null) => void;
     onBackgroundClick: () => void;
     onNodeContextMenu?: (nodeId: string, x: number, y: number) => void; // Right-click for expand
+    folderId?: string;
 }
 
 // D3 Node type with simulation properties
@@ -47,6 +50,36 @@ interface D3Link {
     strength?: number;
 }
 
+// Ingestion Progress UI for 2D
+function IngestionProgressHUD() {
+    const { ingestionProgress } = useSSE();
+    const activeTasks = Object.values(ingestionProgress).filter((p: any) => p.progress < 100);
+
+    if (activeTasks.length === 0) return null;
+
+    return (
+        <div className="absolute top-20 right-4 flex flex-col gap-2 pointer-events-auto z-50">
+            {activeTasks.map((task: any) => (
+                <div key={task.file_id} className="p-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl w-64 shadow-2xl transition-all">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] font-bold text-emerald uppercase tracking-tighter">AI Ingestion</span>
+                        <span className="text-[10px] text-foreground/50">{task.progress}%</span>
+                    </div>
+                    <div className="h-1 w-full bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden mb-2">
+                        <div
+                            className="h-full bg-emerald transition-all duration-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                            style={{ width: `${task.progress}%` }}
+                        />
+                    </div>
+                    <p className="text-[11px] text-foreground/80 truncate">
+                        {PHASE_LABELS[task.phase] || task.phase}
+                    </p>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 export function ForceGraph2D({
     nodes,
     links,
@@ -57,16 +90,24 @@ export function ForceGraph2D({
     onNodeHover,
     onBackgroundClick,
     onNodeContextMenu,
+    folderId,
 }: ForceGraph2DProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const svgRef = useRef<SVGSVGElement>(null);
     const simulationRef = useRef<d3.Simulation<D3Node, D3Link> | null>(null);
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-    const [isDark, setIsDark] = useState(true);
+    const [isDark, setIsDark] = useState(false);
 
-    // Track last click for double-click detection
-    const lastClickRef = useRef<{ time: number; nodeId: string | null }>({ time: 0, nodeId: null });
+    // Real-time Sync via WebSocket - use passed folderId
+    const { lastMessage } = useWebSocket({ folderId });
 
+    useEffect(() => {
+        if (lastMessage?.type === 'node_updated') {
+            console.log('[2D Sync] Live update:', lastMessage.payload);
+        }
+    }, [lastMessage]);
+
+    // Detect dark mode
     // Store previous node positions to prevent resetting on re-renders
     const nodeStateRef = useRef<Map<string, { x: number; y: number; vx?: number; vy?: number }>>(new Map());
 
@@ -123,29 +164,25 @@ export function ForceGraph2D({
 
 
 
-    // Convert links for D3 - filter out self-loops
-    // CRITICAL: Links must reference the EXACT SAME node objects as d3Nodes
+    // Convert links for D3 - use STRING IDs (D3 forceLink will resolve them)
+    // IMPORTANT: Keep as strings - we'll look up positions manually for rendering
     const d3Links: D3Link[] = useMemo(() => {
-        // Create a lookup map for the current d3Nodes
-        const nodeMap = new Map(d3Nodes.map(n => [n.id, n]));
+        // Create a set of valid node IDs
+        const nodeIds = new Set(d3Nodes.map(n => n.id));
 
         return links.reduce<D3Link[]>((acc, l) => {
-            if (l.source === l.target) return acc;
+            // Skip links to non-existent nodes
+            if (!nodeIds.has(l.source) || !nodeIds.has(l.target)) return acc;
 
-            const sourceNode = nodeMap.get(l.source);
-            const targetNode = nodeMap.get(l.target);
-
-            if (sourceNode && targetNode) {
-                acc.push({
-                    source: sourceNode,
-                    target: targetNode,
-                    type: l.type,
-                    strength: l.strength,
-                });
-            }
+            acc.push({
+                source: l.source, // Keep as STRING
+                target: l.target, // Keep as STRING  
+                type: l.type,
+                strength: l.strength,
+            });
             return acc;
         }, []);
-    }, [links, d3Nodes]); // Depend on d3Nodes to refresh references when nodes are recreated
+    }, [links, d3Nodes]);
 
 
 
@@ -209,28 +246,24 @@ export function ForceGraph2D({
         // Center the view initially
         svg.call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2).scale(0.6));
 
-        // Create force simulation with STRONGER repulsion for better spacing
+        // Create force simulation with proper D3 pattern
         const simulation = d3.forceSimulation<D3Node>(d3Nodes)
             .force('link', d3.forceLink<D3Node, D3Link>(d3Links)
                 .id(d => d.id)
-                .distance(250) // Significantly increased distance
-                .strength(0.15) // Weaker link tension to allow spreading
+                .distance(120)
+                .strength(1)
             )
             .force('charge', d3.forceManyBody()
-                .strength(-3000) // Much stronger repulsion
-                .distanceMax(2000) // Affect nodes further away
+                .strength(-800)
+                .distanceMax(400)
             )
-            .force('center', d3.forceCenter(0, 0).strength(0.02)) // Very weak center pull
+            .force('center', d3.forceCenter(0, 0))
             .force('collision', d3.forceCollide()
-                .radius(d => getNodeSize(d as D3Node) + 60) // Larger safety bubble
-                .strength(0.9)
+                .radius(d => getNodeSize(d as D3Node) + 20)
+                .strength(0.8)
             )
-            .force('x', d3.forceX(0).strength(0.01))
-            .force('y', d3.forceY(0).strength(0.01))
-            .velocityDecay(0.3) // Higher friction to stop dancing
-            .alphaDecay(0.05); // Faster cooling to stabilize layout
-
-
+            .force('x', d3.forceX(0).strength(0.02))
+            .force('y', d3.forceY(0).strength(0.02));
 
         simulationRef.current = simulation;
 
@@ -301,7 +334,9 @@ export function ForceGraph2D({
             .attr('class', 'node-group')
             .style('cursor', 'pointer')
             .call(d3.drag<SVGGElement, D3Node>()
+                .clickDistance(5)
                 .on('start', (event, d) => {
+                    // Reheat simulation during drag for smooth movement
                     if (!event.active) simulation.alphaTarget(0.3).restart();
                     d.fx = d.x;
                     d.fy = d.y;
@@ -311,9 +346,13 @@ export function ForceGraph2D({
                     d.fy = event.y;
                 })
                 .on('end', (event, d) => {
+                    // Cool down simulation
                     if (!event.active) simulation.alphaTarget(0);
-                    d.fx = null;
-                    d.fy = null;
+                    // Keep node fixed where dragged
+                    d.fx = d.x;
+                    d.fy = d.y;
+                    // Save position for persistence
+                    nodeStateRef.current.set(d.id, { x: d.x!, y: d.y! });
                 })
             );
 
@@ -349,21 +388,24 @@ export function ForceGraph2D({
         // Event handlers
         nodeGroups
             .on('click', (event, d) => {
+                const nativeEvent = event.sourceEvent || event;
+
+                console.log('Node Action Triggered (2D):', d.id, 'Button:', nativeEvent.button);
                 event.stopPropagation();
 
-                const now = Date.now();
-                if (
-                    lastClickRef.current.nodeId === d.id &&
-                    now - lastClickRef.current.time < 300
-                ) {
-                    // Double click
-                    onNodeDoubleClick(d.id);
-                    lastClickRef.current = { time: 0, nodeId: null };
-                } else {
-                    // Single click
-                    onNodeClick(d.id, event as unknown as React.MouseEvent);
-                    lastClickRef.current = { time: now, nodeId: d.id };
-                }
+                // Single left click - strictly for showing context menu/selecting
+                const syntheticEvent = {
+                    clientX: event.clientX,
+                    clientY: event.clientY,
+                    shiftKey: event.shiftKey,
+                    ctrlKey: event.ctrlKey,
+                    metaKey: event.metaKey,
+                    button: 0,
+                    stopPropagation: () => event.stopPropagation?.(),
+                    preventDefault: () => event.preventDefault?.(),
+                } as unknown as React.MouseEvent;
+
+                onNodeClick(d.id, syntheticEvent);
             })
             .on('mouseenter', (event, d) => {
                 onNodeHover(d.id);
@@ -397,28 +439,27 @@ export function ForceGraph2D({
                     .attr('stroke-opacity', 0);
             })
             .on('contextmenu', (event, d) => {
-                // Right-click for progressive expansion (Neo4j Browser style)
-                if (event) {
-                    if (event.preventDefault) event.preventDefault();
-                    if (event.stopPropagation) event.stopPropagation();
-                    // Handle D3 v6+ wrapped events if necessary
-                    if (event.sourceEvent) {
-                        event.sourceEvent.preventDefault();
-                        event.sourceEvent.stopPropagation();
-                    }
-                }
+                // Block default browser menu
+                event.preventDefault();
+                event.stopPropagation();
 
+                console.log('Node ContextMenu (Right-Click):', d.id);
+
+                // Right-click triggers expansion directly as requested
                 if (onNodeContextMenu) {
                     onNodeContextMenu(d.id, event.clientX, event.clientY);
                 }
             });
 
-
-
+        // REHEAT simulation when data changes
+        if (simulation) {
+            simulation.alpha(1).restart();
+        }
 
         // Background click - clear hover
         svg.on('click', (event) => {
             if (event.target === svgRef.current) {
+                console.log('Background clicked');
                 onBackgroundClick();
                 onNodeHover(null);
             }
@@ -429,66 +470,68 @@ export function ForceGraph2D({
             onNodeHover(null);
         });
 
-        // Update positions on simulation tick
+
+        // TICK HANDLER - Updates all positions on every frame (proper D3 pattern)
         simulation.on('tick', () => {
-            // Save current positions for persistence across re-renders
-            d3Nodes.forEach(node => {
-                if (node.x !== undefined && node.y !== undefined) {
-                    nodeStateRef.current.set(node.id, {
-                        x: node.x,
-                        y: node.y,
-                        vx: node.vx,
-                        vy: node.vy
-                    });
-                }
-            });
-
-
-            // Curved links - ensure source/target are resolved D3Node objects
+            // Update link paths - curved arcs between source and target
             linkElements.attr('d', d => {
                 const source = d.source as D3Node;
                 const target = d.target as D3Node;
-                // Guard against undefined positions during initialization
-                if (source.x === undefined || source.y === undefined ||
-                    target.x === undefined || target.y === undefined) {
+                if (source.x == null || source.y == null || target.x == null || target.y == null) {
                     return '';
                 }
-                const dx = (target.x ?? 0) - (source.x ?? 0);
-                const dy = (target.y ?? 0) - (source.y ?? 0);
-                const dr = Math.sqrt(dx * dx + dy * dy) * 0.8;
+
+                if (source.id === target.id) {
+                    // Self-loop: Render as a circular arc offset from node
+                    const x = source.x;
+                    const y = source.y;
+                    const r = getNodeSize(source) * 1.5;
+                    // Slightly more readable self-loop arc
+                    return `M ${x},${y} m ${-r},0 a ${r},${r} 0 1,1 ${r * 2},0 a ${r},${r} 0 1,1 ${-r * 2},0`;
+                }
+
+                const dx = target.x - source.x;
+                const dy = target.y - source.y;
+                const dr = Math.sqrt(dx * dx + dy * dy) * 1.2; // Slightly more curved
                 return `M${source.x},${source.y}A${dr},${dr} 0 0,1 ${target.x},${target.y}`;
             });
 
-            // Position link labels at curve midpoint
+            // Update link labels - positioned at midpoint or above self-loops
             linkLabels.attr('transform', d => {
                 const source = d.source as D3Node;
                 const target = d.target as D3Node;
-                // Guard against undefined positions
-                if (source.x === undefined || source.y === undefined ||
-                    target.x === undefined || target.y === undefined) {
+                if (source.x == null || source.y == null || target.x == null || target.y == null) {
                     return 'translate(0,0)';
                 }
-                // Approximate midpoint with slight offset for curved path
-                const midX = ((source.x ?? 0) + (target.x ?? 0)) / 2;
-                const midY = ((source.y ?? 0) + (target.y ?? 0)) / 2;
-                // Offset slightly perpendicular to the line for curve
-                const dx = (target.x ?? 0) - (source.x ?? 0);
-                const dy = (target.y ?? 0) - (source.y ?? 0);
+
+                if (source.id === target.id) {
+                    // Position label above self-loop
+                    const r = getNodeSize(source) * 1.5;
+                    return `translate(${source.x}, ${source.y - r - 10})`;
+                }
+
+                const midX = (source.x + target.x) / 2;
+                const midY = (source.y + target.y) / 2;
+                const dx = target.x - source.x;
+                const dy = target.y - source.y;
                 const len = Math.sqrt(dx * dx + dy * dy) || 1;
                 const offsetX = -dy / len * 15;
                 const offsetY = dx / len * 15;
                 return `translate(${midX + offsetX}, ${midY + offsetY})`;
             });
 
+            // Update node positions
             nodeGroups.attr('transform', d => `translate(${d.x ?? 0}, ${d.y ?? 0})`);
         });
-
 
         // Cleanup
         return () => {
             simulation.stop();
         };
-    }, [d3Nodes, d3Links, dimensions, getNodeSize, getNodeColor, getLinkColor, onNodeClick, onNodeDoubleClick, onNodeHover, onBackgroundClick, strokeColor, textColor, isDark]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // CRITICAL: Only rebuild graph when DATA changes, NOT when callbacks change
+        // Callbacks are accessed via closure and don't need to trigger rebuilds
+    }, [d3Nodes, d3Links, dimensions, getNodeSize, getNodeColor, getLinkColor, strokeColor, textColor, isDark]);
 
     // Update visual states when selection/hover changes
     useEffect(() => {
@@ -496,60 +539,72 @@ export function ForceGraph2D({
 
         const svg = d3.select(svgRef.current);
 
+        // Calculate neighborhood for dimming effect
+        const focusNodeId = hoveredNode || (selectedNodes.length === 1 ? selectedNodes[0] : null);
+        const neighbors = new Set<string>();
+        if (focusNodeId) {
+            neighbors.add(focusNodeId);
+            d3Links.forEach(link => {
+                const sourceId = typeof link.source === 'string' ? link.source : (link.source as D3Node).id;
+                const targetId = typeof link.target === 'string' ? link.target : (link.target as D3Node).id;
+
+                if (sourceId === focusNodeId) neighbors.add(targetId);
+                if (targetId === focusNodeId) neighbors.add(sourceId);
+            });
+        }
+
         // Update node styles
         svg.selectAll<SVGGElement, D3Node>('.node-group')
             .each(function (d) {
                 const group = d3.select(this);
                 const isSelected = selectedNodes.includes(d.id);
-                const isHovered = hoveredNode === d.id;
+                const isFocused = focusNodeId && neighbors.has(d.id);
+                const shouldDim = focusNodeId && !isFocused;
 
                 group.select('.node-circle')
                     .attr('stroke', isSelected ? '#10B981' : strokeColor)
                     .attr('stroke-width', isSelected ? 4 : 2)
-                    .attr('opacity', hoveredNode && !isHovered && !isSelected ? 0.3 : 1);
+                    .attr('opacity', shouldDim ? 0.2 : 1);
 
                 group.select('.glow-ring')
                     .attr('stroke-opacity', isSelected ? 0.8 : 0);
 
                 group.select('.node-label')
-                    .attr('opacity', hoveredNode && !isHovered && !isSelected ? 0.3 : 1);
+                    .attr('opacity', shouldDim ? 0.2 : 1);
             });
 
         // Update link styles
         svg.selectAll<SVGPathElement, D3Link>('.link')
             .attr('stroke-opacity', d => {
-                const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
-                const targetId = typeof d.target === 'string' ? d.target : d.target.id;
+                const sourceId = typeof d.source === 'string' ? d.source : (d.source as D3Node).id;
+                const targetId = typeof d.target === 'string' ? d.target : (d.target as D3Node).id;
 
-                if (selectedNodes.includes(sourceId) || selectedNodes.includes(targetId)) {
-                    return 0.8;
-                }
-                if (hoveredNode === sourceId || hoveredNode === targetId) {
-                    return 0.6;
-                }
-                if (hoveredNode) {
-                    return 0.1;
-                }
+                const isLinkFocused = focusNodeId && (sourceId === focusNodeId || targetId === focusNodeId);
+
+                if (isLinkFocused) return 0.8;
+                if (focusNodeId) return 0.05; // Dim heavily if something else is focused
+
+                if (selectedNodes.includes(sourceId) || selectedNodes.includes(targetId)) return 0.8;
                 return 0.4;
             })
             .attr('stroke-width', d => {
-                const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
-                const targetId = typeof d.target === 'string' ? d.target : d.target.id;
+                const sourceId = typeof d.source === 'string' ? d.source : (d.source as D3Node).id;
+                const targetId = typeof d.target === 'string' ? d.target : (d.target as D3Node).id;
 
-                if (selectedNodes.includes(sourceId) || selectedNodes.includes(targetId)) {
-                    return 3;
-                }
+                if (focusNodeId && (sourceId === focusNodeId || targetId === focusNodeId)) return 3;
+                if (selectedNodes.includes(sourceId) || selectedNodes.includes(targetId)) return 3;
                 return 2;
             });
 
-    }, [selectedNodes, hoveredNode, strokeColor]);
+    }, [selectedNodes, hoveredNode, strokeColor, d3Links]);
 
     return (
         <div
             ref={containerRef}
-            className="w-full h-full"
+            className="w-full h-full relative"
             style={{ backgroundColor: bgColor }}
         >
+            <IngestionProgressHUD />
             <svg
                 ref={svgRef}
                 width={dimensions.width}

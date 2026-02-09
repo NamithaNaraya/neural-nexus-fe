@@ -36,9 +36,9 @@ export function useSSE() {
             eventSourceRef.current.close();
         }
 
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-        // Pass token as query param since EventSource doesn't support headers
-        const url = `${baseUrl}/sse/tasks/${user.id}?token=${encodeURIComponent(token)}`;
+        // Use relative path to leverage Next.js proxy defined in next.config.js
+        // This avoids CORS issues and host mismatches (e.g. accessing via IP)
+        const url = `/api/v1/sse/tasks/${user.id}?token=${encodeURIComponent(token)}`;
 
         try {
             const eventSource = new EventSource(url);

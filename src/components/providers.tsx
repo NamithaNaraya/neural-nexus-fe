@@ -14,88 +14,38 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CommandPaletteProvider } from '@/components/command-palette';
 import { useAuthStore } from '@/store/authStore';
 
+import { useUIStore } from '@/store/uiStore';
+
 interface ProvidersProps {
     children: React.ReactNode;
 }
 
-// === Theme Context ===
-type Theme = 'light' | 'dark';
-
-interface ThemeContextType {
-    theme: Theme;
-    toggleTheme: () => void;
-    setTheme: (theme: Theme) => void;
-}
-
-const ThemeContext = createContext<ThemeContextType | null>(null);
-
-export function useTheme() {
-    const context = useContext(ThemeContext);
-    if (!context) {
-        throw new Error('useTheme must be used within ThemeProvider');
-    }
-    return context;
-}
-
 /**
- * ThemeProvider - Manages dark/light mode
+ * ThemeProvider - Manages dark/light mode using the global UI store
  */
 function ThemeProvider({ children }: { children: React.ReactNode }) {
-    const [theme, setThemeState] = useState<Theme>('light'); // Default to light
+    const { theme, setTheme } = useUIStore();
     const [mounted, setMounted] = useState(false);
 
-    // Initialize theme from localStorage or system preference
+    // Initialize theme mounting flag
     useEffect(() => {
         setMounted(true);
-        const stored = localStorage.getItem('neural-nexus-theme') as Theme | null;
 
-        if (stored) {
-            setThemeState(stored);
-        } else {
-            // Check system preference, but default to light if no preference
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            // User requested default to light. We can respect system or force light.
-            // Usually "default to light" means "if I haven't chosen, give me light".
-            // We will respect system if it's explicitly dark, but otherwise light.
-            // Actually, to fully "make the default light", let's prioritize light 
-            // but still allow system override if we want to be nice. 
-            // However, the prompt implies the current default (dark) is unwanted.
-            // Let's just set it to matches ? 'dark' : 'light' but ensure initial state was light.
-            // Wait, if line 44 is 'light', and system is 'dark', this effect will flip it to 'dark'.
-            // If the user wants "Default to light", they might mean "Ignore system dark mode".
-            // I will set it to 'light' in the else block to force the default.
-            setThemeState('light');
+        // Initial sync of document class
+        if (typeof document !== 'undefined') {
+            document.documentElement.classList.toggle('dark', theme === 'dark');
+            document.documentElement.style.colorScheme = theme;
         }
-    }, []);
+    }, [theme]);
 
-    // Apply theme class to document
+    // Apply theme class to document on theme change
     useEffect(() => {
-        if (!mounted) return;
+        if (!mounted || typeof document === 'undefined') return;
 
         const root = document.documentElement;
-
-        if (theme === 'dark') {
-            root.classList.add('dark');
-            root.classList.remove('light');
-        } else {
-            root.classList.add('light');
-            root.classList.remove('dark');
-        }
-
-        // Also set color-scheme for browser UI
+        root.classList.toggle('dark', theme === 'dark');
         root.style.colorScheme = theme;
-
-        // Store preference
-        localStorage.setItem('neural-nexus-theme', theme);
     }, [theme, mounted]);
-
-    const toggleTheme = () => {
-        setThemeState(prev => prev === 'dark' ? 'light' : 'dark');
-    };
-
-    const setTheme = (newTheme: Theme) => {
-        setThemeState(newTheme);
-    };
 
     // Prevent hydration mismatch by not rendering until mounted
     if (!mounted) {
@@ -107,9 +57,9 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
+        <>
             {children}
-        </ThemeContext.Provider>
+        </>
     );
 }
 

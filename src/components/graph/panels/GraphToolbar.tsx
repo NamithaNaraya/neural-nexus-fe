@@ -75,27 +75,27 @@ export function GraphToolbar({
         <>
             <div className="absolute top-0 left-0 right-0 z-40 h-14 px-4 flex items-center justify-between bg-background/80 backdrop-blur-md border-b border-border/40">
                 {/* Left Section - View Mode Toggle */}
-                <div className="flex items-center gap-2">
-                    <div className="flex bg-muted/50 rounded-lg p-1">
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center bg-muted/30 rounded-xl p-1 border border-border/50 shadow-sm backdrop-blur-sm">
                         <ViewModeButton
                             mode="3d"
                             currentMode={viewMode}
                             onClick={() => onViewModeChange('3d')}
-                            icon={<Box className="w-4 h-4" />}
+                            icon={<Box className="w-5 h-5" />}
                             label="3D"
                         />
                         <ViewModeButton
                             mode="2d"
                             currentMode={viewMode}
                             onClick={() => onViewModeChange('2d')}
-                            icon={<Grid3X3 className="w-4 h-4" />}
+                            icon={<Grid3X3 className="w-5 h-5" />}
                             label="2D"
                         />
                         <ViewModeButton
                             mode="charts"
                             currentMode={viewMode}
                             onClick={() => onViewModeChange('charts')}
-                            icon={<PieChart className="w-4 h-4" />}
+                            icon={<PieChart className="w-5 h-5" />}
                             label="Charts"
                         />
                     </div>
@@ -196,18 +196,18 @@ function ViewModeButton({ mode, currentMode, onClick, icon, label }: ViewModeBut
         <button
             onClick={onClick}
             className={`
-                relative flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium
-                transition-colors duration-200
+                relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold
+                transition-all duration-200 ease-out
                 ${isActive
-                    ? 'text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'text-primary'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 }
             `}
         >
             {isActive && (
                 <motion.div
                     layoutId="viewModeIndicator"
-                    className="absolute inset-0 bg-background rounded-md shadow-sm"
+                    className="absolute inset-0 bg-background rounded-lg shadow-md border border-primary/20"
                     transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                 />
             )}
