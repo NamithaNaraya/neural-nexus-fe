@@ -19,6 +19,9 @@ interface InstancedNodesProps {
     onNodeClick: (nodeId: string) => void;
     onNodeDoubleClick: (nodeId: string) => void;
     onNodeHover: (nodeId: string | null) => void;
+    analyticSelectionActive?: boolean;
+    analyticIncludeNeighbors?: boolean;
+    links: { source: string; target: string }[];
 }
 
 // Temporary objects for matrix calculations (reused to avoid GC)
@@ -34,6 +37,9 @@ export function InstancedNodes({
     onNodeClick,
     onNodeDoubleClick,
     onNodeHover,
+    analyticSelectionActive = false,
+    analyticIncludeNeighbors = false,
+    links,
 }: InstancedNodesProps) {
     const meshRef = useRef<THREE.InstancedMesh>(null);
     const glowMeshRef = useRef<THREE.InstancedMesh>(null);
@@ -41,6 +47,17 @@ export function InstancedNodes({
 
     // Track double-click timing
     const lastClickRef = useRef<{ time: number; index: number }>({ time: 0, index: -1 });
+
+    // Neighborhood Map for Analytics
+    const analyticsNeighborhood = useMemo(() => {
+        if (!analyticSelectionActive || !analyticIncludeNeighbors || selectedNodes.length === 0) return new Set<string>();
+        const set = new Set<string>();
+        links.forEach(l => {
+            if (selectedNodes.includes(l.source)) set.add(l.target);
+            if (selectedNodes.includes(l.target)) set.add(l.source);
+        });
+        return set;
+    }, [analyticSelectionActive, analyticIncludeNeighbors, selectedNodes, links]);
 
     // Create node ID to index mapping for fast lookup
     const nodeIndexMap = useMemo(() => {
@@ -120,11 +137,12 @@ export function InstancedNodes({
         // Update colors based on selection/hover state
         nodes.forEach((node, i) => {
             const isSelected = selectedNodes.includes(node.id);
+            const isNeighbor = analyticsNeighborhood.has(node.id);
             const isHovered = hoveredNode === node.id;
 
             // Pulse effect for selected nodes
             if (isSelected) {
-                const pulse = 1 + Math.sin(time * 3) * 0.15;
+                const pulse = 1 + Math.sin(time * (analyticSelectionActive ? 6 : 3)) * (analyticSelectionActive ? 0.25 : 0.15);
                 tempScale.set(sizes[i] * pulse, sizes[i] * pulse, sizes[i] * pulse);
 
                 // Get current position
@@ -134,8 +152,20 @@ export function InstancedNodes({
                 tempMatrix.compose(tempPosition, new THREE.Quaternion(), tempScale);
                 mesh.setMatrixAt(i, tempMatrix);
 
-                // Brighten color
-                tempColor.copy(colors[i]).multiplyScalar(1.5);
+                // Brighten color - extra boost in analytic mode
+                tempColor.copy(colors[i]).multiplyScalar(analyticSelectionActive ? 2.5 : 1.5);
+                mesh.setColorAt(i, tempColor);
+            } else if (isNeighbor) {
+                // Neighbors in analytics mode get a solid distinct look
+                const pulse = 1 + Math.sin(time * 2 + i) * 0.1;
+                tempScale.set(sizes[i] * pulse, sizes[i] * pulse, sizes[i] * pulse);
+
+                mesh.getMatrixAt(i, tempMatrix);
+                tempMatrix.decompose(tempPosition, new THREE.Quaternion(), new THREE.Vector3());
+                tempMatrix.compose(tempPosition, new THREE.Quaternion(), tempScale);
+                mesh.setMatrixAt(i, tempMatrix);
+
+                tempColor.copy(colors[i]).multiplyScalar(1.4);
                 mesh.setColorAt(i, tempColor);
             } else if (isHovered) {
                 // Slightly larger and brighter on hover

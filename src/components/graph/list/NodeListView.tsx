@@ -26,6 +26,7 @@ interface NodeListViewProps {
     onNodeDoubleClick: (nodeId: string) => void;
     onNodeHover: (nodeId: string | null) => void;
     onNodeFocus?: (nodeId: string) => void;
+    analyticSelectionActive?: boolean;
 }
 
 type SortField = 'name' | 'type' | 'degree';
@@ -38,6 +39,7 @@ export function NodeListView({
     onNodeDoubleClick,
     onNodeHover,
     onNodeFocus,
+    analyticSelectionActive = false,
 }: NodeListViewProps) {
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
@@ -137,7 +139,7 @@ export function NodeListView({
                                     onMouseLeave={() => onNodeHover(null)}
                                     className={`
                                         group cursor-pointer transition-all duration-200
-                                        ${isSelected ? 'bg-primary/10' : 'hover:bg-white/5'}
+                                        ${isSelected ? (analyticSelectionActive ? 'bg-slate-900' : 'bg-primary/10') : 'hover:bg-white/5'}
                                     `}
                                 >
                                     <td className="px-6 py-4">
@@ -146,7 +148,7 @@ export function NodeListView({
                                                 className="w-2 h-2 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]"
                                                 style={{ backgroundColor: typeColor, boxShadow: `0 0 12px ${typeColor}66` }}
                                             />
-                                            <span className={`text-sm font-bold ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+                                            <span className={`text-sm font-bold ${isSelected ? (analyticSelectionActive ? 'text-white' : 'text-primary') : 'text-foreground'}`}>
                                                 {node.name}
                                             </span>
                                         </div>

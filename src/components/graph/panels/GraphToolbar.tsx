@@ -28,9 +28,10 @@ import {
     Eye,
     Circle,
     List,
-    Trash2,
 } from 'lucide-react';
 import { AlgorithmDrawer } from './AlgorithmDrawer';
+import { AnalyticsScopeModal } from '../modals/AnalyticsScopeModal';
+import { AnalyticsSelectionLocker } from './AnalyticsSelectionLocker';
 import { useGraphStore } from '@/store/graphStore';
 
 interface GraphToolbarProps {
@@ -52,6 +53,7 @@ interface GraphToolbarProps {
     totalNodeCount?: number;
     totalLinkCount?: number;
     selectedCount?: number;
+    isSidebarOpen?: boolean;
 }
 
 export function GraphToolbar({
@@ -73,9 +75,20 @@ export function GraphToolbar({
     totalNodeCount = 0,
     totalLinkCount = 0,
     selectedCount = 0,
+    isSidebarOpen = false,
 }: GraphToolbarProps) {
     const [showAlgorithmDrawer, setShowAlgorithmDrawer] = useState(false);
-    const { setFilters, clearDiscovery, discoveredNodeIds } = useGraphStore();
+    const [showScopeModal, setShowScopeModal] = useState(false);
+    const [includeNeighbors, setIncludeNeighbors] = useState(false);
+    const [runOnSelection, setRunOnSelection] = useState(false);
+
+    const {
+        setFilters,
+        clearDiscovery,
+        analyticSelectionActive,
+        setAnalyticSelectionActive,
+        clearSelection
+    } = useGraphStore();
 
     // Calculate if filtering is active
     const isFiltered = nodeCount !== totalNodeCount || linkCount !== totalLinkCount;
@@ -137,21 +150,11 @@ export function GraphToolbar({
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
                         <ToolbarButton
-                            onClick={() => setShowAlgorithmDrawer(true)}
+                            onClick={() => setShowScopeModal(true)}
                             icon={<Zap className="w-4 h-4" />}
                             title="Graph Algorithms"
                             className="text-amber-500 hover:bg-amber-500/10"
                         />
-                        <div className="w-px h-6 bg-border/20 mx-1" />
-                        {discoveredNodeIds.size > 0 && (
-                            <ToolbarButton
-                                onClick={clearDiscovery}
-                                icon={<Trash2 className="w-4 h-4" />}
-                                title="Clear Exploration Path"
-                                className="text-rose-400 hover:bg-rose-400/10"
-                            />
-                        )}
-                        <div className="w-px h-6 bg-border/20 mx-1" />
                         {onResetCamera && (
                             <ToolbarButton
                                 onClick={onResetCamera}
@@ -218,6 +221,41 @@ export function GraphToolbar({
                 isOpen={showAlgorithmDrawer}
                 onClose={() => setShowAlgorithmDrawer(false)}
                 folderId={folderId}
+                runOnSelection={runOnSelection}
+                initialSetupPhase={false}
+                includeNeighbors={includeNeighbors}
+                onChangeScope={() => {
+                    setShowAlgorithmDrawer(false);
+                    setShowScopeModal(true);
+                }}
+            />
+
+            {/* Selection Scope Modal */}
+            <AnalyticsScopeModal
+                isOpen={showScopeModal}
+                onClose={() => setShowScopeModal(false)}
+                onSelectGlobal={() => {
+                    setRunOnSelection(false);
+                    setShowAlgorithmDrawer(true);
+                }}
+                onSelectTargeted={() => {
+                    setRunOnSelection(true);
+                    setAnalyticSelectionActive(true);
+                }}
+            />
+
+            {/* Selection Locker */}
+            <AnalyticsSelectionLocker
+                isActive={analyticSelectionActive}
+                isSidebarOpen={isSidebarOpen}
+                onCancel={() => {
+                    setAnalyticSelectionActive(false);
+                    clearSelection();
+                }}
+                onConfirm={() => {
+                    setAnalyticSelectionActive(false);
+                    setShowAlgorithmDrawer(true);
+                }}
             />
         </>
     );

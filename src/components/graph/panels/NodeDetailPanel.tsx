@@ -35,18 +35,6 @@ import {
     Palette,
 } from 'lucide-react';
 
-const COLOR_PRESETS = [
-    '#6366F1', // Indigo
-    '#8B5CF6', // Purple
-    '#EC4899', // Pink
-    '#EF4444', // Red
-    '#F97316', // Orange
-    '#FBBF24', // Amber
-    '#22C55E', // Green
-    '#14B8A6', // Teal
-    '#06B6D4', // Cyan
-    '#3B82F6', // Blue
-];
 
 // Static presets removed - now fetched dynamically from API
 const RELATIONSHIP_TYPES = []; // Placeholder, will be populated via state
@@ -85,8 +73,6 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
     const [editName, setEditName] = useState(node.name);
     const [editType, setEditType] = useState(node.type);
     const [editDescription, setEditDescription] = useState(node.description || '');
-    const [editColor, setEditColor] = useState(node.color || '#6366F1');
-    const [editSize, setEditSize] = useState(node.size || 10);
     const [isSaving, setIsSaving] = useState(false);
 
     // Relationship state
@@ -114,8 +100,6 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
         setEditName(node.name);
         setEditType(node.type);
         setEditDescription(node.description || '');
-        setEditColor(node.color || '#6366F1');
-        setEditSize(node.size || 10);
         setIsEditing(false);
         setIsRelating(false);
     }, [node]);
@@ -157,16 +141,12 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                 name: editName,
                 type: editType,
                 description: editDescription,
-                color: editColor,
-                size: editSize,
             });
             // Update local store with the fields we sent
             updateNode(node.id, {
                 name: editName,
                 type: editType,
                 description: editDescription,
-                color: editColor,
-                size: editSize,
             });
             setIsEditing(false);
         } catch (error) {
@@ -364,41 +344,6 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/5">
-                {/* Styling (Edit Mode Only) */}
-                {isEditing && (
-                    <div className="p-6 border-b border-white/5 space-y-6 bg-primary/5">
-                        <div>
-                            <h4 className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                                <Palette className="w-3.5 h-3.5" /> CHROMATIC SYNC
-                            </h4>
-                            <div className="flex flex-wrap gap-3">
-                                {COLOR_PRESETS.map((preset) => (
-                                    <button
-                                        key={preset}
-                                        onClick={() => setEditColor(preset)}
-                                        className={`w-8 h-8 rounded-xl border-2 transition-all duration-300 ${editColor === preset ? 'border-white ring-4 ring-primary/20 scale-125' : 'border-transparent hover:scale-110'
-                                            }`}
-                                        style={{ backgroundColor: preset, boxShadow: editColor === preset ? `0 0 15px ${preset}60` : 'none' }}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                        <div>
-                            <h4 className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                                <Box className="w-3.5 h-3.5" /> DIMENSIONAL SCALE: {editSize}
-                            </h4>
-                            <input
-                                type="range"
-                                min="5"
-                                max="30"
-                                step="1"
-                                value={editSize}
-                                onChange={(e) => setEditSize(parseInt(e.target.value))}
-                                className="w-full h-2 bg-white/5 rounded-full appearance-none cursor-pointer accent-primary"
-                            />
-                        </div>
-                    </div>
-                )}
                 {/* Relate Mode UI */}
                 {isRelating && (
                     <div className="p-6 border-b border-white/10 space-y-6 bg-indigo-500/5">

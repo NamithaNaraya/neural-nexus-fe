@@ -14,6 +14,8 @@ interface LinksProps {
     nodeMap: Map<string, any>;
     focusNodeId: string | null;
     pulseGeometry: THREE.BufferGeometry;
+    selectedNodes?: string[];
+    analyticSelectionActive?: boolean;
 }
 
 import { Segments, Segment } from '@react-three/drei';
@@ -22,7 +24,9 @@ export function RelationshipLinks({
     links = [],
     nodeMap = new Map(),
     focusNodeId = null,
-    pulseGeometry
+    pulseGeometry,
+    selectedNodes = [],
+    analyticSelectionActive = false
 }: LinksProps) {
     const pulseMeshRef = useRef<THREE.InstancedMesh>(null);
 
@@ -39,7 +43,8 @@ export function RelationshipLinks({
             const target = nodeMap.get(targetId);
 
             if (sourceId && targetId && source && target) {
-                const linkColor = RELATIONSHIP_COLORS[link.type] || RELATIONSHIP_COLORS.default;
+                const isCorrelation = analyticSelectionActive && selectedNodes.includes(sourceId) && selectedNodes.includes(targetId);
+                const linkColor = isCorrelation ? '#000000' : (RELATIONSHIP_COLORS[link.type] || RELATIONSHIP_COLORS.default);
                 const linkId = (link as any).id || `${sourceId}-${targetId}-${i}`;
 
                 // Create Curved Path Points
@@ -51,7 +56,6 @@ export function RelationshipLinks({
                 const distance = start.distanceTo(end);
 
                 // Push control point "outward" or "upward" for an organic look
-                // For a "flowy" feel, we push it slightly away from the center or use a consistent bias
                 const offset = mid.clone().normalize().multiplyScalar(distance * 0.15);
                 const control = mid.clone().add(offset).add(new THREE.Vector3(0, distance * 0.1, 0));
 
@@ -72,12 +76,13 @@ export function RelationshipLinks({
                     segments,
                     curve, // Store curve for particle lerping
                     color: linkColor,
-                    opacity: focusNodeId ? (sourceId === focusNodeId || targetId === focusNodeId ? 0.8 : 0.05) : 0.6
+                    opacity: isCorrelation ? 1 : (focusNodeId ? (sourceId === focusNodeId || targetId === focusNodeId ? 0.8 : 0.05) : 0.6),
+                    width: isCorrelation ? 2.5 : 2.5
                 });
             }
         });
         return result;
-    }, [links, nodeMap, focusNodeId]);
+    }, [links, nodeMap, focusNodeId, selectedNodes, analyticSelectionActive]);
 
     const tempMatrix = useMemo(() => new THREE.Matrix4(), []);
     const tempPos = useMemo(() => new THREE.Vector3(), []);

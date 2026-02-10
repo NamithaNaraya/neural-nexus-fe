@@ -26,6 +26,10 @@ import {
     ChevronLeft,
     Sparkles,
     Brain,
+    Globe,
+    BoxSelect,
+    MousePointer2,
+    Users,
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/shared';
 import { api } from '@/lib/api';
@@ -52,6 +56,12 @@ interface AlgorithmDrawerProps {
     isOpen: boolean;
     onClose: () => void;
     folderId?: string;
+
+    // Externalized Scope State
+    runOnSelection?: boolean;
+    initialSetupPhase?: boolean;
+    includeNeighbors?: boolean;
+    onChangeScope?: () => void;
 }
 
 type AlgorithmCategory = 'centrality' | 'community' | 'prediction' | 'analysis';
@@ -187,15 +197,68 @@ const categoryLabels: Record<AlgorithmCategory, { label: string; icon: React.Rea
     analysis: { label: 'Analysis', icon: <Activity className="w-4 h-4" /> },
 };
 
-export function AlgorithmDrawer({ isOpen, onClose, folderId }: AlgorithmDrawerProps) {
+export function AlgorithmDrawer({
+    isOpen,
+    onClose,
+    folderId,
+    runOnSelection: externalRunOnSelection = false,
+    initialSetupPhase = true,
+    includeNeighbors: externalIncludeNeighbors = false,
+    onChangeScope
+}: AlgorithmDrawerProps) {
     const selectedNodes = useGraphStore(state => state.selectedNodes);
 
     const [activeCategory, setActiveCategory] = useState<AlgorithmCategory>('centrality');
     const [selectedAlgorithm, setSelectedAlgorithm] = useState<string | null>(null);
     const [result, setResult] = useState<AlgorithmResult | null>(null);
-    const [runOnSelection, setRunOnSelection] = useState(false);
+    const [runOnSelection, setRunOnSelection] = useState(selectedNodes.length > 0);
+
+    // Sync external changes and auto-default
+    React.useEffect(() => {
+        if (selectedNodes.length > 0) {
+            setRunOnSelection(true);
+        }
+    }, [selectedNodes.length]);
+
+    React.useEffect(() => {
+        setRunOnSelection(externalRunOnSelection);
+    }, [externalRunOnSelection]);
+
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Setup Phase State
+    const [setupPhase, setSetupPhase] = useState(initialSetupPhase);
+    const [includeNeighbors, setIncludeNeighbors] = useState(externalIncludeNeighbors);
+
+    // Sync external changes
+    React.useEffect(() => {
+        setIncludeNeighbors(externalIncludeNeighbors);
+    }, [externalIncludeNeighbors]);
+
+    // Sync setup phase if initial changes
+    React.useEffect(() => {
+        setSetupPhase(initialSetupPhase);
+    }, [initialSetupPhase]);
+
+    const nodes = useGraphStore(state => state.nodes);
+    const links = useGraphStore(state => state.links);
+
+    // Calculate effective targeted nodes including neighbors if requested
+    const effectiveTargetedIds = React.useMemo(() => {
+        if (!runOnSelection) return [];
+        if (!includeNeighbors) return selectedNodes;
+
+        const neighborIds = new Set(selectedNodes);
+        links.forEach(link => {
+            const sourceId = typeof link.source === 'string' ? link.source : (link.source as any).id;
+            const targetId = typeof link.target === 'string' ? link.target : (link.target as any).id;
+
+            if (selectedNodes.includes(sourceId)) neighborIds.add(targetId);
+            if (selectedNodes.includes(targetId)) neighborIds.add(sourceId);
+        });
+        return Array.from(neighborIds);
+    }, [runOnSelection, includeNeighbors, selectedNodes, links]);
 
     const runAlgorithm = useCallback(async (config: AlgorithmConfig) => {
         setSelectedAlgorithm(config.key);
@@ -204,7 +267,7 @@ export function AlgorithmDrawer({ isOpen, onClose, folderId }: AlgorithmDrawerPr
         setResult(null);
 
         try {
-            const nodeIds = runOnSelection && selectedNodes.length > 0 ? selectedNodes : undefined;
+            const nodeIds = runOnSelection && effectiveTargetedIds.length > 0 ? effectiveTargetedIds : undefined;
             const data = await fetchAlgorithm(config.endpoint, folderId, nodeIds);
             setResult(data);
         } catch (err) {
@@ -212,7 +275,7 @@ export function AlgorithmDrawer({ isOpen, onClose, folderId }: AlgorithmDrawerPr
         } finally {
             setIsLoading(false);
         }
-    }, [folderId, runOnSelection, selectedNodes]);
+    }, [folderId, runOnSelection, effectiveTargetedIds]);
 
     const filteredAlgorithms = algorithms.filter(a => a.category === activeCategory);
 
@@ -225,7 +288,7 @@ export function AlgorithmDrawer({ isOpen, onClose, folderId }: AlgorithmDrawerPr
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+                        className="fixed inset-0 bg-background/60 dark:bg-black/60 backdrop-blur-md z-40"
                         onClick={onClose}
                     />
                 )}
@@ -235,116 +298,261 @@ export function AlgorithmDrawer({ isOpen, onClose, folderId }: AlgorithmDrawerPr
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
-                        initial={{ translateX: '100%' }}
-                        animate={{ translateX: 0 }}
-                        exit={{ translateX: '100%' }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
                         data-tour="algorithm-drawer"
-                        className="fixed top-0 right-0 h-full w-[480px] glass-strong z-50 border-l border-white/10 shadow-[-20px_0_60px_rgba(0,0,0,0.3)] flex flex-col"
+                        className="fixed inset-0 bg-white/90 dark:bg-slate-950/80 backdrop-blur-3xl z-50 flex flex-col overflow-hidden text-foreground"
                     >
                         {/* Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-white/10">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-xl bg-primary/20 text-primary">
-                                    <Zap className="w-5 h-5" />
+                        <div className="flex items-center justify-between p-8 border-b border-black/5 dark:border-white/5 bg-transparent shrink-0">
+                            <div className="w-full flex items-center justify-between px-8">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 rounded-2xl bg-primary/20 text-primary shadow-xl shadow-primary/10">
+                                        <Zap className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-black tracking-tighter uppercase font-heading">Neural Analytics Engine</h2>
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                            <p className="text-[10px] text-muted-foreground uppercase font-black tracking-[0.3em] opacity-60">System Ready • Advanced Intelligence</p>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h2 className="text-lg font-bold tracking-tight">Graph Intelligence</h2>
-                                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest opacity-60">Advanced Analytics</p>
+                                <div className="flex items-center gap-6">
+                                    {selectedNodes.length > 0 && (
+                                        <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-primary/10 border border-primary/20">
+                                            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-primary">
+                                                {selectedNodes.length} Entities Selected
+                                            </span>
+                                        </div>
+                                    )}
+                                    {!setupPhase && !selectedAlgorithm && (
+                                        <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/5 border border-white/5">
+                                            <div className={`w-2 h-2 rounded-full ${runOnSelection ? 'bg-amber-500' : 'bg-emerald-500'} animate-pulse`} />
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                                Scope: {runOnSelection ? 'Targeted Set' : 'Global Network'}
+                                            </span>
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={() => {
+                                            setSetupPhase(true);
+                                            setSelectedAlgorithm(null);
+                                            setResult(null);
+                                            onClose();
+                                        }}
+                                        className="p-3 rounded-2xl hover:bg-white/10 transition-all text-muted-foreground hover:text-foreground border border-white/5 hover:border-white/20"
+                                    >
+                                        <X className="w-6 h-6" />
+                                    </button>
                                 </div>
                             </div>
-                            <button
-                                onClick={onClose}
-                                className="p-2 rounded-xl hover:bg-white/10 transition-colors text-muted-foreground hover:text-foreground"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
                         </div>
 
-                        {/* Main Content: List or Detail */}
-                        <div className="flex-1 flex flex-col overflow-hidden relative">
+                        {/* Main Content: Setup, List, or Detail */}
+                        <div className="flex-1 flex flex-col overflow-hidden relative bg-transparent">
                             <AnimatePresence mode="wait">
-                                {!selectedAlgorithm ? (
+                                {setupPhase ? (
+                                    <motion.div
+                                        key="setup"
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 1.05 }}
+                                        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                                        className="flex-1 flex flex-col items-center justify-center p-12 overflow-y-auto scrollbar-none"
+                                    >
+                                        <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            {/* Option 1: Global */}
+                                            <button
+                                                onClick={() => {
+                                                    setRunOnSelection(false);
+                                                    setSetupPhase(false);
+                                                }}
+                                                className={`group relative flex flex-col p-10 rounded-[3rem] border-2 transition-all duration-500 text-left ${!runOnSelection
+                                                    ? 'bg-primary/5 border-primary shadow-2xl shadow-primary/10'
+                                                    : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/5 dark:border-white/5 hover:bg-black/[0.05] dark:hover:bg-white/[0.05] hover:border-black/10 dark:hover:border-white/10'}`}
+                                            >
+                                                <div className="mb-8 p-6 rounded-3xl bg-white/5 w-fit group-hover:scale-110 group-hover:bg-primary/20 transition-all duration-500">
+                                                    <Globe className={`w-10 h-10 ${!runOnSelection ? 'text-primary' : 'text-muted-foreground'}`} />
+                                                </div>
+                                                <h3 className="text-3xl font-black tracking-tighter mb-4 uppercase">Global Horizon</h3>
+                                                <p className="text-sm text-muted-foreground leading-relaxed font-medium">Map intelligence across the entire active network. Recommended for discovery of high-level patterns and global hubs.</p>
+
+                                                <div className="mt-8 flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 w-fit opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                                    <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Full Access Locked</span>
+                                                </div>
+                                            </button>
+
+                                            {/* Option 2: Targeted */}
+                                            <div className={`flex flex-col p-10 rounded-[3rem] border-2 transition-all duration-500 ${runOnSelection
+                                                ? 'bg-primary/5 border-primary shadow-2xl shadow-primary/10'
+                                                : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/5 dark:border-white/5 hover:bg-black/[0.05] dark:hover:bg-white/[0.05] hover:border-black/10 dark:hover:border-white/10'}`}>
+                                                <div className="flex-1">
+                                                    <div className="mb-8 p-6 rounded-3xl bg-white/5 w-fit">
+                                                        <BoxSelect className={`w-10 h-10 ${runOnSelection ? 'text-primary' : 'text-muted-foreground'}`} />
+                                                    </div>
+                                                    <h3 className="text-3xl font-black tracking-tighter mb-4 uppercase">Targeted Segment</h3>
+                                                    <p className="text-sm text-muted-foreground leading-relaxed font-medium mb-8">Execute algorithms on a custom set of entities. Perfect for localized root cause analysis and impact studies.</p>
+
+                                                    {!runOnSelection ? (
+                                                        <button
+                                                            onClick={() => setRunOnSelection(true)}
+                                                            className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-white/10 text-[11px] font-black uppercase tracking-widest hover:bg-white/20 transition-all"
+                                                        >
+                                                            <MousePointer2 className="w-4 h-4" />
+                                                            Configure Subset
+                                                        </button>
+                                                    ) : (
+                                                        <div className="space-y-6">
+
+                                                            {/* Selection Summary */}
+                                                            <div className="p-6 rounded-[2rem] bg-white/5 border border-white/5 shadow-inner">
+                                                                <div className="flex items-center justify-between mb-6">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-black text-[12px]">
+                                                                            {effectiveTargetedIds.length}
+                                                                        </div>
+                                                                        <span className="text-[11px] font-black text-foreground uppercase tracking-wider">In Analysis Scope</span>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => useGraphStore.getState().clearSelection()}
+                                                                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive transition-all hover:text-white"
+                                                                    >
+                                                                        <X className="w-3 h-3" />
+                                                                        <span className="text-[9px] font-black uppercase">Clear</span>
+                                                                    </button>
+                                                                </div>
+                                                                <div className="max-h-32 overflow-y-auto scrollbar-none space-y-2 pr-2">
+                                                                    {selectedNodes.length > 0 ? (
+                                                                        selectedNodes.slice(0, 5).map(id => {
+                                                                            const node = nodes.find(n => n.id === id);
+                                                                            return (
+                                                                                <div key={id} className="flex items-center gap-3 p-2 rounded-xl bg-white/5 border border-white/5">
+                                                                                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                                                                    <span className="text-[10px] font-medium truncate">{node?.name || id}</span>
+                                                                                    {includeNeighbors && (
+                                                                                        <span className="ml-auto text-[8px] font-black text-muted-foreground uppercase">+ Neighbors</span>
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        })
+                                                                    ) : (
+                                                                        <div className="py-4 text-center border-2 border-dashed border-white/5 rounded-xl">
+                                                                            <p className="text-[9px] text-muted-foreground italic">Select nodes on the graph to begin</p>
+                                                                        </div>
+                                                                    )}
+                                                                    {selectedNodes.length > 5 && (
+                                                                        <div className="text-[9px] text-center text-muted-foreground pt-1">+{selectedNodes.length - 5} more...</div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            <button
+                                                                onClick={() => setSetupPhase(false)}
+                                                                disabled={effectiveTargetedIds.length === 0}
+                                                                className="w-full py-4 rounded-2xl bg-primary text-primary-foreground text-[11px] font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
+                                                            >
+                                                                Confirm Targeted Set
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setRunOnSelection(false)}
+                                                                className="w-full py-2 text-[9px] font-black text-muted-foreground uppercase opacity-60 hover:opacity-100 transition-opacity"
+                                                            >
+                                                                Switch back to Global
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                ) : !selectedAlgorithm ? (
                                     <motion.div
                                         key="list"
-                                        initial={{ opacity: 0, x: -20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: -20 }}
-                                        className="flex-1 flex flex-col overflow-hidden"
+                                        initial={{ opacity: 0, y: 30 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -30 }}
+                                        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                                        className="flex-1 flex flex-col overflow-hidden w-full p-12"
                                     >
-                                        {/* Category Tabs */}
-                                        <div className="flex px-4 pt-4 gap-1 overflow-x-auto scrollbar-none shrink-0">
-                                            {Object.entries(categoryLabels).map(([key, { label, icon }]) => (
+                                        <div className="max-w-7xl mx-auto w-full flex flex-col h-full">
+                                            <div className="flex items-center justify-between mb-8">
                                                 <button
-                                                    key={key}
-                                                    onClick={() => setActiveCategory(key as AlgorithmCategory)}
-                                                    className={`
-                                                        flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-full transition-all duration-300
-                                                        ${activeCategory === key
-                                                            ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                                                            : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
-                                                        }
-                                                    `}
-                                                >
-                                                    {icon}
-                                                    {label}
-                                                </button>
-                                            ))}
-                                        </div>
-
-                                        {/* Algorithm List */}
-                                        <div className="px-4 py-6 space-y-3 overflow-y-auto scrollbar-thin scrollbar-thumb-white/5">
-                                            <div className="px-1 mb-2">
-                                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-50">Available Strategies</h3>
-                                            </div>
-                                            {filteredAlgorithms.map(algo => (
-                                                <button
-                                                    key={algo.key}
                                                     onClick={() => {
-                                                        setSelectedAlgorithm(algo.key);
-                                                        setResult(null);
-                                                        setError(null);
+                                                        if (onChangeScope) {
+                                                            onChangeScope();
+                                                        } else {
+                                                            setSetupPhase(true);
+                                                        }
                                                     }}
-                                                    className="w-full flex items-center gap-4 p-4 rounded-2xl border border-white/5 bg-white/2 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 group text-left"
+                                                    className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors text-[10px] font-black uppercase tracking-widest group"
                                                 >
-                                                    <div className="p-3 rounded-xl bg-white/5 text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-500 group-hover:rotate-6 shadow-lg">
-                                                        {algo.icon}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="font-bold text-sm tracking-tight mb-0.5">{algo.name}</div>
-                                                        <div className="text-[10px] text-muted-foreground/80 font-medium truncate">{algo.description}</div>
-                                                    </div>
-                                                    <div className="p-2 rounded-lg bg-white/5 opacity-0 group-hover:opacity-100 transition-all">
-                                                        <Zap className="w-3.5 h-3.5 text-primary" />
-                                                    </div>
+                                                    <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
+                                                    Reconfigure Scope
                                                 </button>
-                                            ))}
-                                        </div>
-
-                                        {/* Footer / Scope */}
-                                        <div className="mt-auto m-4 p-4 rounded-2xl bg-white/5 border border-white/5">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <Target className="w-4 h-4 text-primary/80" />
-                                                    <span className="text-xs font-bold uppercase tracking-wider opacity-80">Scope</span>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    {selectedNodes.length > 0 && (
-                                                        <span className="text-[10px] px-2.5 py-1 rounded-full bg-primary/20 text-primary font-black border border-primary/20">
-                                                            {selectedNodes.length} SELECTED
-                                                        </span>
-                                                    )}
+                                            </div>
+                                            {/* Category Tabs */}
+                                            <div className="flex gap-2 mb-10 overflow-x-auto scrollbar-none shrink-0 justify-center">
+                                                {Object.entries(categoryLabels).map(([key, { label, icon }]) => (
                                                     <button
-                                                        onClick={() => setRunOnSelection(!runOnSelection)}
-                                                        disabled={selectedNodes.length === 0}
-                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-500 focus:outline-none ${runOnSelection && selectedNodes.length > 0 ? 'bg-primary shadow-[0_0_12px_rgba(168,85,247,0.4)]' : 'bg-white/10'
-                                                            } ${selectedNodes.length === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                                        key={key}
+                                                        onClick={() => setActiveCategory(key as AlgorithmCategory)}
+                                                        className={`
+                                                        flex items-center gap-3 px-8 py-4 text-xs font-black uppercase tracking-widest rounded-3xl transition-all duration-500
+                                                        ${activeCategory === key
+                                                                ? 'bg-primary text-primary-foreground shadow-2xl shadow-primary/40 scale-105 border border-primary/50'
+                                                                : 'text-muted-foreground bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10 hover:text-foreground'
+                                                            }
+                                                    `}
                                                     >
-                                                        <span
-                                                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-300 ${runOnSelection && selectedNodes.length > 0 ? 'translate-x-6' : 'translate-x-1'
-                                                                }`}
-                                                        />
+                                                        {icon}
+                                                        {label}
                                                     </button>
+                                                ))}
+                                            </div>
+
+                                            {/* Algorithm Grid */}
+                                            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/5 pr-4">
+                                                <div className="px-1 mb-8 flex items-center justify-between">
+                                                    <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-primary/80">Select Analytic Strategy</h3>
+                                                    <div className="h-px flex-1 bg-gradient-to-r from-primary/20 to-transparent ml-8" />
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
+                                                    {filteredAlgorithms.map(algo => (
+                                                        <button
+                                                            key={algo.key}
+                                                            onClick={() => {
+                                                                setSelectedAlgorithm(algo.key);
+                                                                setResult(null);
+                                                                setError(null);
+                                                            }}
+                                                            className="group relative flex flex-col p-10 rounded-[3rem] bg-black/[0.03] dark:bg-white/[0.03] border border-black/5 dark:border-white/5 hover:border-primary/40 hover:bg-black/[0.05] dark:hover:bg-white/[0.05] transition-all duration-500 hover:-translate-y-1"
+                                                        >
+                                                            <div className="flex items-center gap-4 mb-6">
+                                                                <div className="p-4 rounded-2xl bg-white/5 text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-700 group-hover:rotate-12 shadow-inner">
+                                                                    {React.cloneElement(algo.icon as React.ReactElement, { className: 'w-6 h-6' })}
+                                                                </div>
+                                                                <div className="font-black text-lg tracking-tight group-hover:text-primary transition-colors flex items-center gap-3">
+                                                                    {algo.name}
+                                                                    {runOnSelection && (
+                                                                        <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 text-[8px] font-black border border-amber-500/20 uppercase tracking-widest shrink-0">
+                                                                            Targeted
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-xs text-muted-foreground/80 font-medium leading-relaxed mb-8 flex-1">{algo.description}</div>
+                                                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary/40 group-hover:text-primary transition-colors">
+                                                                <span>Deep Scan</span>
+                                                                <Zap className="w-3 h-3 fill-current" />
+                                                            </div>
+                                                        </button>
+                                                    ))}
                                                 </div>
                                             </div>
                                         </div>
@@ -352,153 +560,233 @@ export function AlgorithmDrawer({ isOpen, onClose, folderId }: AlgorithmDrawerPr
                                 ) : (
                                     <motion.div
                                         key="detail"
-                                        initial={{ opacity: 0, x: 20 }}
+                                        initial={{ opacity: 0, x: 50 }}
                                         animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: 20 }}
-                                        className="flex-1 flex flex-col overflow-hidden p-6"
+                                        exit={{ opacity: 0, x: 50 }}
+                                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                                        className="flex-1 flex flex-col overflow-hidden w-full p-12"
                                     >
-                                        {/* Back Button */}
-                                        <button
-                                            onClick={() => {
-                                                setSelectedAlgorithm(null);
-                                                setResult(null);
-                                                setError(null);
-                                            }}
-                                            className="w-fit flex items-center gap-2 mb-8 group p-2 -ml-2 rounded-xl hover:bg-white/5 transition-all"
-                                        >
-                                            <div className="p-1.5 rounded-lg border border-white/10 text-muted-foreground group-hover:text-primary group-hover:border-primary/50 transition-all">
-                                                <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+                                        <div className="flex items-center justify-between mb-8">
+                                            {/* Back Button */}
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedAlgorithm(null);
+                                                    setResult(null);
+                                                    setError(null);
+                                                }}
+                                                className="w-fit flex items-center gap-3 group px-5 py-3 rounded-2xl bg-white/5 hover:bg-white/10 transition-all border border-white/5"
+                                            >
+                                                <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                                                <span className="text-[11px] uppercase font-black tracking-widest text-muted-foreground group-hover:text-foreground">Back to selection</span>
+                                            </button>
+
+                                            <div className="flex items-center gap-4">
+                                                <div className="px-4 py-2 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-3">
+                                                    <Brain className="w-4 h-4 text-primary animate-pulse" />
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary">Contextual Reasoning Active</span>
+                                                </div>
                                             </div>
-                                            <span className="text-[10px] uppercase font-black tracking-widest text-muted-foreground group-hover:text-foreground">Back to selection</span>
-                                        </button>
+                                        </div>
 
                                         {(() => {
                                             const algo = algorithms.find(a => a.key === selectedAlgorithm);
                                             if (!algo) return null;
 
                                             return (
-                                                <div className="flex-1 flex flex-col overflow-hidden space-y-6">
-                                                    {/* Header Info */}
-                                                    <div className="flex items-center gap-3 mb-3">
-                                                        <div className="p-3 rounded-2xl bg-primary text-primary-foreground shadow-xl shadow-primary/20">
-                                                            {React.cloneElement(algo.icon as React.ReactElement, { className: 'w-5 h-5' })}
-                                                        </div>
-                                                        <div>
-                                                            <h3 className="text-xl font-black tracking-tight leading-none mb-0.5">{algo.name}</h3>
-                                                            <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest opacity-70">{algo.category} ANALYSIS</p>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Compact Info Section */}
-                                                    <div className="grid grid-cols-2 gap-3 bg-primary/5 p-4 rounded-2xl border border-primary/10">
-                                                        <section>
-                                                            <h4 className="text-[10px] font-black text-primary/60 uppercase tracking-widest mb-1.5">Function</h4>
-                                                            <p className="text-sm text-foreground/80 leading-snug font-medium">{algo.simpleInfo}</p>
-                                                        </section>
-
-                                                        <section className="pl-3 border-l border-primary/10">
-                                                            <h4 className="text-[10px] font-black text-emerald-400/60 uppercase tracking-widest mb-1.5">Value</h4>
-                                                            <p className="text-sm font-bold text-foreground leading-snug">{algo.benefit}</p>
-                                                        </section>
-                                                    </div>
-
-                                                    {/* Results or Action Area */}
-                                                    <div className="flex-1 flex flex-col overflow-hidden relative mt-4">
-                                                        {error && (
-                                                            <div className="p-4 mb-4 rounded-2xl bg-destructive/10 text-destructive text-xs font-bold border border-destructive/20">
-                                                                {error}
-                                                            </div>
-                                                        )}
-
-                                                        {isLoading ? (
-                                                            <div className="flex-1 flex flex-col items-center justify-center space-y-4">
-                                                                <div className="relative">
-                                                                    <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                                                                    <Zap className="absolute inset-0 m-auto w-5 h-5 text-primary animate-pulse" />
-                                                                </div>
-                                                                <p className="text-xs font-black uppercase tracking-widest text-primary">Scanning Data Patterns...</p>
-                                                            </div>
-                                                        ) : result ? (
-                                                            <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4">
-                                                                <div className="flex items-center justify-between mb-3 px-1">
-                                                                    <h3 className="font-black text-[10px] uppercase tracking-widest text-primary">{algo.name} ANALYSIS</h3>
-                                                                    <div className="px-2 py-0.5 rounded-md bg-white/5 text-[10px] font-bold text-muted-foreground">
-                                                                        {result.results?.length || 0} TOTAL SAMPLES
+                                                <div className="flex-1 flex flex-col min-h-0">
+                                                    {/* Side-by-Side Content Layout */}
+                                                    <div className="flex-1 flex gap-8 min-h-0">
+                                                        {/* Left: Info & Insights (Solid Sidebar Style) */}
+                                                        <div className="w-[450px] flex flex-col gap-8 shrink-0 py-4 pr-12 border-r border-black/5 dark:border-white/5">
+                                                            <div className="relative z-10">
+                                                                <div className="flex items-center gap-6 mb-12">
+                                                                    <div className="p-5 rounded-2xl bg-primary text-primary-foreground shadow-xl shadow-primary/20">
+                                                                        {React.cloneElement(algo.icon as React.ReactElement, { className: 'w-8 h-8' })}
+                                                                    </div>
+                                                                    <div>
+                                                                        <h3 className="text-3xl font-black tracking-tighter leading-none mb-1">{algo.name}</h3>
+                                                                        <p className="text-[10px] text-primary font-black uppercase tracking-[0.4em]">{algo.category} PROTOCOL</p>
                                                                     </div>
                                                                 </div>
 
-                                                                {/* Intelligence Narrative Section - Reduced to 20% height */}
-                                                                <div className="h-[22%] mb-4 relative group/insight shrink-0">
-                                                                    <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/30 via-cyan-400/30 to-primary/30 rounded-2xl blur opacity-10 group-hover/insight:opacity-30 transition duration-1000" />
-                                                                    <div className="relative h-full p-4 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg flex flex-col">
-                                                                        <div className="flex items-center gap-2 mb-2">
-                                                                            <Sparkles className="w-3 h-3 text-primary" />
-                                                                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary/80">Intelligence Brief</span>
-                                                                        </div>
+                                                                <div className="space-y-10">
+                                                                    <section>
+                                                                        <h4 className="text-[10px] font-black text-black/40 dark:text-white/30 uppercase tracking-[0.3em] mb-3">Operational Purpose</h4>
+                                                                        <p className="text-sm text-foreground/70 leading-relaxed font-medium">
+                                                                            {algo.simpleInfo}
+                                                                        </p>
+                                                                    </section>
 
+                                                                    <section>
+                                                                        <h4 className="text-[10px] font-black text-emerald-600/50 dark:text-emerald-400/30 uppercase tracking-[0.3em] mb-3">Strategic Value</h4>
+                                                                        <p className="text-sm font-bold text-foreground leading-relaxed italic border-l-2 border-emerald-500/50 pl-5 py-1.5">
+                                                                            {algo.benefit}
+                                                                        </p>
+                                                                    </section>
+
+                                                                    <div className="h-px bg-black/5 dark:bg-white/5 my-8" />
+
+                                                                    <section className="p-6 rounded-3xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
+                                                                        <div className="flex items-center gap-3 mb-4">
+                                                                            <div className={`w-2 h-2 rounded-full ${runOnSelection ? 'bg-amber-500' : 'bg-emerald-500'} animate-pulse`} />
+                                                                            <h4 className="text-[10px] font-black text-black/50 dark:text-white/50 uppercase tracking-[0.3em]">Processing Scope</h4>
+                                                                        </div>
+                                                                        <div className="flex items-center justify-between">
+                                                                            <div className="flex items-center gap-3">
+                                                                                {runOnSelection ? <BoxSelect className="w-4 h-4 text-primary" /> : <Globe className="w-4 h-4 text-primary" />}
+                                                                                <span className="text-sm font-bold">{runOnSelection ? 'Targeted Segment' : 'Global Network'}</span>
+                                                                            </div>
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    if (onChangeScope) {
+                                                                                        onChangeScope();
+                                                                                    } else {
+                                                                                        setSetupPhase(true);
+                                                                                        setSelectedAlgorithm(null);
+                                                                                    }
+                                                                                }}
+                                                                                className="text-[10px] font-black text-primary hover:text-primary/70 transition-colors uppercase tracking-widest"
+                                                                            >
+                                                                                Change
+                                                                            </button>
+                                                                        </div>
+                                                                        {runOnSelection && (
+                                                                            <div className="mt-4 pt-4 border-t border-white/5">
+                                                                                <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">{effectiveTargetedIds.length} Entities Selected</div>
+                                                                                {includeNeighbors && (
+                                                                                    <div className="text-[9px] text-primary font-bold uppercase tracking-widest">+ First-Degree Neighbors included</div>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                    </section>
+                                                                </div>
+                                                            </div>
+
+                                                            {result && (
+                                                                <div className="flex-1 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                                                                    <div className="h-full p-6 rounded-[2.5rem] bg-gradient-to-br from-primary/10 via-transparent to-transparent border border-primary/20 shadow-2xl flex flex-col">
+                                                                        <div className="flex items-center gap-3 mb-4">
+                                                                            <Sparkles className="w-4 h-4 text-primary" />
+                                                                            <h3 className="font-black text-[11px] uppercase tracking-[0.2em] text-primary">Intelligence Brief</h3>
+                                                                        </div>
                                                                         <div className="flex-1 overflow-y-auto scrollbar-none">
-                                                                            <p className="text-xs leading-relaxed font-bold text-foreground italic">
+                                                                            <p className="text-sm leading-relaxed font-bold text-foreground/90 italic">
                                                                                 {result.insight || "Analysis complete. The engine has successfully mapped the underlying influence and structural pathways of your dataset."}
                                                                             </p>
                                                                         </div>
                                                                     </div>
                                                                 </div>
+                                                            )}
 
-                                                                {/* Results List Section - Increased to 80% height */}
-                                                                <div className="h-[80%] flex flex-col min-h-0 bg-primary/5 rounded-3xl border border-primary/20 p-4 shadow-2xl relative overflow-hidden">
-                                                                    <div className="absolute top-0 right-0 p-4 opacity-10">
-                                                                        <Activity className="w-12 h-12 text-primary" />
+                                                            {!result && !isLoading && (
+                                                                <div className="mt-auto pt-10">
+                                                                    <button
+                                                                        onClick={() => runAlgorithm(algo)}
+                                                                        disabled={runOnSelection && selectedNodes.length === 0}
+                                                                        className={`group relative w-full flex items-center justify-center gap-3 py-6 rounded-2xl bg-primary text-primary-foreground font-black text-sm uppercase tracking-[0.3em] shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all hover:-translate-y-1 active:scale-95 outline-none ${runOnSelection && selectedNodes.length === 0 ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
+                                                                    >
+                                                                        <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
+                                                                        <Zap className="w-5 h-5 fill-current animate-pulse" />
+                                                                        {runOnSelection ? `Scan ${selectedNodes.length} Selected` : 'Initialize Global Scan'}
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Right: Results Display (Integrated Page Style) */}
+                                                        <div className="flex-1 flex flex-col min-h-0 py-4 pl-8 relative overflow-hidden">
+                                                            {error && (
+                                                                <div className="p-6 mb-6 rounded-3xl bg-destructive/10 text-destructive text-sm font-black border border-destructive/20 animate-in shake duration-500">
+                                                                    {error}
+                                                                </div>
+                                                            )}
+
+                                                            {isLoading ? (
+                                                                <div className="flex-1 flex flex-col items-center justify-center space-y-6">
+                                                                    <div className="relative">
+                                                                        <div className="w-20 h-20 border-4 border-primary/10 border-t-primary rounded-full animate-spin" />
+                                                                        <Activity className="absolute inset-0 m-auto w-8 h-8 text-primary animate-pulse" />
                                                                     </div>
-
-                                                                    <div className="px-1 mb-3 flex items-center justify-between relative z-10">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <h4 className="text-[11px] font-black uppercase tracking-widest text-primary">Raw Data Signals</h4>
-                                                                            <div className="px-1.5 py-0.5 rounded bg-primary text-[8px] font-black text-primary-foreground uppercase tracking-tighter">Live</div>
+                                                                    <div className="text-center">
+                                                                        <p className="text-sm font-black uppercase tracking-[0.4em] text-primary mb-2">Neural Pattern Discovery</p>
+                                                                        <p className="text-[10px] text-muted-foreground font-bold italic">Processing complex structural signals...</p>
+                                                                    </div>
+                                                                </div>
+                                                            ) : result ? (
+                                                                <div className="flex-1 flex flex-col min-h-0">
+                                                                    <div className="flex items-center justify-between mb-8 px-2">
+                                                                        <div className="flex items-center gap-4">
+                                                                            <div className="p-3 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
+                                                                                <Network className="w-5 h-5 text-primary" />
+                                                                            </div>
+                                                                            <div>
+                                                                                <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-foreground">Discovery Stream</h4>
+                                                                                <p className="text-[10px] text-muted-foreground font-medium">{result.results?.length || 0} Points of Interest Detected</p>
+                                                                            </div>
                                                                         </div>
-                                                                        <div className="h-px flex-1 bg-primary/20 mx-3" />
+                                                                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                                                                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                                                            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Signal Locked</span>
+                                                                        </div>
                                                                     </div>
 
-                                                                    <div className="flex-1 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 pr-2 pb-2 relative z-10">
-                                                                        {result.results?.slice(0, 40).map((item, i) => (
+                                                                    <div className="flex-1 grid grid-cols-1 gap-4 overflow-y-auto scrollbar-thin scrollbar-thumb-white/5 pr-4 pb-8">
+                                                                        {result.results?.slice(0, 50).map((item, i) => (
                                                                             <motion.div
-                                                                                initial={{ opacity: 0, y: 10 }}
+                                                                                initial={{ opacity: 0, y: 20 }}
                                                                                 animate={{ opacity: 1, y: 0 }}
-                                                                                transition={{ delay: i * 0.02 }}
+                                                                                transition={{ delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
                                                                                 key={item.id || i}
-                                                                                className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all group/item shadow-sm"
+                                                                                className="flex items-center justify-between p-6 rounded-[2.5rem] bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all group/item shadow-sm hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1"
                                                                             >
-                                                                                <div className="min-w-0 flex-1 mr-4">
-                                                                                    <div className="font-bold text-sm tracking-tight truncate group-hover/item:text-primary transition-colors">{item.name}</div>
-                                                                                    {item.type && (
-                                                                                        <div className="text-[9px] uppercase tracking-widest text-primary/70 font-black mt-0.5">{item.type}</div>
-                                                                                    )}
+                                                                                <div className="flex items-center gap-5 min-w-0 flex-1 mr-6">
+                                                                                    <div className="p-4 rounded-2xl bg-white/5 text-muted-foreground group-hover/item:bg-primary group-hover/item:text-primary-foreground transition-all duration-500 shadow-inner">
+                                                                                        {item.type?.toLowerCase().includes('person') || item.type?.toLowerCase().includes('user') ? (
+                                                                                            <Users className="w-5 h-5" />
+                                                                                        ) : item.type?.toLowerCase().includes('org') || item.type?.toLowerCase().includes('group') ? (
+                                                                                            <Globe className="w-5 h-5" />
+                                                                                        ) : (
+                                                                                            <Target className="w-5 h-5" />
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <div className="min-w-0">
+                                                                                        <div className="font-black text-base tracking-tight truncate group-hover/item:text-primary transition-colors uppercase leading-none mb-1.5">{item.name}</div>
+                                                                                        {item.type && (
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <div className="w-1.5 h-1.5 rounded-full bg-primary/40 group-hover/item:bg-primary" />
+                                                                                                <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-black group-hover/item:text-primary/60 transition-colors">{item.type}</div>
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
                                                                                 </div>
                                                                                 {item.score !== undefined && (
-                                                                                    <div className="px-2.5 py-1 rounded-xl bg-primary text-xs font-mono text-primary-foreground font-black shadow-lg shadow-primary/20 border border-primary transition-all group-hover/item:scale-105">
-                                                                                        {item.score.toFixed(4)}
+                                                                                    <div className="flex flex-col items-end shrink-0">
+                                                                                        <span className="text-[9px] font-black text-primary/40 uppercase tracking-[0.2em] mb-1.5">Signal Strength</span>
+                                                                                        <div className="px-6 py-2.5 rounded-2xl bg-primary/10 text-sm font-mono text-primary font-black border border-primary/20 shadow-inner group-hover/item:scale-110 group-hover/item:bg-primary group-hover/item:text-primary-foreground transition-all duration-500">
+                                                                                            {item.score.toFixed(4)}
+                                                                                        </div>
                                                                                     </div>
                                                                                 )}
                                                                             </motion.div>
                                                                         ))}
                                                                     </div>
                                                                 </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex-1 flex flex-col justify-end">
-                                                                <div className="bg-white/5 rounded-3xl p-6 border border-white/5 mb-4 text-center">
-                                                                    <p className="text-[10px] font-bold text-muted-foreground italic leading-relaxed">
-                                                                        Deep-scan will analyze nodes based on the current graph context. Large graphs may take a few seconds.
+                                                            ) : (
+                                                                <div className="flex-1 flex flex-col items-center justify-center text-center p-12">
+                                                                    <div className="relative mb-10">
+                                                                        <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full animate-pulse" />
+                                                                        <div className="relative w-32 h-32 bg-black/5 dark:bg-white/5 rounded-[3.5rem] flex items-center justify-center border border-black/5 dark:border-white/5 shadow-2xl">
+                                                                            <Target className="w-16 h-16 text-muted-foreground/20 animate-bounce" />
+                                                                        </div>
+                                                                    </div>
+                                                                    <h4 className="text-3xl font-black text-foreground/40 uppercase tracking-tighter mb-4 leading-none">Awaiting Signal Sync</h4>
+                                                                    <p className="text-sm text-muted-foreground/60 font-bold max-w-sm italic leading-relaxed">
+                                                                        Target the current graph context to begin mapping neural dependencies and influence pathways.
                                                                     </p>
                                                                 </div>
-                                                                <button
-                                                                    onClick={() => runAlgorithm(algo)}
-                                                                    className="w-full flex items-center justify-center gap-3 py-5 rounded-2xl bg-primary text-primary-foreground font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-primary/40 hover:shadow-primary/60 hover:scale-[1.02] active:scale-95 transition-all"
-                                                                >
-                                                                    <Zap className="w-5 h-5 fill-current" />
-                                                                    Execute Analysis
-                                                                </button>
-                                                            </div>
-                                                        )}
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             );

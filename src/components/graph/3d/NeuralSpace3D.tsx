@@ -38,18 +38,16 @@ interface NeuralSpace3DProps {
     isDark?: boolean;
     bgColor?: string;
     resetKey?: number;
+    analyticSelectionActive?: boolean;
+    analyticIncludeNeighbors?: boolean;
 }
 
 // Simplified Scene that includes post-processing for better lifecycle sync
 interface SceneProps extends NeuralSpace3DProps {
     nodeGeometry: THREE.BufferGeometry;
     pulseGeometry: THREE.BufferGeometry;
-    isMounted: boolean;
     setOrbitEnabled: (enabled: boolean) => void;
     orbitEnabled: boolean;
-    d3AlphaDecay?: number;
-    d3VelocityDecay?: number;
-    resetKey?: number;
 }
 
 function Scene(props: SceneProps) {
@@ -61,7 +59,6 @@ function Scene(props: SceneProps) {
         nodeGeometry,
         pulseGeometry,
         folderId,
-        isMounted,
         setOrbitEnabled,
         orbitEnabled
     } = props;
@@ -130,7 +127,7 @@ function Scene(props: SceneProps) {
                 return { ...baseNode, degree };
             });
         });
-    }, [nodes, links]);
+    }, [nodes, links, props.analyticSelectionActive]);
 
     const nodeMap = useMemo(() => new Map(nodesWithPositions.map(n => [n.id, n])), [nodesWithPositions]);
 
@@ -168,13 +165,24 @@ function Scene(props: SceneProps) {
                 maxDistance={4000}
             />
 
-            <RelationshipLinks links={Array.isArray(links) ? links : []} nodeMap={nodeMap} focusNodeId={focusNodeId} pulseGeometry={pulseGeometry} />
+            <RelationshipLinks
+                links={Array.isArray(links) ? links : []}
+                nodeMap={nodeMap}
+                focusNodeId={focusNodeId}
+                pulseGeometry={pulseGeometry}
+                selectedNodes={Array.isArray(selectedNodes) ? selectedNodes : []}
+                analyticSelectionActive={props.analyticSelectionActive}
+            />
             <InstancedNodes
                 nodes={nodesWithPositions}
+                links={Array.isArray(links) ? links : []}
                 selectedNodes={Array.isArray(selectedNodes) ? selectedNodes : []}
                 hoveredNode={hoveredNode}
                 onNodeClick={props.onNodeClick}
+                onNodeDoubleClick={props.onNodeDoubleClick}
                 onNodeHover={props.onNodeHover}
+                analyticSelectionActive={props.analyticSelectionActive}
+                analyticIncludeNeighbors={props.analyticIncludeNeighbors}
                 nodeGeometry={nodeGeometry}
                 onDragStart={() => setOrbitEnabled(false)}
                 onDragEnd={() => setOrbitEnabled(true)}
@@ -281,11 +289,8 @@ export function NeuralSpace3D(props: NeuralSpace3DProps) {
                     bgColor={sceneBgColor}
                     nodeGeometry={nodeGeometry}
                     pulseGeometry={pulseGeometry}
-                    isMounted={mounted}
                     setOrbitEnabled={setOrbitEnabled}
                     orbitEnabled={orbitEnabled}
-                    d3AlphaDecay={0.05}
-                    d3VelocityDecay={0.6}
                 />
             </Canvas>
             <div className="absolute bottom-4 left-4 z-10 p-3 rounded-lg border border-white/5 bg-background/40 backdrop-blur-xl max-w-xs pointer-events-none">

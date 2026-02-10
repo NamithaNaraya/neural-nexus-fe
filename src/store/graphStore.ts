@@ -83,6 +83,7 @@ interface GraphState {
     clearSelection: () => void;
     setSelectedNodes: (ids: string[]) => void;
     setHoveredNode: (id: string | null) => void;
+    selectNodeWithNeighbors: (id: string) => void;
 
     // Expanded Nodes (Double-click expansion tracking)
     expandedNodes: Set<string>;
@@ -148,6 +149,16 @@ interface GraphState {
     addToDiscovery: (ids: string | string[]) => void;
     removeFromDiscovery: (id: string) => void;
     clearDiscovery: () => void;
+
+    // Isolation (Focus on a specific neighborhood)
+    isolatedNodeId: string | null;
+    setIsolatedNode: (id: string | null) => void;
+
+    // Analytics Selection Flow
+    analyticSelectionActive: boolean;
+    setAnalyticSelectionActive: (active: boolean) => void;
+    analyticIncludeNeighbors: boolean;
+    setAnalyticIncludeNeighbors: (include: boolean) => void;
 
     fetchGraph: (folderId?: string | null, fileId?: string | null) => Promise<void>;
 }
@@ -222,9 +233,33 @@ export const useGraphStore = create<GraphState>()(
         deselectNode: (id) => set((state) => ({
             selectedNodes: state.selectedNodes.filter((n) => n !== id),
         })),
-        clearSelection: () => set({ selectedNodes: [] }),
+        clearSelection: () => set({ selectedNodes: [], isolatedNodeId: null }),
         setSelectedNodes: (ids) => set({ selectedNodes: ids }),
         setHoveredNode: (id) => set({ hoveredNode: id }),
+        selectNodeWithNeighbors: (id) => {
+            set((state) => {
+                const neighborIds = new Set<string>();
+                neighborIds.add(id);
+
+                // Find immediate neighbors from the links array
+                state.links.forEach(link => {
+                    const s = typeof link.source === 'object' ? (link.source as any).id : link.source;
+                    const t = typeof link.target === 'object' ? (link.target as any).id : link.target;
+
+                    if (s === id) neighborIds.add(t);
+                    if (t === id) neighborIds.add(s);
+                });
+
+                const currentSelection = new Set(state.selectedNodes);
+                neighborIds.forEach(nid => currentSelection.add(nid));
+
+                return { selectedNodes: Array.from(currentSelection) };
+            });
+        },
+
+        // Isolation
+        isolatedNodeId: null,
+        setIsolatedNode: (id) => set({ isolatedNodeId: id }),
 
         // Expanded Nodes (Double-click expansion tracking)
         expandedNodes: new Set<string>(),
@@ -289,7 +324,24 @@ export const useGraphStore = create<GraphState>()(
 
         // Computed filtered data
         filteredNodes: () => {
-            const { nodes, filters } = get();
+            const { nodes, links, filters, isolatedNodeId } = get();
+
+            // ISOLATION MODE: If a node is isolated, only show it and its neighbors
+            if (isolatedNodeId) {
+                const neighbors = new Set<string>();
+                neighbors.add(isolatedNodeId);
+
+                // Find all immediate neighbors
+                links.forEach(link => {
+                    const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
+                    const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
+
+                    if (sourceId === isolatedNodeId) neighbors.add(targetId);
+                    if (targetId === isolatedNodeId) neighbors.add(sourceId);
+                });
+
+                return nodes.filter(node => neighbors.has(node.id));
+            }
 
             return nodes.filter((node) => {
                 // DISCOVERY OVERRIDE: If the node was explicitly discovered/clicked, it's always visible
@@ -482,6 +534,12 @@ export const useGraphStore = create<GraphState>()(
             return { discoveredNodeIds: newDiscovered };
         }),
         clearDiscovery: () => set({ discoveredNodeIds: new Set() }),
+
+        // Analytics Selection Flow
+        analyticSelectionActive: false,
+        setAnalyticSelectionActive: (active) => set({ analyticSelectionActive: active }),
+        analyticIncludeNeighbors: false,
+        setAnalyticIncludeNeighbors: (include) => set({ analyticIncludeNeighbors: include }),
 
         // Async Actions
         fetchGraph: async (folderId, fileId) => {

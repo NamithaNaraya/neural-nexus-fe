@@ -8,13 +8,17 @@ import { useGraphStore } from '@/store/graphStore';
 
 interface NodesProps {
     nodes: any[];
+    links: any[];
     selectedNodes: string[];
     hoveredNode: string | null;
     onNodeClick: (nodeId: string, event?: any) => void;
+    onNodeDoubleClick?: (nodeId: string) => void;
     onNodeHover: (nodeId: string | null) => void;
     nodeGeometry: THREE.BufferGeometry;
     onDragStart?: () => void;
     onDragEnd?: () => void;
+    analyticSelectionActive?: boolean;
+    analyticIncludeNeighbors?: boolean;
 }
 
 export function InstancedNodes({
@@ -22,10 +26,14 @@ export function InstancedNodes({
     selectedNodes = [],
     hoveredNode = null,
     onNodeClick,
+    onNodeDoubleClick,
     onNodeHover,
     nodeGeometry,
     onDragStart,
     onDragEnd,
+    analyticSelectionActive = false,
+    analyticIncludeNeighbors = false,
+    links = [],
 }: NodesProps) {
     const meshRef = useRef<THREE.InstancedMesh>(null);
     const updateNode = useGraphStore(state => state.updateNode);
@@ -41,22 +49,41 @@ export function InstancedNodes({
         if (!Array.isArray(nodes) || !meshRef.current) return;
         const time = state.clock.getElapsedTime();
 
+        // Neighborhood Map for Analytics
+        const analyticsNeighbors = new Set<string>();
+        if (analyticSelectionActive && analyticIncludeNeighbors && selectedNodes.length > 0) {
+            links.forEach(l => {
+                if (selectedNodes.includes(l.source)) analyticsNeighbors.add(l.target);
+                if (selectedNodes.includes(l.target)) analyticsNeighbors.add(l.source);
+            });
+        }
+
         nodes.forEach((node, i) => {
             if (!node) return;
 
             const isSelected = Array.isArray(selectedNodes) && selectedNodes.includes(node.id);
             const isHovered = hoveredNode === node.id;
+            const isAnalyticNeighbor = analyticsNeighbors.has(node.id);
 
             // Neo4j-style scaling: base size + degree influence
             const degreeBonus = Math.min((node.degree || 0) * 1.5, 30);
-            const sizeScalar = (isSelected ? 10 : isHovered ? 9 : 8) + (degreeBonus / 4);
+
+            // Analytic Boldness
+            let sizeScalar = (isSelected ? 10 : isHovered ? 9 : 8) + (degreeBonus / 4);
+            if (analyticSelectionActive && isSelected) {
+                const pulse = 1 + Math.sin(time * 6 + i) * 0.2;
+                sizeScalar *= 1.3 * pulse;
+            } else if (analyticSelectionActive && isAnalyticNeighbor) {
+                const pulse = 1 + Math.sin(time * 3 + i) * 0.1;
+                sizeScalar *= 1.15 * pulse;
+            }
 
             // Calculate organic sway (breathing)
-            // Use node ID hash or index for unique phase
             const phase = i * 0.5;
-            const swayX = Math.sin(time * 0.5 + phase) * 1.2;
-            const swayY = Math.cos(time * 0.4 + phase) * 1.2;
-            const swayZ = Math.sin(time * 0.6 + phase) * 1.2;
+            const swayMultiplier = (isSelected || isAnalyticNeighbor) ? 0.4 : 1.0;
+            const swayX = Math.sin(time * 0.5 + phase) * 1.2 * swayMultiplier;
+            const swayY = Math.cos(time * 0.4 + phase) * 1.2 * swayMultiplier;
+            const swayZ = Math.sin(time * 0.6 + phase) * 1.2 * swayMultiplier;
 
             const x = (typeof node.x === 'number' && isFinite(node.x) ? node.x : 0) + swayX;
             const y = (typeof node.y === 'number' && isFinite(node.y) ? node.y : 0) + swayY;
@@ -66,31 +93,32 @@ export function InstancedNodes({
             tempObject.scale.setScalar(sizeScalar);
             tempObject.updateMatrix();
             meshRef.current!.setMatrixAt(i, tempObject.matrix);
-        });
 
-        meshRef.current.instanceMatrix.needsUpdate = true;
-    });
-
-    // Handle initial colors and updates when filters change
-    useEffect(() => {
-        if (!Array.isArray(nodes) || !meshRef.current) return;
-
-        nodes.forEach((node, i) => {
-            const isSelected = Array.isArray(selectedNodes) && selectedNodes.includes(node.id);
-            const isHovered = hoveredNode === node.id;
-
+            // Update color in real-time for analytic pop
             const colorHex = node.color || NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
-            tempColor.set(colorHex);
 
-            // Brighten up the color if selected/hovered
-            if (isSelected) tempColor.multiplyScalar(1.5);
-            else if (isHovered) tempColor.multiplyScalar(1.2);
-
+            if (analyticSelectionActive && (isSelected || isAnalyticNeighbor)) {
+                tempColor.set('#000000');
+                tempColor.multiplyScalar(isSelected ? 0.3 : 0.6); // Darker for selected, slightly visible for neighbors
+            } else {
+                tempColor.set(colorHex);
+                if (isSelected) {
+                    tempColor.multiplyScalar(1.5);
+                } else if (isHovered) {
+                    tempColor.multiplyScalar(1.2);
+                }
+            }
             meshRef.current!.setColorAt(i, tempColor);
         });
 
-        if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
-    }, [nodes, selectedNodes, hoveredNode, tempColor]);
+        meshRef.current!.instanceMatrix.needsUpdate = true;
+        if (meshRef.current?.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
+    });
+
+    // Remove legacy color effect
+    useEffect(() => {
+        // Handled in useFrame for real-time analytic pulsing
+    }, []);
 
     const handlePointerMove = useCallback((e: any) => {
         if (draggingNodeId) {
@@ -147,6 +175,13 @@ export function InstancedNodes({
                 args={[nodeGeometry, undefined, (Array.isArray(nodes) ? nodes.length : 0)]}
                 onPointerMove={handlePointerMove}
                 onPointerDown={handlePointerDown}
+                onDoubleClick={(e) => {
+                    if (e.instanceId !== undefined && Array.isArray(nodes)) {
+                        e.stopPropagation();
+                        const node = nodes[e.instanceId];
+                        if (node && onNodeDoubleClick) onNodeDoubleClick(node.id);
+                    }
+                }}
                 onPointerUp={() => setDraggingNodeId(null)}
                 onPointerOut={() => {
                     if (!draggingNodeId && typeof onNodeHover === 'function') onNodeHover(null);
@@ -166,7 +201,12 @@ export function InstancedNodes({
             {nodes.filter(n => Array.isArray(selectedNodes) && selectedNodes.includes(n.id)).map(node => (
                 <mesh key={`ring-${node.id}`} position={[node.x!, node.y!, node.z!]}>
                     <ringGeometry args={[12, 14, 32]} />
-                    <meshBasicMaterial color="#ffffff" transparent opacity={0.4} side={THREE.DoubleSide} />
+                    <meshBasicMaterial
+                        color={analyticSelectionActive ? "#000000" : "#ffffff"}
+                        transparent
+                        opacity={analyticSelectionActive ? 0.9 : 0.4}
+                        side={THREE.DoubleSide}
+                    />
                 </mesh>
             ))}
         </group>

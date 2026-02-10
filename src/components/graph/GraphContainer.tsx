@@ -212,6 +212,7 @@ export function GraphContainer({
         nodeCount,
         linkCount,
         selectNode,
+        deselectNode,
         setHoveredNode,
         clearSelection,
         filteredNodes,
@@ -220,6 +221,9 @@ export function GraphContainer({
         zoomToNode,
         resetCamera,
         addToDiscovery,
+        setIsolatedNode,
+        isolatedNodeId,
+        analyticSelectionActive,
     } = useGraphStore();
 
     // Get filtered data
@@ -271,7 +275,9 @@ export function GraphContainer({
 
     // Handlers
     const handleNodeDoubleClick = useCallback(async (nodeId: string) => {
-        console.log('Expanding node:', nodeId);
+        console.log('Node Isolation Triggered:', nodeId);
+        setIsolatedNode(nodeId);
+
         try {
             const data = await expandMutation.mutateAsync({ nodeId });
             console.log('Expansion result:', data);
@@ -308,18 +314,34 @@ export function GraphContainer({
         } catch (err) {
             console.error('Expansion failed:', err);
         }
-    }, [expandMutation]);
+    }, [expandMutation, setIsolatedNode]);
 
-    // Unified Click (Left or Right): Expand + Show Detail Sidebar
-    const handleNodeAction = useCallback(async (nodeId: string, event?: any) => {
+    // Unified Click (Left or Right): Show Detail Sidebar
+    const handleNodeClick = useCallback((nodeId: string, event?: any) => {
         // Prevent default browser context menu if it's a right click
         if (event?.preventDefault) event.preventDefault();
         if (event?.stopPropagation) event.stopPropagation();
 
-        console.log('Node Action Triggered:', nodeId);
+        console.log('Node Click Triggered (Highlight):', nodeId);
 
-        // 1. Select the node
-        selectNode(nodeId, false);
+        // 1. Select the node (Highlight)
+        // Multi-select enabled if analyticSelectionActive is true OR shift/ctrl/meta is held
+        const isMulti = analyticSelectionActive || event?.shiftKey || event?.ctrlKey || event?.metaKey;
+
+        // AUTO-NEIGHBOR LOGIC: If in analytics mode
+        if (analyticSelectionActive) {
+            if (selectedNodes.includes(nodeId)) {
+                // If already selected, deselect it (toggle)
+                selectNode(nodeId, true);
+            } else {
+                // If not selected, select node + neighbors (Chained Expansion)
+                const { selectNodeWithNeighbors } = useGraphStore.getState();
+                selectNodeWithNeighbors(nodeId);
+            }
+        } else {
+            // Default behavior: just toggle this node
+            selectNode(nodeId, isMulti);
+        }
 
         // 2. Open Sidebar Detail
         const node = nodes.find(n => n.id === nodeId);
@@ -330,14 +352,9 @@ export function GraphContainer({
             // Discovery: Always mark this node as discovered so it stays visible
             addToDiscovery(nodeId);
         }
+    }, [selectNode, nodes, addToDiscovery, analyticSelectionActive, selectedNodes, links]);
 
-        // 3. Trigger Expansion (First layer)
-        handleNodeDoubleClick(nodeId);
-    }, [selectNode, nodes, handleNodeDoubleClick, addToDiscovery]);
-
-    // Keep handleNodeClick for API compatibility with visualization components
-    const handleNodeClick = handleNodeAction;
-    const handleNodeRightClick = handleNodeAction;
+    const handleNodeRightClick = handleNodeClick;
 
     const handleNodeHover = useCallback((nodeId: string | null) => {
         setHoveredNode(nodeId);
@@ -494,6 +511,7 @@ export function GraphContainer({
                     totalNodeCount={nodes.length}
                     totalLinkCount={links.length}
                     selectedCount={selectedNodes.length}
+                    isSidebarOpen={showNodeDetail}
                 />
             )}
 
@@ -529,6 +547,8 @@ export function GraphContainer({
                                             onBackgroundClick={handleBackgroundClick}
                                             onNodeContextMenu={handleNodeRightClick}
                                             resetKey={resetKey}
+                                            analyticSelectionActive={useGraphStore.getState().analyticSelectionActive}
+                                            analyticIncludeNeighbors={useGraphStore.getState().analyticIncludeNeighbors}
                                         />
                                     </Suspense>
                                 </motion.div>
@@ -553,6 +573,8 @@ export function GraphContainer({
                                             onBackgroundClick={handleBackgroundClick}
                                             onNodeContextMenu={handleNodeRightClick}
                                             resetKey={resetKey}
+                                            analyticSelectionActive={useGraphStore.getState().analyticSelectionActive}
+                                            analyticIncludeNeighbors={useGraphStore.getState().analyticIncludeNeighbors}
                                         />
                                     </Suspense>
 
@@ -590,6 +612,7 @@ export function GraphContainer({
                                         onNodeDoubleClick={handleNodeDoubleClick}
                                         onNodeHover={handleNodeHover}
                                         onNodeFocus={handleNodeFocus}
+                                        analyticSelectionActive={useGraphStore.getState().analyticSelectionActive}
                                     />
                                 </motion.div>
                             )}
