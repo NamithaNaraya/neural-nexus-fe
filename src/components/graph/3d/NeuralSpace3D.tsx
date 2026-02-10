@@ -37,6 +37,7 @@ interface NeuralSpace3DProps {
     folderId?: string;
     isDark?: boolean;
     bgColor?: string;
+    resetKey?: number;
 }
 
 // Simplified Scene that includes post-processing for better lifecycle sync
@@ -48,6 +49,7 @@ interface SceneProps extends NeuralSpace3DProps {
     orbitEnabled: boolean;
     d3AlphaDecay?: number;
     d3VelocityDecay?: number;
+    resetKey?: number;
 }
 
 function Scene(props: SceneProps) {
@@ -154,6 +156,7 @@ function Scene(props: SceneProps) {
                 targetNodeId={Array.isArray(selectedNodes) && selectedNodes.length === 1 ? selectedNodes[0] : null}
                 nodeMap={nodeMap}
                 defaultCenter={graphCenter}
+                resetKey={props.resetKey}
             />
 
             <OrbitControls

@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Maximize2, Minimize2, BarChart3, PieChart, Activity, X } from 'lucide-react';
+import { Maximize2, Minimize2, BarChart3, PieChart, Activity, X, Grid, Layers } from 'lucide-react';
 
-export type ChartType = 'bar' | 'donut' | 'sunburst' | 'list';
+export type ChartType = 'bar' | 'donut' | 'sunburst' | 'list' | 'heatmap' | 'treemap';
 
 interface ChartCardProps {
     title: string;
@@ -35,15 +35,17 @@ export function ChartCard({
                             key={type}
                             onClick={(e) => { e.stopPropagation(); setCurrentType(type); }}
                             className={`p-1.5 rounded-md transition-all ${currentType === type
-                                    ? 'bg-background shadow-sm text-foreground'
-                                    : 'text-muted-foreground hover:text-foreground'
+                                ? 'bg-background shadow-sm text-foreground'
+                                : 'text-muted-foreground hover:text-foreground'
                                 }`}
                             title={`Switch to ${type} chart`}
                         >
                             {type === 'bar' && <BarChart3 className="w-4 h-4" />}
                             {type === 'donut' && <PieChart className="w-4 h-4" />}
                             {type === 'sunburst' && <Activity className="w-4 h-4" />}
-                            {/* Using Activity for Sunburst as a placeholder abstract icon if needed, or PieChart */}
+
+                            {type === 'heatmap' && <Grid className="w-4 h-4" />}
+                            {type === 'treemap' && <Layers className="w-4 h-4" />}
                         </button>
                     ))}
                 </div>

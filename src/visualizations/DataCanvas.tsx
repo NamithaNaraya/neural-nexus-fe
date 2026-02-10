@@ -1,11 +1,13 @@
 import React, { useMemo } from 'react';
 import { useGraphStore } from '@/store/graphStore';
+import { ChartCard, ChartType } from './ChartCard';
+import { NODE_TYPE_COLORS, RELATIONSHIP_COLORS } from '../components/graph/types';
+import { Download, Activity, Layers, Grid } from 'lucide-react';
+import { HeatmapChart } from '../components/visualizations/matrix/HeatmapChart';
+import { TreemapChart } from '../components/visualizations/hierarchical/TreemapChart';
 import { SunburstChart } from './charts/SunburstChart';
 import { DonutChart } from './charts/DonutChart';
 import { BarChart } from './charts/BarChart';
-import { ChartCard, ChartType } from './ChartCard';
-import { NODE_TYPE_COLORS, RELATIONSHIP_COLORS } from '../components/graph/types';
-import { Download } from 'lucide-react';
 
 export function DataCanvas() {
     const { nodes, links, filters, filteredNodes, filteredLinks } = useGraphStore();
@@ -68,7 +70,7 @@ export function DataCanvas() {
     }, [visibleLinks]);
 
     // 4. Hierarchical Data for Sunburst (Type -> Name)
-    const hierarchyData = useMemo(() => {
+    const sunburstData = useMemo(() => {
         const root = { name: "Graph", children: [] as any[] };
         const types: Record<string, any> = {};
 
@@ -84,7 +86,7 @@ export function DataCanvas() {
             types[n.type].children.push({
                 name: n.name,
                 value: 1,
-                color: NODE_TYPE_COLORS[n.type] // Optional: Shade variation could occur here
+                color: NODE_TYPE_COLORS[n.type]
             });
         });
 
@@ -103,8 +105,37 @@ export function DataCanvas() {
         return Math.round(ratio);
     }, [visibleNodes, visibleLinks]);
 
+
+    // 6. Hierarchical Data (Hierarchy / Treemap)
+    const treemapData = useMemo(() => {
+        const types = Array.from(new Set(visibleNodes.map(n => n.type)));
+        const children = types.map(type => ({
+            id: type,
+            name: type,
+            children: visibleNodes
+                .filter(n => n.type === type)
+                .map(n => ({ id: n.id, name: n.name, value: 1 }))
+        }));
+        return { id: 'root', name: 'Knowledge Graph', children };
+    }, [visibleNodes]);
+
+    // 7. Heatmap Data (Type vs Type Intensity)
+    const heatmapData = useMemo(() => {
+        const types = Array.from(new Set(visibleNodes.map(n => n.type))).sort();
+        const matrix = types.map(rowType =>
+            types.map(colType => {
+                return visibleLinks.filter(l => {
+                    const s = visibleNodes.find(n => n.id === (typeof l.source === 'object' ? (l.source as any).id : l.source));
+                    const t = visibleNodes.find(n => n.id === (typeof l.target === 'object' ? (l.target as any).id : l.target));
+                    return s?.type === rowType && t?.type === colType;
+                }).length;
+            })
+        );
+        return { rows: types, columns: types, values: matrix };
+    }, [visibleNodes, visibleLinks]);
+
     return (
-        <div className="w-full h-full overflow-y-auto bg-background p-6">
+        <div className="flex-1 min-h-0 w-full overflow-y-auto bg-background p-6">
             <div className="max-w-7xl mx-auto space-y-8 pb-20">
                 {/* Header */}
                 <div className="flex items-center justify-between">
@@ -177,7 +208,7 @@ export function DataCanvas() {
                         renderChart={(type, isMaximized) => (
                             <div className="flex justify-center">
                                 <SunburstChart
-                                    data={hierarchyData}
+                                    data={sunburstData}
                                     width={isMaximized ? 700 : 300}
                                     height={isMaximized ? 700 : 300}
                                 />
@@ -219,7 +250,7 @@ export function DataCanvas() {
                         )}
                     />
 
-                    {/* Card 5: Relationship Types (Bar or Donut) */}
+                    {/* Card 5: Relationship Types (Bar only) */}
                     <ChartCard
                         title="Relationship Types"
                         subtitle="Distribution of connection types"
@@ -231,6 +262,41 @@ export function DataCanvas() {
                                 height={isMaximized ? 600 : 300}
                                 xAxisLabel="Relationship"
                                 yAxisLabel="Count"
+                            />
+                        )}
+                    />
+
+                    {/* Card 6: Relationship Intensity (Heatmap) */}
+                    <ChartCard
+                        title="Connection Density"
+                        subtitle="Heatmap of type-to-type interactions"
+                        availableTypes={['heatmap']}
+                        defaultType="heatmap"
+                        renderChart={(type, isMaximized) => (
+                            <HeatmapChart
+                                data={heatmapData}
+                                config={{
+                                    width: isMaximized ? 900 : 500,
+                                    height: isMaximized ? 600 : 350
+                                }}
+                                colorScheme="warm"
+                            />
+                        )}
+                    />
+
+                    {/* Card 8: Hierarchical Distribution (Treemap) */}
+                    <ChartCard
+                        title="EntityType Distribution"
+                        subtitle="Sized by node density"
+                        availableTypes={['treemap']}
+                        defaultType="treemap"
+                        renderChart={(type, isMaximized) => (
+                            <TreemapChart
+                                data={treemapData}
+                                config={{
+                                    width: isMaximized ? 900 : 500,
+                                    height: isMaximized ? 600 : 350
+                                }}
                             />
                         )}
                     />

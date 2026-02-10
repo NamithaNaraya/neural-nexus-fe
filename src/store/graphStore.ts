@@ -10,6 +10,7 @@
  */
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { graphApi } from '@/lib/api';
 
 // === Type Definitions ===
 
@@ -141,6 +142,9 @@ interface GraphState {
     // Loading
     isGraphLoading: boolean;
     setGraphLoading: (loading: boolean) => void;
+
+    // Async Actions
+    fetchGraph: (folderId?: string | null, fileId?: string | null) => Promise<void>;
 }
 
 // Default filter configuration
@@ -445,6 +449,30 @@ export const useGraphStore = create<GraphState>()(
         // Loading
         isGraphLoading: false,
         setGraphLoading: (loading) => set({ isGraphLoading: loading }),
+
+        // Async Actions
+        fetchGraph: async (folderId, fileId) => {
+            const { setGraphLoading, setGraphData } = get();
+            setGraphLoading(true);
+            try {
+                let response;
+                if (fileId) {
+                    response = await graphApi.getFile(fileId);
+                } else if (folderId) {
+                    response = await graphApi.getFolder(folderId);
+                } else {
+                    response = await graphApi.getAll();
+                }
+
+                if (response && response.nodes) {
+                    setGraphData(response.nodes, response.links || []);
+                }
+            } catch (error) {
+                console.error('Failed to fetch graph:', error);
+            } finally {
+                setGraphLoading(false);
+            }
+        },
     }))
 );
 

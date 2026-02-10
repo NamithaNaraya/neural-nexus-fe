@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
     MessageSquare,
     Send,
@@ -57,7 +57,8 @@ export function ChatAssistant() {
         setCameraFocus,
         setSelectedNodes,
         selectedNodes,
-        nodes
+        nodes,
+        activeFolderId
     } = useGraphStore();
 
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -70,6 +71,9 @@ export function ChatAssistant() {
         }
     }, [currentSession?.messages, isThinking]);
 
+    // Scope control
+    const [useGlobalSearch, setUseGlobalSearch] = useState(false);
+
     // Initialize session if none exists
     useEffect(() => {
         if (!currentSessionId && sessions.length === 0) {
@@ -78,6 +82,14 @@ export function ChatAssistant() {
             setCurrentSession(sessions[0].id);
         }
     }, [currentSessionId, sessions, createSession, setCurrentSession]);
+
+    // Determine current scope for UI indicator
+    const currentScopeLabel = useMemo(() => {
+        if (useGlobalSearch) return "Universal Search";
+        if (selectedNodes.length > 0) return `Targeting ${selectedNodes.length} Selectee${selectedNodes.length > 1 ? 's' : ''}`;
+        if (activeFolderId) return "Current Folder Only";
+        return "Universal Search";
+    }, [useGlobalSearch, selectedNodes, activeFolderId]);
 
     const handleSend = async (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -89,12 +101,20 @@ export function ChatAssistant() {
         setIsThinking(true);
 
         try {
-            // Scope can be added here if needed (e.g. current folderId)
+            // Determine Scope
+            let scope: any = undefined;
+            if (!useGlobalSearch) {
+                if (selectedNodes.length > 0) {
+                    scope = { type: 'selection', id: selectedNodes.join(',') };
+                } else if (activeFolderId) {
+                    scope = { type: 'folder', id: activeFolderId };
+                }
+            }
+
             const response = (await docAiApi.query.ask({
                 question,
                 session_id: currentSessionId,
-                // We could pass selected nodes as context filter
-                scope: selectedNodes.length > 0 ? { type: 'selection', id: selectedNodes.join(',') } : undefined
+                scope
             })) as QueryResponse;
 
             addMessage('assistant', response.answer, response.citations?.map((c: Citation) => ({
@@ -164,6 +184,26 @@ export function ChatAssistant() {
                                     <ChevronDown size={20} />
                                 </button>
                             </div>
+                        </div>
+
+                        {/* Scope Indicator & Toggle */}
+                        <div className="px-4 py-2 bg-muted/30 border-b border-white/5 flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 overflow-hidden">
+                                <Target size={12} className={useGlobalSearch ? "text-muted-foreground" : "text-primary"} />
+                                <span className="text-[10px] font-bold uppercase tracking-wider truncate">
+                                    {currentScopeLabel}
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setUseGlobalSearch(!useGlobalSearch)}
+                                className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-tighter transition-all ${useGlobalSearch
+                                        ? 'bg-zinc-800 text-muted-foreground'
+                                        : 'bg-primary/20 text-primary border border-primary/30'
+                                    }`}
+                            >
+                                {useGlobalSearch ? "Enable Context" : "Go Global"}
+                            </button>
                         </div>
 
                         {/* History / Sessions (Collapsible) */}

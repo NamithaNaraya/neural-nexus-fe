@@ -8,21 +8,12 @@
  * - Node selection and details
  * - Search and filter
  */
-/**
- * Graph Visualization Page
- * 
- * Full-page graph exploration with folder context.
- * Features:
- * - 3D/2D view toggle
- * - Progressive exploration
- * - Node selection and details
- * - Search and filter
- */
 'use client';
 
 import React, { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
+import { useUIStore } from '@/store/uiStore';
 import { useGraphStore } from '@/store/graphStore';
 import { useFolderGraph } from '@/hooks/useApi';
 import { GraphContainer } from '@/components/graph/GraphContainer';
@@ -246,9 +237,11 @@ class PageErrorBoundary extends React.Component<
 }
 
 export default function GraphPage() {
+    const { isFullscreen } = useUIStore();
+
     return (
         <div className="h-screen w-full bg-background flex flex-col">
-            <Header />
+            {!isFullscreen && <Header />}
             <PageErrorBoundary>
                 <Suspense fallback={
                     <div className="flex-1 flex items-center justify-center">

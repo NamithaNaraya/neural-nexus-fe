@@ -79,7 +79,7 @@ export function InstancedNodes({
             const isSelected = Array.isArray(selectedNodes) && selectedNodes.includes(node.id);
             const isHovered = hoveredNode === node.id;
 
-            const colorHex = NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
+            const colorHex = node.color || NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
             tempColor.set(colorHex);
 
             // Brighten up the color if selected/hovered

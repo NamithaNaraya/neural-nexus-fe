@@ -51,6 +51,14 @@ export const graphApi = {
     search: (query: string, limit?: number) =>
         api.get<GraphNode[]>(`/graph/search?q=${encodeURIComponent(query)}${limit ? `&limit=${limit}` : ''}`),
 
+    // Search nodes for CRUD (identity lookup)
+    searchForCrud: (q: string, folderId?: string, limit?: number) => {
+        let url = `/graph/nodes/search?q=${encodeURIComponent(q)}`;
+        if (folderId) url += `&folder_id=${folderId}`;
+        if (limit) url += `&limit=${limit}`;
+        return api.get<{ nodes: any[]; count: number }>(url);
+    },
+
     // Path finding
     findPath: (sourceId: string, targetId: string) =>
         api.get<{ path: string[]; links: GraphLink[] }>(`/graph/path?source=${sourceId}&target=${targetId}`),

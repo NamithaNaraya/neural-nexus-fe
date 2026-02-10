@@ -168,7 +168,7 @@ export function NodeEditor({ isOpen, node, onClose, onSave, onDelete, onNavigate
                                     <input
                                         value={editedNode.name}
                                         onChange={e => setEditedNode({ ...editedNode, name: e.target.value })}
-                                        className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500"
+                                        className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500 shadow-inner"
                                     />
                                 </div>
 
@@ -179,7 +179,7 @@ export function NodeEditor({ isOpen, node, onClose, onSave, onDelete, onNavigate
                                     <input
                                         value={editedNode.type}
                                         onChange={e => setEditedNode({ ...editedNode, type: e.target.value })}
-                                        className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500"
+                                        className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500 shadow-inner"
                                     />
                                 </div>
 
@@ -191,7 +191,7 @@ export function NodeEditor({ isOpen, node, onClose, onSave, onDelete, onNavigate
                                         value={editedNode.description || ''}
                                         onChange={e => setEditedNode({ ...editedNode, description: e.target.value })}
                                         rows={3}
-                                        className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500 resize-none"
+                                        className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-emerald-500 resize-none shadow-inner"
                                     />
                                 </div>
                             </div>
@@ -209,7 +209,7 @@ export function NodeEditor({ isOpen, node, onClose, onSave, onDelete, onNavigate
                                             <input
                                                 value={String(prop.value)}
                                                 onChange={e => updateProperty(prop.key, e.target.value)}
-                                                className="flex-1 px-2 py-1 rounded bg-slate-800 border border-white/10 text-white text-xs focus:outline-none focus:border-emerald-500"
+                                                className="flex-1 px-2 py-1 rounded bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-emerald-500 shadow-sm"
                                             />
                                             <button
                                                 onClick={() => removeProperty(prop.key)}
@@ -226,13 +226,13 @@ export function NodeEditor({ isOpen, node, onClose, onSave, onDelete, onNavigate
                                             placeholder="Key"
                                             value={newPropertyKey}
                                             onChange={e => setNewPropertyKey(e.target.value)}
-                                            className="w-20 px-2 py-1 rounded bg-slate-700 border border-white/10 text-white text-xs placeholder:text-white/30"
+                                            className="w-20 px-2 py-1 rounded bg-white/10 border border-white/10 text-white text-xs placeholder:text-white/30 shadow-sm"
                                         />
                                         <input
                                             placeholder="Value"
                                             value={newPropertyValue}
                                             onChange={e => setNewPropertyValue(e.target.value)}
-                                            className="flex-1 px-2 py-1 rounded bg-slate-700 border border-white/10 text-white text-xs placeholder:text-white/30"
+                                            className="flex-1 px-2 py-1 rounded bg-white/10 border border-white/10 text-white text-xs placeholder:text-white/30 shadow-sm"
                                         />
                                         <button
                                             onClick={addProperty}

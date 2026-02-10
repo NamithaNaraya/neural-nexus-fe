@@ -26,6 +26,7 @@ import { ChatAssistant } from './panels/ChatAssistant';
 import { GraphViewMode } from './types';
 import { useNodeExpansion, useShortestPath } from '@/hooks/useApi';
 import { useDevice, useViewModeLock } from '@/hooks/useDevice';
+import { useUIStore } from '@/store/uiStore';
 import { Loader2, Maximize2, Minimize2, Zap, FolderTree, AlertTriangle } from 'lucide-react';
 import { OnboardingOverlay, useOnboarding } from '@/components/onboarding';
 import { NodeEditorModal, RelationshipEditorModal, DeleteConfirmModal } from './modals';
@@ -40,6 +41,11 @@ const NeuralSpace3D = dynamic(() => import('./3d/NeuralSpace3D').then(m => ({ de
 const ForceGraph2D = dynamic(() => import('./2d/ForceGraph2D').then(m => ({ default: m.ForceGraph2D })), {
     ssr: false,
     loading: () => <GraphLoadingState message="Initializing 2D Engine..." />,
+});
+
+const NodeListView = dynamic(() => import('./list/NodeListView').then(m => ({ default: m.NodeListView })), {
+    ssr: false,
+    loading: () => <GraphLoadingState message="Initializing Registry..." />,
 });
 
 // Props
@@ -152,7 +158,6 @@ class GraphErrorBoundary extends React.Component<
 
 
 
-// ... other imports
 
 export function GraphContainer({
     folderId,
@@ -168,8 +173,10 @@ export function GraphContainer({
 
     // State
     const [viewMode, setViewMode] = useState<GraphViewMode>(initialMode);
-    const [isImmersive, setIsImmersive] = useState(initialImmersive);
+    const { isFullscreen, setFullscreen } = useUIStore();
     const [showFilters, setShowFilters] = useState(true);
+    const [resetKey, setResetKey] = useState(0);
+    const [lastGraphMode, setLastGraphMode] = useState<GraphViewMode>('2d');
 
     const [showFileScope, setShowFileScope] = useState(false);
     const [showNodeDetail, setShowNodeDetail] = useState(false);
@@ -237,7 +244,6 @@ export function GraphContainer({
         }
     }, [visibleNodes, visibleLinks, nodes.length, links.length, filters]);
 
-    // ... (rest of render)
 
     // Check if we have data
     const hasData = nodes.length > 0;
@@ -330,6 +336,32 @@ export function GraphContainer({
         setHoveredNode(nodeId);
     }, [setHoveredNode]);
 
+    const handleNodeFocus = useCallback((nodeId: string) => {
+        // Switch to last active graph view
+        setViewMode(lastGraphMode);
+
+        // Show details
+        const node = nodes.find(n => n.id === nodeId);
+        if (node) {
+            setSelectedNodeForDetail(node);
+            setShowNodeDetail(true);
+            selectNode(nodeId, false);
+
+            // Allow state to settle, then zoom
+            setTimeout(() => {
+                zoomToNode?.(nodeId);
+            }, 100);
+        }
+    }, [lastGraphMode, nodes, zoomToNode, selectNode]);
+
+    const handleViewModeChange = useCallback((mode: GraphViewMode) => {
+        // Record graph modes so we can return to them from List/Charts
+        if (viewMode === '2d' || viewMode === '3d') {
+            setLastGraphMode(viewMode);
+        }
+        setViewMode(mode);
+    }, [viewMode]);
+
     const handleBackgroundClick = useCallback(() => {
         clearSelection();
         setShowNodeDetail(false);
@@ -374,9 +406,10 @@ export function GraphContainer({
         });
     }, []);
 
-    const handleNodeUpdated = useCallback(() => {
-        // Refresh graph data - could trigger a refetch
-        console.log('Node updated, graph will refresh on next load');
+    const handleNodeUpdated = useCallback((node: any) => {
+        const { updateNode } = useGraphStore.getState();
+        updateNode(node.id, node);
+        setShowNodeEditor(false);
     }, []);
 
     const handleRelationshipCreated = useCallback((relationship: any) => {
@@ -398,19 +431,43 @@ export function GraphContainer({
     }, [deleteTargetNode]);
 
     const toggleImmersive = useCallback(() => {
-        setIsImmersive(prev => !prev);
-    }, []);
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+            });
+            setFullscreen(true);
+        } else {
+            document.exitFullscreen();
+            setFullscreen(false);
+        }
+    }, [setFullscreen]);
 
-    const handleViewModeChange = useCallback((mode: GraphViewMode) => {
-        setViewMode(mode);
-    }, []);
+    // Listen for escape key or other ways fullscreen exits
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setFullscreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, [setFullscreen]);
+
+    const handleResetView = useCallback(() => {
+        console.log('Resetting view...');
+        // 1. Reset store camera
+        useGraphStore.getState().resetCamera();
+        // 2. Clear selection
+        clearSelection();
+        // 3. Increment reset key to trigger component-level resets
+        setResetKey(prev => prev + 1);
+    }, [clearSelection]);
+
 
     // Container classes
     const containerClasses = useMemo(() => {
-        const base = 'relative bg-background overflow-hidden';
-        const immersive = isImmersive ? 'fixed inset-0 z-50' : 'w-full h-full';
+        const base = 'relative bg-background overflow-hidden flex flex-col';
+        const immersive = isFullscreen ? 'fixed inset-0 z-50' : 'w-full h-full';
         return `${base} ${immersive} ${className}`;
-    }, [isImmersive, className]);
+    }, [isFullscreen, className]);
 
     return (
         <div className={containerClasses}>
@@ -419,43 +476,28 @@ export function GraphContainer({
                 <GraphToolbar
                     viewMode={viewMode}
                     onViewModeChange={handleViewModeChange}
-                    isImmersive={isImmersive}
+                    isImmersive={isFullscreen}
                     onToggleImmersive={toggleImmersive}
-                    onToggleFilters={() => setShowFilters(prev => !prev)}
-                    onStartTour={() => console.log('Tour started')}
-                    onResetCamera={useGraphStore.getState().resetCamera}
-                    onExport={() => {
-                        const data = {
-                            nodes: visibleNodes,
-                            links: visibleLinks,
-                            timestamp: new Date().toISOString()
-                        };
-                        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `neural-nexus-graph-${new Date().toISOString().slice(0, 10)}.json`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                    }}
+                    onToggleFilters={() => setShowFilters(!showFilters)}
+                    onResetCamera={handleResetView}
                     showFilters={showFilters}
-
-                    hasExpandedNodes={useGraphStore.getState().expandedNodes.size > 0}
                     folderId={folderId}
                     nodeCount={visibleNodes.length}
                     linkCount={visibleLinks.length}
-                    totalNodeCount={nodeCount}
-                    totalLinkCount={linkCount}
+                    totalNodeCount={nodes.length}
+                    totalLinkCount={links.length}
+                    selectedCount={selectedNodes.length}
                 />
             )}
 
-            {/* Main Visualization Area */}
-            <div className="absolute inset-0 pt-0 flex items-center justify-center">
+            {/* Main Graph Content Area */}
+            <div className="flex-1 relative min-h-0 flex flex-col">
                 {isGraphLoading ? (
-                    <GraphLoadingState message="Loading graph data..." />
+                    <GraphLoadingState message="Processing neural pathways..." />
                 ) : !hasData ? (
-                    <GraphEmptyState folderId={folderId} />
+                    <GraphEmptyState
+                        folderId={folderId}
+                    />
                 ) : (
                     <GraphErrorBoundary>
                         <AnimatePresence mode="wait">
@@ -479,6 +521,7 @@ export function GraphContainer({
                                             onNodeHover={handleNodeHover}
                                             onBackgroundClick={handleBackgroundClick}
                                             onNodeContextMenu={handleNodeRightClick}
+                                            resetKey={resetKey}
                                         />
                                     </Suspense>
                                 </motion.div>
@@ -502,19 +545,45 @@ export function GraphContainer({
                                             onNodeHover={handleNodeHover}
                                             onBackgroundClick={handleBackgroundClick}
                                             onNodeContextMenu={handleNodeRightClick}
+                                            resetKey={resetKey}
                                         />
                                     </Suspense>
 
                                 </motion.div>
-                            ) : (
+                            ) : viewMode === 'charts' ? (
                                 <motion.div
                                     key="charts"
                                     initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
+                                    animate={{
+                                        opacity: 1,
+                                        paddingLeft: showFilters ? 400 : 0
+                                    }}
                                     exit={{ opacity: 0 }}
-                                    className="w-full h-full bg-background"
+                                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                                    className="flex-1 min-h-0 w-full bg-background flex flex-col"
                                 >
                                     <DataCanvas />
+                                </motion.div>
+                            ) : (
+                                <motion.div
+                                    key="list"
+                                    initial={{ opacity: 0 }}
+                                    animate={{
+                                        opacity: 1,
+                                        paddingLeft: showFilters ? 400 : 0
+                                    }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                                    className="flex-1 min-h-0 w-full flex flex-col"
+                                >
+                                    <NodeListView
+                                        nodes={visibleNodes}
+                                        selectedNodes={selectedNodes}
+                                        onNodeClick={handleNodeClick}
+                                        onNodeDoubleClick={handleNodeDoubleClick}
+                                        onNodeHover={handleNodeHover}
+                                        onNodeFocus={handleNodeFocus}
+                                    />
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -577,7 +646,7 @@ export function GraphContainer({
             )}
 
             {/* Immersive Mode Toggle Button (when in immersive) */}
-            {isImmersive && (
+            {isFullscreen && (
                 <button
                     onClick={toggleImmersive}
                     className="absolute top-4 right-4 z-50 p-2 bg-background/80 backdrop-blur-sm rounded-lg border border-border hover:bg-muted transition-colors"

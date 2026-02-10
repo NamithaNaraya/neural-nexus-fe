@@ -8,13 +8,23 @@ interface CameraProps {
     targetNodeId: string | null;
     nodeMap: Map<string, any>;
     defaultCenter: THREE.Vector3;
+    resetKey?: number;
 }
 
-export function CameraManager({ targetNodeId, nodeMap, defaultCenter }: CameraProps) {
+export function CameraManager({ targetNodeId, nodeMap, defaultCenter, resetKey }: CameraProps) {
     const { camera, controls } = useThree();
     const targetVec = useRef(new THREE.Vector3(0, 0, 0));
     const isFirstLoad = useRef(true);
     const lastTargetId = useRef<string | null>(null);
+
+    // Handle Reset Signal
+    React.useEffect(() => {
+        if (resetKey && resetKey > 0) {
+            console.log('[3D] Resetting camera view...');
+            isFirstLoad.current = true;
+            lastTargetId.current = null;
+        }
+    }, [resetKey]);
 
     useFrame((state) => {
         let focusPos: THREE.Vector3;

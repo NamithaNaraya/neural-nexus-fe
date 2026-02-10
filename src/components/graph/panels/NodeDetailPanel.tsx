@@ -255,7 +255,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                     type="text"
                                     value={editName}
                                     onChange={(e) => setEditName(e.target.value)}
-                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-sm font-bold mb-2 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-sm font-bold mb-2 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner"
                                 />
                             ) : (
                                 <>
@@ -270,7 +270,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                 <select
                                     value={editType}
                                     onChange={(e) => setEditType(e.target.value)}
-                                    className="text-xs bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50 block w-full appearance-none cursor-pointer"
+                                    className="text-xs bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50 block w-full appearance-none cursor-pointer shadow-inner"
                                 >
                                     {availableNodeTypes.map(type => (
                                         <option key={type} value={type} className="bg-slate-900">{type}</option>
@@ -394,7 +394,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                 step="1"
                                 value={editSize}
                                 onChange={(e) => setEditSize(parseInt(e.target.value))}
-                                className="w-full h-2 bg-black/40 rounded-full appearance-none cursor-pointer accent-primary"
+                                className="w-full h-2 bg-white/5 rounded-full appearance-none cursor-pointer accent-primary"
                             />
                         </div>
                     </div>
@@ -416,10 +416,10 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                         placeholder="Scan for nodes..."
                                         value={relSearch}
                                         onChange={(e) => setRelSearch(e.target.value)}
-                                        className="w-full bg-black/40 border border-white/10 rounded-2xl pl-10 pr-4 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium"
+                                        className="w-full bg-white/5 border border-white/10 rounded-2xl pl-10 pr-4 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium shadow-inner"
                                     />
                                 </div>
-                                <div className="mt-3 max-h-40 overflow-y-auto rounded-2xl bg-black/20 border border-white/5 scrollbar-thin scrollbar-thumb-white/5">
+                                <div className="mt-3 max-h-40 overflow-y-auto rounded-2xl bg-white/5 border border-white/5 scrollbar-thin scrollbar-thumb-white/5">
                                     {filteredNodes.length > 0 ? (
                                         filteredNodes.map(n => (
                                             <button
@@ -446,7 +446,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                     <select
                                         value={relType}
                                         onChange={(e) => setRelType(e.target.value)}
-                                        className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/50 appearance-none cursor-pointer font-bold tracking-tight"
+                                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/50 appearance-none cursor-pointer font-bold tracking-tight shadow-inner"
                                     >
                                         {availableRelTypes.map(type => (
                                             <option key={type} value={type} className="bg-slate-900">{type.replace(/_/g, ' ')}</option>
@@ -495,7 +495,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                 value={editDescription}
                                 onChange={(e) => setEditDescription(e.target.value)}
                                 rows={4}
-                                className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium leading-relaxed resize-none"
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium leading-relaxed resize-none shadow-inner"
                                 placeholder="Input semantic context..."
                             />
                         ) : (
@@ -523,11 +523,11 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                         </p>
                         <div className="space-y-3">
                             {Object.entries(node.properties.conflicts as Record<string, any[]>).map(([key, values]) => (
-                                <div key={key} className="p-3.5 rounded-2xl bg-black/40 border border-amber-500/20 shadow-inner">
+                                <div key={key} className="p-3.5 rounded-2xl bg-white/5 border border-amber-500/20 shadow-inner">
                                     <p className="text-xs font-bold text-amber-200 mb-2 uppercase tracking-wide">{key}</p>
                                     <div className="space-y-2">
                                         {values.map((v, i) => (
-                                            <div key={i} className="flex items-center justify-between text-[10px] font-medium bg-black/20 p-2 rounded-lg">
+                                            <div key={i} className="flex items-center justify-between text-[10px] font-medium bg-white/5 p-2 rounded-lg">
                                                 <span className="text-muted-foreground/60 italic truncate max-w-[120px]">
                                                     {v.source || 'Undefined Source'}
                                                 </span>
@@ -670,7 +670,7 @@ function PropertyRow({ label, value, icon }: PropertyRowProps) {
                 {icon}
                 {label}
             </span>
-            <span className="text-xs text-foreground font-bold tracking-tight bg-black/20 px-2 py-1 rounded-lg border border-white/5">{value}</span>
+            <span className="text-xs text-foreground font-bold tracking-tight bg-white/5 px-2 py-1 rounded-lg border border-white/5">{value}</span>
         </div>
     );
 }

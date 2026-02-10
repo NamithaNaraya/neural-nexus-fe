@@ -30,6 +30,7 @@ interface ForceGraph2DProps {
     onBackgroundClick: () => void;
     onNodeContextMenu?: (nodeId: string, x: number, y: number) => void; // Right-click for expand
     folderId?: string;
+    resetKey?: number;
 }
 
 // D3 Node type with simulation properties
@@ -91,12 +92,41 @@ export function ForceGraph2D({
     onBackgroundClick,
     onNodeContextMenu,
     folderId,
+    resetKey = 0,
 }: ForceGraph2DProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const svgRef = useRef<SVGSVGElement>(null);
     const simulationRef = useRef<d3.Simulation<D3Node, D3Link> | null>(null);
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
     const [isDark, setIsDark] = useState(false);
+
+    // Zoom behavior ref to allow programmatic reset
+    const zoomRef = useRef<any>(null);
+
+    // ... existing logic
+
+    // Handle Reset Signal
+    useEffect(() => {
+        if (resetKey > 0) {
+            console.log('[2D] Resetting layout and camera...');
+
+            // 1. Clear sticky positions
+            nodeStateRef.current.clear();
+
+            // 2. Reset zoom transform
+            if (svgRef.current && zoomRef.current) {
+                const svg = d3.select(svgRef.current);
+                svg.transition()
+                    .duration(750)
+                    .call(zoomRef.current.transform, d3.zoomIdentity.translate(dimensions.width / 2, dimensions.height / 2).scale(0.6));
+            }
+
+            // 3. Reheat simulation to re-center nodes (since sticky is gone)
+            if (simulationRef.current) {
+                simulationRef.current.alpha(1).restart();
+            }
+        }
+    }, [resetKey, dimensions.width, dimensions.height]);
 
     // Real-time Sync via WebSocket - use passed folderId
     const { lastMessage } = useWebSocket({ folderId });
@@ -109,7 +139,7 @@ export function ForceGraph2D({
 
     // Detect dark mode
     // Store previous node positions to prevent resetting on re-renders
-    const nodeStateRef = useRef<Map<string, { x: number; y: number; vx?: number; vy?: number }>>(new Map());
+    const nodeStateRef = useRef<Map<string, { x: number; y: number; vx?: number; vy?: number; fx?: number | null; fy?: number | null }>>(new Map());
 
     // Detect dark mode
     useEffect(() => {
@@ -146,7 +176,9 @@ export function ForceGraph2D({
                     x: existingState.x,
                     y: existingState.y,
                     vx: existingState.vx,
-                    vy: existingState.vy
+                    vy: existingState.vy,
+                    fx: existingState.fx,
+                    fy: existingState.fy
                 };
             }
 
@@ -196,7 +228,7 @@ export function ForceGraph2D({
 
     // Get node color
     const getNodeColor = useCallback((node: D3Node) => {
-        return NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
+        return node.color || NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
     }, []);
 
     // Get link color
@@ -242,6 +274,7 @@ export function ForceGraph2D({
             });
 
         svg.call(zoom);
+        zoomRef.current = zoom;
 
         // Center the view initially
         svg.call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2).scale(0.6));
@@ -250,20 +283,20 @@ export function ForceGraph2D({
         const simulation = d3.forceSimulation<D3Node>(d3Nodes)
             .force('link', d3.forceLink<D3Node, D3Link>(d3Links)
                 .id(d => d.id)
-                .distance(120)
+                .distance(180) // Increased for better spreading
                 .strength(1)
             )
             .force('charge', d3.forceManyBody()
-                .strength(-800)
-                .distanceMax(400)
+                .strength(-2000) // Much stronger repulsion
+                .distanceMax(600)
             )
             .force('center', d3.forceCenter(0, 0))
             .force('collision', d3.forceCollide()
-                .radius(d => getNodeSize(d as D3Node) + 20)
-                .strength(0.8)
+                .radius(d => getNodeSize(d as D3Node) + 40) // More buffer for labels
+                .strength(0.9)
             )
-            .force('x', d3.forceX(0).strength(0.02))
-            .force('y', d3.forceY(0).strength(0.02));
+            .force('x', d3.forceX(0).strength(0.01)) // Subtle pull to center
+            .force('y', d3.forceY(0).strength(0.01));
 
         simulationRef.current = simulation;
 
@@ -351,8 +384,15 @@ export function ForceGraph2D({
                     // Keep node fixed where dragged
                     d.fx = d.x;
                     d.fy = d.y;
-                    // Save position for persistence
-                    nodeStateRef.current.set(d.id, { x: d.x!, y: d.y! });
+                    // Save position for persistence, including fixed coordinates
+                    nodeStateRef.current.set(d.id, {
+                        x: d.x!,
+                        y: d.y!,
+                        fx: d.fx,
+                        fy: d.fy,
+                        vx: d.vx,
+                        vy: d.vy
+                    });
                 })
             );
 

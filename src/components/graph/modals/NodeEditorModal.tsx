@@ -46,7 +46,8 @@ interface NodeEditorModalProps {
     fileId?: string;
 }
 
-const NODE_TYPES = [
+// Fallback node types with icons
+const DEFAULT_NODE_TYPES = [
     { value: 'Person', label: 'Person', icon: User },
     { value: 'Organization', label: 'Organization', icon: Building },
     { value: 'Concept', label: 'Concept', icon: Lightbulb },
@@ -55,6 +56,16 @@ const NODE_TYPES = [
     { value: 'Document', label: 'Document', icon: FileText },
     { value: 'Topic', label: 'Topic', icon: Tag },
 ];
+
+const ICON_MAP: Record<string, any> = {
+    Person: User,
+    Organization: Building,
+    Concept: Lightbulb,
+    Event: Calendar,
+    Location: MapPin,
+    Document: FileText,
+    Topic: Tag,
+};
 
 const COLOR_PRESETS = [
     '#6366F1', // Indigo
@@ -87,6 +98,32 @@ export function NodeEditorModal({
     );
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [availableTypes, setAvailableTypes] = useState<any[]>(DEFAULT_NODE_TYPES);
+
+    // Entity lookup state
+    const [suggestions, setSuggestions] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
+    // Load dynamic node types
+    useEffect(() => {
+        const loadTypes = async () => {
+            try {
+                const result = await graphApi.getNodeTypes();
+                if (result.types && result.types.length > 0) {
+                    const mapped = result.types.map(t => ({
+                        value: t,
+                        label: t,
+                        icon: ICON_MAP[t] || Tag
+                    }));
+                    setAvailableTypes(mapped);
+                }
+            } catch (err) {
+                console.error('Failed to load node types:', err);
+            }
+        };
+        loadTypes();
+    }, []);
 
     // Reset form when modal opens/closes
     useEffect(() => {
@@ -106,6 +143,35 @@ export function NodeEditorModal({
             setCustomProperties([]);
         }
     }, [isOpen, initialData, mode]);
+
+    // Handle entity lookup
+    useEffect(() => {
+        if (mode === 'create' && name.length >= 2) {
+            const timer = setTimeout(async () => {
+                setIsSearching(true);
+                try {
+                    const result = await graphApi.searchForCrud(name, folderId);
+                    setSuggestions(result.nodes || []);
+                    setShowSuggestions(result.nodes.length > 0);
+                } catch (err) {
+                    console.error('Search failed:', err);
+                } finally {
+                    setIsSearching(false);
+                }
+            }, 300);
+            return () => clearTimeout(timer);
+        } else {
+            setSuggestions([]);
+            setShowSuggestions(false);
+        }
+    }, [name, mode, folderId]);
+
+    const selectSuggestion = (suggestion: any) => {
+        setName(suggestion.name);
+        setType(suggestion.type);
+        setDescription(suggestion.description || '');
+        setShowSuggestions(false);
+    };
 
     const addProperty = () => {
         setCustomProperties([...customProperties, { key: '', value: '' }]);
@@ -158,7 +224,14 @@ export function NodeEditorModal({
                     properties,
                     color,
                 });
-                onSuccess(result);
+                onSuccess({
+                    id: initialData.id,
+                    name: name.trim(),
+                    type,
+                    description: description.trim(),
+                    properties,
+                    color,
+                });
             }
 
             onClose();
@@ -208,13 +281,49 @@ export function NodeEditorModal({
                             <label className="block text-sm font-medium text-foreground mb-2">
                                 Name <span className="text-destructive">*</span>
                             </label>
-                            <input
-                                type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="Enter entity name..."
-                                className="w-full px-4 py-2.5 rounded-xl bg-muted/50 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                            />
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    onFocus={() => name.length >= 2 && suggestions.length > 0 && setShowSuggestions(true)}
+                                    placeholder="Enter entity name..."
+                                    className="w-full px-4 py-2.5 rounded-xl bg-muted/50 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                />
+                                {isSearching && (
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                        <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                                    </div>
+                                )}
+
+                                {showSuggestions && suggestions.length > 0 && (
+                                    <div className="absolute z-[60] left-0 right-0 mt-2 bg-background/95 backdrop-blur-md border border-border rounded-xl shadow-xl overflow-hidden">
+                                        <div className="px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-b border-border bg-primary/5">
+                                            Existing Entities Found
+                                        </div>
+                                        <div className="max-h-48 overflow-y-auto">
+                                            {suggestions.map((suggestion) => (
+                                                <button
+                                                    key={suggestion.id}
+                                                    onClick={() => selectSuggestion(suggestion)}
+                                                    className="w-full px-4 py-3 flex items-start gap-3 hover:bg-muted transition-colors border-b border-border last:border-0"
+                                                >
+                                                    <div className="mt-0.5 p-1 rounded bg-primary/10 text-primary">
+                                                        {ICON_MAP[suggestion.type] ?
+                                                            React.createElement(ICON_MAP[suggestion.type], { className: "w-3 h-3" }) :
+                                                            <Tag className="w-3 h-3" />
+                                                        }
+                                                    </div>
+                                                    <div className="text-left overflow-hidden">
+                                                        <div className="text-sm font-medium text-foreground truncate">{suggestion.name}</div>
+                                                        <div className="text-xs text-muted-foreground truncate">{suggestion.type}</div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Type */}
@@ -223,17 +332,17 @@ export function NodeEditorModal({
                                 Type
                             </label>
                             <div className="grid grid-cols-4 gap-2">
-                                {NODE_TYPES.map(({ value, label, icon: Icon }) => (
+                                {availableTypes.slice(0, 8).map(({ value, label, icon: Icon }) => (
                                     <button
                                         key={value}
                                         onClick={() => setType(value)}
                                         className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all ${type === value
-                                                ? 'border-primary bg-primary/10 text-primary'
-                                                : 'border-border bg-muted/30 text-muted-foreground hover:border-primary/50'
+                                            ? 'border-primary bg-primary/10 text-primary'
+                                            : 'border-border bg-muted/30 text-muted-foreground hover:border-primary/50'
                                             }`}
                                     >
                                         <Icon className="w-5 h-5" />
-                                        <span className="text-xs">{label}</span>
+                                        <span className="text-xs truncate w-full text-center">{label}</span>
                                     </button>
                                 ))}
                             </div>
@@ -265,8 +374,8 @@ export function NodeEditorModal({
                                         key={preset}
                                         onClick={() => setColor(preset)}
                                         className={`w-8 h-8 rounded-full transition-all ${color === preset
-                                                ? 'ring-2 ring-offset-2 ring-offset-card ring-white scale-110'
-                                                : 'hover:scale-110'
+                                            ? 'ring-2 ring-offset-2 ring-offset-card ring-white scale-110'
+                                            : 'hover:scale-110'
                                             }`}
                                         style={{ backgroundColor: preset }}
                                     />

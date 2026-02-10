@@ -27,6 +27,7 @@ import {
     Link2,
     Eye,
     Circle,
+    List,
 } from 'lucide-react';
 import { AlgorithmDrawer } from './AlgorithmDrawer';
 
@@ -48,6 +49,7 @@ interface GraphToolbarProps {
     linkCount?: number;
     totalNodeCount?: number;
     totalLinkCount?: number;
+    selectedCount?: number;
 }
 
 export function GraphToolbar({
@@ -68,6 +70,7 @@ export function GraphToolbar({
     linkCount = 0,
     totalNodeCount = 0,
     totalLinkCount = 0,
+    selectedCount = 0,
 }: GraphToolbarProps) {
     const [showAlgorithmDrawer, setShowAlgorithmDrawer] = useState(false);
 
@@ -102,6 +105,13 @@ export function GraphToolbar({
                             icon={<PieChart className="w-5 h-5" />}
                             label="Charts"
                         />
+                        <ViewModeButton
+                            mode="list"
+                            currentMode={viewMode}
+                            onClick={() => onViewModeChange('list')}
+                            icon={<List className="w-5 h-5" />}
+                            label="List"
+                        />
                     </div>
 
                     <div className="w-px h-8 bg-border/20" />
@@ -114,12 +124,6 @@ export function GraphToolbar({
                             title="Toggle Filters"
                         />
 
-                        <ToolbarButton
-                            onClick={() => setShowAlgorithmDrawer(true)}
-                            icon={<Zap className="w-4 h-4" />}
-                            title="Graph Algorithms"
-                            className="text-amber-500 hover:bg-amber-500/10"
-                        />
                     </div>
                 </div>
 
@@ -129,6 +133,12 @@ export function GraphToolbar({
                 {/* Right Section: Utilities & Stats */}
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
+                        <ToolbarButton
+                            onClick={() => setShowAlgorithmDrawer(true)}
+                            icon={<Zap className="w-4 h-4" />}
+                            title="Graph Algorithms"
+                            className="text-amber-500 hover:bg-amber-500/10"
+                        />
                         {onResetCamera && (
                             <ToolbarButton
                                 onClick={onResetCamera}
@@ -156,19 +166,34 @@ export function GraphToolbar({
                     <div className="w-px h-8 bg-border/20" />
 
                     {/* Horizontal Statistics Indicator */}
-                    <div className="flex items-center gap-6 px-2">
-                        <div className="flex items-center gap-2 group/stats">
-                            <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.6)] animate-pulse" />
-                            <div className="flex flex-col -gap-1">
-                                <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest leading-none">nodes</span>
-                                <span className="text-sm font-bold text-white leading-none">{nodeCount}</span>
+                    <div className="flex items-center gap-6 px-4 py-1.5 glass-strong rounded-full border border-white/5 bg-white/5 mx-2">
+                        <div className="flex items-center gap-2.5 group/stats">
+                            <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.6)] animate-pulse" />
+                            <div className="flex flex-col">
+                                <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest leading-none">Nodes</span>
+                                <div className="flex items-baseline gap-1.5 mt-0.5">
+                                    <span className="text-sm font-black text-foreground leading-none">
+                                        {nodeCount} <span className="text-[10px] text-muted-foreground/60 font-medium">/</span> {totalNodeCount}
+                                    </span>
+                                    {selectedCount > 0 && (
+                                        <span className="text-[10px] font-black text-cyan-400/90 leading-none">
+                                            ({selectedCount} SELECTED)
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 group/stats">
-                            <div className="w-2 h-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.6)] animate-pulse" />
-                            <div className="flex flex-col -gap-1">
-                                <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest leading-none">links</span>
-                                <span className="text-sm font-bold text-white leading-none">{linkCount}</span>
+
+
+                        <div className="flex items-center gap-2.5 group/stats ml-2">
+                            <div className="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.6)] animate-pulse" />
+                            <div className="flex flex-col">
+                                <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest leading-none">Links</span>
+                                <div className="flex items-baseline gap-1.5 mt-0.5">
+                                    <span className="text-sm font-black text-foreground leading-none">
+                                        {linkCount} <span className="text-[10px] text-muted-foreground/60 font-medium">/</span> {totalLinkCount}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>

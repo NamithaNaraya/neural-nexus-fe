@@ -8,6 +8,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 
+import { GraphViewMode } from '../components/graph/types';
+
 interface DeviceInfo {
     isMobile: boolean;
     isTablet: boolean;
@@ -86,9 +88,9 @@ export function useDevice(options: UseDeviceOptions = {}): DeviceInfo {
  * Hook to automatically lock view mode based on device capability
  */
 export function useViewModeLock(
-    currentViewMode: '2d' | '3d' | 'charts' | 'hybrid',
-    setViewMode: (mode: '2d' | '3d' | 'charts' | 'hybrid') => void
-): { lockedMode: '2d' | '3d' | 'charts' | 'hybrid'; isLocked: boolean; reason?: string } {
+    currentViewMode: GraphViewMode,
+    setViewMode: (mode: GraphViewMode) => void
+): { lockedMode: GraphViewMode; isLocked: boolean; reason?: string } {
     const { is3DCapable, isMobile, isTablet } = useDevice();
 
     useEffect(() => {
