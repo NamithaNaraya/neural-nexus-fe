@@ -24,6 +24,8 @@ import {
     BarChart3,
     Info,
     ChevronLeft,
+    Sparkles,
+    Brain,
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/shared';
 import { api } from '@/lib/api';
@@ -83,8 +85,8 @@ const algorithms: AlgorithmConfig[] = [
         icon: <TrendingUp className="w-4 h-4" />,
         category: 'centrality',
         endpoint: '/analytics/centrality/pagerank',
-        simpleInfo: "Finds the most important and influential nodes by looking at how many other nodes connect to them.",
-        benefit: "Identifies key players and authoritative sources in your network."
+        simpleInfo: "Evaluates the relative importance of nodes based on the quality and quantity of their connections.",
+        benefit: "Reveals high-authority hubs and primary influence centers in your dataset."
     },
     {
         key: 'betweenness',
@@ -93,8 +95,8 @@ const algorithms: AlgorithmConfig[] = [
         icon: <Share2 className="w-4 h-4" />,
         category: 'centrality',
         endpoint: '/analytics/centrality/betweenness',
-        simpleInfo: "Finds the 'bridge' nodes that connect different parts of your network together.",
-        benefit: "Identifies critical hubs that control the flow of information."
+        simpleInfo: "Identifies 'bridge' nodes that serve as critical connectors between isolated data clusters.",
+        benefit: "Pinpoints bottleneck entities that control the flow of information across your network."
     },
     {
         key: 'closeness',
@@ -103,8 +105,8 @@ const algorithms: AlgorithmConfig[] = [
         icon: <Target className="w-4 h-4" />,
         category: 'centrality',
         endpoint: '/analytics/centrality/closeness',
-        simpleInfo: "Finds nodes that can quickly reach every other node in the network.",
-        benefit: "Identifies the best nodes for spreading information effectively."
+        simpleInfo: "Measures how quickly a node can access all other pieces of information in the dataset.",
+        benefit: "Detects the most efficiently positioned nodes for data distribution or gathering."
     },
     {
         key: 'louvain',
@@ -113,8 +115,8 @@ const algorithms: AlgorithmConfig[] = [
         icon: <Network className="w-4 h-4" />,
         category: 'community',
         endpoint: '/analytics/community/louvain',
-        simpleInfo: "Groups nodes into communities based on how closely they are related to each other.",
-        benefit: "Uncovers natural clusters and hidden groups in your data."
+        simpleInfo: "Uncovers deep community structures by grouping nodes into highly cohesive thematic clusters.",
+        benefit: "Exposes logical segmentations and hidden organizational patterns in complex data."
     },
     {
         key: 'leiden',
@@ -123,8 +125,8 @@ const algorithms: AlgorithmConfig[] = [
         icon: <Layers className="w-4 h-4" />,
         category: 'community',
         endpoint: '/analytics/community/leiden',
-        simpleInfo: "An advanced way to find communities that ensures group members are very well connected.",
-        benefit: "Provides highly accurate and meaningful community segmentation."
+        simpleInfo: "Utilizes advanced modularity optimization to find extremely precise and well-defined communities.",
+        benefit: "Provides high-resolution clustering for more accurate cross-modality data analysis."
     },
     {
         key: 'node-similarity',
@@ -133,8 +135,8 @@ const algorithms: AlgorithmConfig[] = [
         icon: <Search className="w-4 h-4" />,
         category: 'prediction',
         endpoint: '/analytics/similarity/nodes',
-        simpleInfo: "Compares nodes to see how similar they are based on their connections.",
-        benefit: "Great for finding related entities or making recommendations."
+        simpleInfo: "Compares structural overlap between nodes to find entities with identical connection profiles.",
+        benefit: "Ideal for identifying duplicates, related entities, or making data recommendations."
     },
     {
         key: 'link-prediction',
@@ -143,8 +145,8 @@ const algorithms: AlgorithmConfig[] = [
         icon: <GitBranch className="w-4 h-4" />,
         category: 'prediction',
         endpoint: '/analytics/link-prediction',
-        simpleInfo: "Predicts which nodes are likely to connect in the future based on existing patterns.",
-        benefit: "Helps you discover potential relationships before they happen."
+        simpleInfo: "Analyzes existing relationship patterns to forecast likely future connections between entities.",
+        benefit: "Anticipates growth trends and discovers missing links before they are explicitly documented."
     },
     {
         key: 'health',
@@ -238,7 +240,7 @@ export function AlgorithmDrawer({ isOpen, onClose, folderId }: AlgorithmDrawerPr
                         exit={{ translateX: '100%' }}
                         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                         data-tour="algorithm-drawer"
-                        className="fixed top-0 right-0 h-full w-[400px] glass-strong z-50 border-l border-white/10 shadow-[-20px_0_60px_rgba(0,0,0,0.3)] flex flex-col"
+                        className="fixed top-0 right-0 h-full w-[480px] glass-strong z-50 border-l border-white/10 shadow-[-20px_0_60px_rgba(0,0,0,0.3)] flex flex-col"
                     >
                         {/* Header */}
                         <div className="flex items-center justify-between p-6 border-b border-white/10">
@@ -377,25 +379,25 @@ export function AlgorithmDrawer({ isOpen, onClose, folderId }: AlgorithmDrawerPr
                                             return (
                                                 <div className="flex-1 flex flex-col overflow-hidden space-y-6">
                                                     {/* Header Info */}
-                                                    <div className="flex items-center gap-4 mb-4">
-                                                        <div className="p-4 rounded-3xl bg-primary shadow-2xl shadow-primary/20 text-primary-foreground transform rotate-3">
-                                                            {algo.icon}
+                                                    <div className="flex items-center gap-3 mb-3">
+                                                        <div className="p-3 rounded-2xl bg-primary text-primary-foreground shadow-xl shadow-primary/20">
+                                                            {React.cloneElement(algo.icon as React.ReactElement, { className: 'w-5 h-5' })}
                                                         </div>
                                                         <div>
-                                                            <h3 className="text-2xl font-black tracking-tight">{algo.name}</h3>
-                                                            <p className="text-xs text-muted-foreground font-medium">{algo.category.toUpperCase()} ANALYSIS</p>
+                                                            <h3 className="text-xl font-black tracking-tight leading-none mb-0.5">{algo.name}</h3>
+                                                            <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest opacity-70">{algo.category} ANALYSIS</p>
                                                         </div>
                                                     </div>
 
-                                                    {/* Simple Info Section */}
-                                                    <div className="space-y-6 bg-white/2 p-6 rounded-3xl border border-white/5">
+                                                    {/* Compact Info Section */}
+                                                    <div className="grid grid-cols-2 gap-3 bg-primary/5 p-4 rounded-2xl border border-primary/10">
                                                         <section>
-                                                            <h4 className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-2 font-black">What it does</h4>
-                                                            <p className="text-sm text-foreground/80 leading-relaxed font-medium">{algo.simpleInfo}</p>
+                                                            <h4 className="text-[10px] font-black text-primary/60 uppercase tracking-widest mb-1.5">Function</h4>
+                                                            <p className="text-sm text-foreground/80 leading-snug font-medium">{algo.simpleInfo}</p>
                                                         </section>
 
-                                                        <section className="pt-4 border-t border-white/5">
-                                                            <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-2 font-black">Why use it</h4>
+                                                        <section className="pl-3 border-l border-primary/10">
+                                                            <h4 className="text-[10px] font-black text-emerald-400/60 uppercase tracking-widest mb-1.5">Value</h4>
                                                             <p className="text-sm font-bold text-foreground leading-snug">{algo.benefit}</p>
                                                         </section>
                                                     </div>
@@ -414,45 +416,71 @@ export function AlgorithmDrawer({ isOpen, onClose, folderId }: AlgorithmDrawerPr
                                                                     <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
                                                                     <Zap className="absolute inset-0 m-auto w-5 h-5 text-primary animate-pulse" />
                                                                 </div>
-                                                                <p className="text-[10px] font-black uppercase tracking-widest text-primary">Discovering Patterns...</p>
+                                                                <p className="text-xs font-black uppercase tracking-widest text-primary">Scanning Data Patterns...</p>
                                                             </div>
                                                         ) : result ? (
                                                             <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4">
-                                                                <div className="flex items-center justify-between mb-4 px-1">
-                                                                    <h3 className="font-black text-[10px] uppercase tracking-widest text-primary">{algo.name} RESULTS</h3>
+                                                                <div className="flex items-center justify-between mb-3 px-1">
+                                                                    <h3 className="font-black text-[10px] uppercase tracking-widest text-primary">{algo.name} ANALYSIS</h3>
                                                                     <div className="px-2 py-0.5 rounded-md bg-white/5 text-[10px] font-bold text-muted-foreground">
-                                                                        {result.results?.length || 0} TOTAL
+                                                                        {result.results?.length || 0} TOTAL SAMPLES
                                                                     </div>
                                                                 </div>
 
-                                                                {result.insight && (
-                                                                    <div className="mb-4 p-4 rounded-2xl bg-primary/10 border border-primary/20 shadow-inner">
-                                                                        <p className="text-xs leading-relaxed font-medium text-foreground italic">"{result.insight}"</p>
-                                                                    </div>
-                                                                )}
+                                                                {/* Intelligence Narrative Section - Reduced to 20% height */}
+                                                                <div className="h-[22%] mb-4 relative group/insight shrink-0">
+                                                                    <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/30 via-cyan-400/30 to-primary/30 rounded-2xl blur opacity-10 group-hover/insight:opacity-30 transition duration-1000" />
+                                                                    <div className="relative h-full p-4 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg flex flex-col">
+                                                                        <div className="flex items-center gap-2 mb-2">
+                                                                            <Sparkles className="w-3 h-3 text-primary" />
+                                                                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary/80">Intelligence Brief</span>
+                                                                        </div>
 
-                                                                <div className="flex-1 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 pr-2 pb-4">
-                                                                    {result.results?.slice(0, 15).map((item, i) => (
-                                                                        <motion.div
-                                                                            initial={{ opacity: 0, x: 10 }}
-                                                                            animate={{ opacity: 1, x: 0 }}
-                                                                            transition={{ delay: i * 0.05 }}
-                                                                            key={item.id || i}
-                                                                            className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-all group/item"
-                                                                        >
-                                                                            <div className="min-w-0 flex-1 mr-4">
-                                                                                <div className="font-bold text-xs truncate group-hover/item:text-primary transition-colors">{item.name}</div>
-                                                                                {item.type && (
-                                                                                    <div className="text-[9px] uppercase tracking-tighter text-muted-foreground font-black mt-0.5">{item.type}</div>
-                                                                                )}
-                                                                            </div>
-                                                                            {item.score !== undefined && (
-                                                                                <div className="px-2 py-1 rounded-lg bg-white/5 text-[10px] font-mono text-cyan-400 font-bold border border-cyan-400/10">
-                                                                                    {item.score.toFixed(4)}
+                                                                        <div className="flex-1 overflow-y-auto scrollbar-none">
+                                                                            <p className="text-xs leading-relaxed font-bold text-foreground italic">
+                                                                                {result.insight || "Analysis complete. The engine has successfully mapped the underlying influence and structural pathways of your dataset."}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Results List Section - Increased to 80% height */}
+                                                                <div className="h-[80%] flex flex-col min-h-0 bg-primary/5 rounded-3xl border border-primary/20 p-4 shadow-2xl relative overflow-hidden">
+                                                                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                                                                        <Activity className="w-12 h-12 text-primary" />
+                                                                    </div>
+
+                                                                    <div className="px-1 mb-3 flex items-center justify-between relative z-10">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <h4 className="text-[11px] font-black uppercase tracking-widest text-primary">Raw Data Signals</h4>
+                                                                            <div className="px-1.5 py-0.5 rounded bg-primary text-[8px] font-black text-primary-foreground uppercase tracking-tighter">Live</div>
+                                                                        </div>
+                                                                        <div className="h-px flex-1 bg-primary/20 mx-3" />
+                                                                    </div>
+
+                                                                    <div className="flex-1 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 pr-2 pb-2 relative z-10">
+                                                                        {result.results?.slice(0, 40).map((item, i) => (
+                                                                            <motion.div
+                                                                                initial={{ opacity: 0, y: 10 }}
+                                                                                animate={{ opacity: 1, y: 0 }}
+                                                                                transition={{ delay: i * 0.02 }}
+                                                                                key={item.id || i}
+                                                                                className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all group/item shadow-sm"
+                                                                            >
+                                                                                <div className="min-w-0 flex-1 mr-4">
+                                                                                    <div className="font-bold text-sm tracking-tight truncate group-hover/item:text-primary transition-colors">{item.name}</div>
+                                                                                    {item.type && (
+                                                                                        <div className="text-[9px] uppercase tracking-widest text-primary/70 font-black mt-0.5">{item.type}</div>
+                                                                                    )}
                                                                                 </div>
-                                                                            )}
-                                                                        </motion.div>
-                                                                    ))}
+                                                                                {item.score !== undefined && (
+                                                                                    <div className="px-2.5 py-1 rounded-xl bg-primary text-xs font-mono text-primary-foreground font-black shadow-lg shadow-primary/20 border border-primary transition-all group-hover/item:scale-105">
+                                                                                        {item.score.toFixed(4)}
+                                                                                    </div>
+                                                                                )}
+                                                                            </motion.div>
+                                                                        ))}
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         ) : (

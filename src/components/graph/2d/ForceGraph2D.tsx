@@ -252,9 +252,17 @@ export function ForceGraph2D({
 
     // Initialize and update D3 simulation
     useEffect(() => {
-        if (!svgRef.current || d3Nodes.length === 0) return;
+        if (!svgRef.current) return;
 
         const svg = d3.select(svgRef.current);
+
+        // Always clear previous content to prevent stale renders on empty data
+        svg.selectAll('*').remove();
+
+        if (d3Nodes.length === 0) {
+            console.log('[2D] No nodes to render, cleared view.');
+            return;
+        }
         const width = dimensions.width;
         const height = dimensions.height;
 

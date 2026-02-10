@@ -33,23 +33,23 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
 
     // Toggle node type filter
     const toggleNodeType = useCallback((type: string) => {
-        const current = filters.nodeTypes;
+        const current = filters.nodeTypes.filter(t => t !== '__NONE__');
         let updated;
 
-        if (current.length === 0) {
-            // If all were selected (empty means all), unchecking one means all but that one
+        if (filters.nodeTypes.length === 0) {
+            // Case 1: Switching from "Show All" to "Show All except one"
             updated = nodeTypes.filter(t => t !== type);
         } else {
+            // Case 2: Standard toggle
             updated = current.includes(type)
                 ? current.filter(t => t !== type)
                 : [...current, type];
         }
 
-        // If we just unchecked everything, set to a sentinel or handle appropriately
         if (updated.length === 0) {
             setFilters({ nodeTypes: ['__NONE__'] });
         } else if (updated.length === nodeTypes.length) {
-            setFilters({ nodeTypes: [] }); // Store as all-selected (empty)
+            setFilters({ nodeTypes: [] }); // Reset to empty for "Show All" performance
         } else {
             setFilters({ nodeTypes: updated });
         }
@@ -57,10 +57,10 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
 
     // Toggle relationship type filter
     const toggleRelationshipType = useCallback((type: string) => {
-        const current = filters.relationshipTypes;
+        const current = filters.relationshipTypes.filter(t => t !== '__NONE__');
         let updated;
 
-        if (current.length === 0) {
+        if (filters.relationshipTypes.length === 0) {
             updated = linkTypes.filter(t => t !== type);
         } else {
             updated = current.includes(type)
@@ -89,20 +89,50 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
 
     // Bulk select handlers
     const selectAllNodeTypes = useCallback(() => {
-        setFilters({ nodeTypes: [] }); // Empty array means all selected in our logic
-    }, [setFilters]);
+        if (nodeSearch) {
+            const current = filters.nodeTypes.length === 0 ? nodeTypes : filters.nodeTypes.filter(t => t !== '__NONE__');
+            const visible = nodeTypes.filter((t: string) => t.toLowerCase().includes(nodeSearch.toLowerCase()));
+            const toAdd = visible.filter(t => !current.includes(t));
+            const updated = [...current, ...toAdd];
+            setFilters({ nodeTypes: updated.length === nodeTypes.length ? [] : updated });
+        } else {
+            setFilters({ nodeTypes: [] });
+        }
+    }, [nodeSearch, nodeTypes, filters.nodeTypes, setFilters]);
 
     const deselectAllNodeTypes = useCallback(() => {
-        setFilters({ nodeTypes: ['__NONE__'] });
-    }, [setFilters]);
+        if (nodeSearch) {
+            const current = filters.nodeTypes.length === 0 ? nodeTypes : filters.nodeTypes.filter(t => t !== '__NONE__');
+            const visible = nodeTypes.filter((t: string) => t.toLowerCase().includes(nodeSearch.toLowerCase()));
+            const updated = current.filter(t => !visible.includes(t));
+            setFilters({ nodeTypes: updated.length === 0 ? ['__NONE__'] : updated });
+        } else {
+            setFilters({ nodeTypes: ['__NONE__'] });
+        }
+    }, [nodeSearch, nodeTypes, filters.nodeTypes, setFilters]);
 
     const selectAllRelTypes = useCallback(() => {
-        setFilters({ relationshipTypes: [] });
-    }, [setFilters]);
+        if (linkSearch) {
+            const current = filters.relationshipTypes.length === 0 ? linkTypes : filters.relationshipTypes.filter(t => t !== '__NONE__');
+            const visible = linkTypes.filter((t: string) => t.toLowerCase().includes(linkSearch.toLowerCase()));
+            const toAdd = visible.filter(t => !current.includes(t));
+            const updated = [...current, ...toAdd];
+            setFilters({ relationshipTypes: updated.length === linkTypes.length ? [] : updated });
+        } else {
+            setFilters({ relationshipTypes: [] });
+        }
+    }, [linkSearch, linkTypes, filters.relationshipTypes, setFilters]);
 
     const deselectAllRelTypes = useCallback(() => {
-        setFilters({ relationshipTypes: ['__NONE__'] });
-    }, [setFilters]);
+        if (linkSearch) {
+            const current = filters.relationshipTypes.length === 0 ? linkTypes : filters.relationshipTypes.filter(t => t !== '__NONE__');
+            const visible = linkTypes.filter((t: string) => t.toLowerCase().includes(linkSearch.toLowerCase()));
+            const updated = current.filter(t => !visible.includes(t));
+            setFilters({ relationshipTypes: updated.length === 0 ? ['__NONE__'] : updated });
+        } else {
+            setFilters({ relationshipTypes: ['__NONE__'] });
+        }
+    }, [linkSearch, linkTypes, filters.relationshipTypes, setFilters]);
 
     const filteredNodeTypes = nodeTypes.filter((t: string) => t.toLowerCase().includes(nodeSearch.toLowerCase()));
     const filteredLinkTypes = linkTypes.filter((t: string) => t.toLowerCase().includes(linkSearch.toLowerCase()));

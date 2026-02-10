@@ -168,7 +168,7 @@ function GraphContent() {
     return (
         <GraphContainer
             folderId={folderId}
-            initialMode="3d"
+            initialMode="2d"
             showToolbar
             showSidebar
             initialShowInbox={searchParams.get('view') === 'inbox'}

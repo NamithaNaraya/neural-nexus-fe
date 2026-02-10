@@ -313,6 +313,11 @@ export const useGraphStore = create<GraphState>()(
                     }
                 }
 
+                // Filter by orphan status (Apply LAST so other filters run first)
+                if (!filters.showOrphans && (node.degree || 0) === 0) {
+                    return false;
+                }
+
                 return true;
             });
         },

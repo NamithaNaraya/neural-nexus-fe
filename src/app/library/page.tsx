@@ -759,14 +759,14 @@ function LibraryContent() {
                                 ref={fileInputRef}
                                 type="file"
                                 multiple
-                                accept=".pdf,.txt,.docx,.doc,.md"
+                                accept=".pdf,.txt,.docx,.doc,.md,.csv,.xlsx"
                                 onChange={handleFileSelect}
                                 className="hidden"
                             />
                             <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-emerald/50 hover:bg-muted/30 transition-all">
                                 <FileUp className="w-12 h-12 text-emerald mx-auto mb-4" />
                                 <p className="text-foreground font-medium mb-1">Click to upload files</p>
-                                <p className="text-sm text-muted-foreground">PDF, TXT, DOCX, MD supported</p>
+                                <p className="text-sm text-muted-foreground">PDF, TXT, DOCX, MD, CSV, EXCEL supported</p>
                             </div>
                         </label>
 
