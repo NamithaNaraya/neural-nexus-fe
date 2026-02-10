@@ -219,6 +219,7 @@ export function GraphContainer({
         filters,
         zoomToNode,
         resetCamera,
+        addToDiscovery,
     } = useGraphStore();
 
     // Get filtered data
@@ -296,8 +297,11 @@ export function GraphContainer({
 
                 console.log(`Adding ${newNodes.length} nodes and ${newLinks.length} relations to graph`);
 
-                const { addNodesAndLinks } = useGraphStore.getState();
+                const { addNodesAndLinks, addToDiscovery } = useGraphStore.getState();
                 addNodesAndLinks(newNodes, newLinks);
+
+                // Discovery: Add new neighbors to discovery set so they become visible
+                addToDiscovery(newNodes.map(n => n.id));
             } else {
                 console.warn('Expansion returned no new nodes');
             }
@@ -322,11 +326,14 @@ export function GraphContainer({
         if (node) {
             setSelectedNodeForDetail(node);
             setShowNodeDetail(true);
+
+            // Discovery: Always mark this node as discovered so it stays visible
+            addToDiscovery(nodeId);
         }
 
         // 3. Trigger Expansion (First layer)
         handleNodeDoubleClick(nodeId);
-    }, [selectNode, nodes, handleNodeDoubleClick]);
+    }, [selectNode, nodes, handleNodeDoubleClick, addToDiscovery]);
 
     // Keep handleNodeClick for API compatibility with visualization components
     const handleNodeClick = handleNodeAction;

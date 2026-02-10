@@ -28,8 +28,10 @@ import {
     Eye,
     Circle,
     List,
+    Trash2,
 } from 'lucide-react';
 import { AlgorithmDrawer } from './AlgorithmDrawer';
+import { useGraphStore } from '@/store/graphStore';
 
 interface GraphToolbarProps {
     viewMode: GraphViewMode;
@@ -73,6 +75,7 @@ export function GraphToolbar({
     selectedCount = 0,
 }: GraphToolbarProps) {
     const [showAlgorithmDrawer, setShowAlgorithmDrawer] = useState(false);
+    const { setFilters, clearDiscovery, discoveredNodeIds } = useGraphStore();
 
     // Calculate if filtering is active
     const isFiltered = nodeCount !== totalNodeCount || linkCount !== totalLinkCount;
@@ -139,6 +142,16 @@ export function GraphToolbar({
                             title="Graph Algorithms"
                             className="text-amber-500 hover:bg-amber-500/10"
                         />
+                        <div className="w-px h-6 bg-border/20 mx-1" />
+                        {discoveredNodeIds.size > 0 && (
+                            <ToolbarButton
+                                onClick={clearDiscovery}
+                                icon={<Trash2 className="w-4 h-4" />}
+                                title="Clear Exploration Path"
+                                className="text-rose-400 hover:bg-rose-400/10"
+                            />
+                        )}
+                        <div className="w-px h-6 bg-border/20 mx-1" />
                         {onResetCamera && (
                             <ToolbarButton
                                 onClick={onResetCamera}

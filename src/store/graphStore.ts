@@ -143,7 +143,12 @@ interface GraphState {
     isGraphLoading: boolean;
     setGraphLoading: (loading: boolean) => void;
 
-    // Async Actions
+    // Discovery Mode (Incremental exploration)
+    discoveredNodeIds: Set<string>;
+    addToDiscovery: (ids: string | string[]) => void;
+    removeFromDiscovery: (id: string) => void;
+    clearDiscovery: () => void;
+
     fetchGraph: (folderId?: string | null, fileId?: string | null) => Promise<void>;
 }
 
@@ -287,6 +292,11 @@ export const useGraphStore = create<GraphState>()(
             const { nodes, filters } = get();
 
             return nodes.filter((node) => {
+                // DISCOVERY OVERRIDE: If the node was explicitly discovered/clicked, it's always visible
+                if (get().discoveredNodeIds.has(node.id)) {
+                    return true;
+                }
+
                 // Filter by node type
                 if (filters.nodeTypes.length > 0 && !filters.nodeTypes.includes(node.type)) {
                     return false;
@@ -454,6 +464,24 @@ export const useGraphStore = create<GraphState>()(
         // Loading
         isGraphLoading: false,
         setGraphLoading: (loading) => set({ isGraphLoading: loading }),
+
+        // Discovery Mode
+        discoveredNodeIds: new Set<string>(),
+        addToDiscovery: (ids) => set((state) => {
+            const newDiscovered = new Set(state.discoveredNodeIds);
+            if (Array.isArray(ids)) {
+                ids.forEach(id => newDiscovered.add(id));
+            } else {
+                newDiscovered.add(ids);
+            }
+            return { discoveredNodeIds: newDiscovered };
+        }),
+        removeFromDiscovery: (id) => set((state) => {
+            const newDiscovered = new Set(state.discoveredNodeIds);
+            newDiscovered.delete(id);
+            return { discoveredNodeIds: newDiscovered };
+        }),
+        clearDiscovery: () => set({ discoveredNodeIds: new Set() }),
 
         // Async Actions
         fetchGraph: async (folderId, fileId) => {

@@ -25,6 +25,7 @@ export function GraphSearch() {
         searchResults,
         setSearchQuery,
         selectNode,
+        addToDiscovery,
     } = useGraphStore();
 
     // Reset selected index when results change
@@ -45,11 +46,12 @@ export function GraphSearch() {
 
     // Handle result selection
     const handleSelect = useCallback((nodeId: string) => {
+        addToDiscovery(nodeId);
         selectNode(nodeId);
         setSearchQuery('');
         setIsFocused(false);
         inputRef.current?.blur();
-    }, [selectNode, setSearchQuery]);
+    }, [selectNode, setSearchQuery, addToDiscovery]);
 
     // Handle keyboard navigation
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
