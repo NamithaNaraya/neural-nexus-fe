@@ -27,7 +27,8 @@ import {
     Users,
     Link2,
 } from 'lucide-react';
-import { docAiApi } from '@/lib/api';
+import api, { docAiApi } from '@/lib/api';
+import { Database } from 'lucide-react';
 import { FileExtractionDetails } from '@/components/shared/FileExtractionDetails';
 
 // Re-exporting from shared component might be cleaner, but for now we just use the shared ones
@@ -107,15 +108,15 @@ export function ReviewInboxPanel({
         setExpandedFileId(prev => prev === fileId ? null : fileId);
     };
 
-    // Approve file
-    const handleApprove = async (fileId: string) => {
+    // Verify & Ingest file
+    const handleVerifyAndIngest = async (fileId: string) => {
         setProcessing(prev => new Set(prev).add(fileId));
         try {
             await docAiApi.files.approveIngestion(fileId);
             setPendingFiles(prev => prev.filter(f => f.id !== fileId));
             onApprove?.(fileId);
         } catch (e) {
-            console.error('Approval failed:', e);
+            console.error('Ingestion failed:', e);
         } finally {
             setProcessing(prev => {
                 const next = new Set(prev);
@@ -125,15 +126,15 @@ export function ReviewInboxPanel({
         }
     };
 
-    // Reject file
-    const handleReject = async (fileId: string) => {
+    // Reject/Discard file
+    const handleDiscard = async (fileId: string) => {
         setProcessing(prev => new Set(prev).add(fileId));
         try {
-            await docAiApi.files.rejectIngestion(fileId);
+            await api.post(`/files/${fileId}/reject`); // Adjust endpoint if needed
             setPendingFiles(prev => prev.filter(f => f.id !== fileId));
             onReject?.(fileId);
         } catch (e) {
-            console.error('Rejection failed:', e);
+            console.error('Discard failed:', e);
         } finally {
             setProcessing(prev => {
                 const next = new Set(prev);
@@ -186,9 +187,9 @@ export function ReviewInboxPanel({
                             <Inbox className="w-5 h-5 text-amber-500" />
                         </div>
                         <div>
-                            <h2 className="font-semibold text-foreground">Review Inbox</h2>
+                            <h2 className="font-semibold text-foreground">Verification Inbox</h2>
                             <p className="text-xs text-muted-foreground">
-                                {filteredFiles.length} file{filteredFiles.length !== 1 ? 's' : ''} awaiting approval
+                                {filteredFiles.length} file{filteredFiles.length !== 1 ? 's' : ''} awaiting ingestion
                             </p>
                         </div>
                     </div>
@@ -254,8 +255,8 @@ export function ReviewInboxPanel({
                                 isExpanded={expandedFileId === file.id}
                                 isProcessing={processing.has(file.id)}
                                 onToggle={() => handleExpand(file.id)}
-                                onApprove={() => handleApprove(file.id)}
-                                onReject={() => handleReject(file.id)}
+                                onApprove={() => handleVerifyAndIngest(file.id)}
+                                onReject={() => handleDiscard(file.id)}
                             />
                         ))}
                     </AnimatePresence>
@@ -267,11 +268,11 @@ export function ReviewInboxPanel({
                 <div className="p-4 border-t border-border bg-muted/30">
                     <div className="flex gap-2">
                         <button
-                            onClick={() => filteredFiles.forEach(f => handleApprove(f.id))}
-                            className="flex-1 py-2 px-4 bg-emerald-500/10 text-emerald-500 rounded-lg text-sm font-medium hover:bg-emerald-500/20 transition-colors flex items-center justify-center gap-2"
+                            onClick={() => filteredFiles.forEach(f => handleVerifyAndIngest(f.id))}
+                            className="flex-1 py-2.5 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-bold shadow-lg shadow-purple-600/20 transition-all flex items-center justify-center gap-2"
                         >
-                            <Check className="w-4 h-4" />
-                            Approve All
+                            <Database className="w-4 h-4" />
+                            Verify & Ingest All
                         </button>
                         <button
                             onClick={fetchPendingFiles}
@@ -363,24 +364,12 @@ function FileReviewCard({
                             {/* Actions */}
                             <div className="flex gap-2">
                                 <button
-                                    onClick={onApprove}
-                                    disabled={isProcessing}
-                                    className="flex-1 py-1.5 px-3 bg-emerald-500/10 text-emerald-500 rounded-lg text-xs font-medium hover:bg-emerald-500/20 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                                >
-                                    {isProcessing ? (
-                                        <Loader2 className="w-3 h-3 animate-spin" />
-                                    ) : (
-                                        <Check className="w-3 h-3" />
-                                    )}
-                                    Approve
-                                </button>
-                                <button
                                     onClick={onReject}
                                     disabled={isProcessing}
-                                    className="flex-1 py-1.5 px-3 bg-red-500/10 text-red-500 rounded-lg text-xs font-medium hover:bg-red-500/20 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                    className="flex-1 py-2 px-3 border border-border text-muted-foreground rounded-lg text-sm font-bold hover:bg-muted transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
-                                    <XCircle className="w-3 h-3" />
-                                    Reject
+                                    <XCircle className="w-4 h-4" />
+                                    Discard This File
                                 </button>
                             </div>
                         </div>

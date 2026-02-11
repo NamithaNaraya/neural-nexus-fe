@@ -164,8 +164,8 @@ export function FileExtractionDetails({
                 <button
                     onClick={() => setActiveTab('entities')}
                     className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${activeTab === 'entities'
-                            ? 'border-primary text-primary'
-                            : 'border-transparent text-muted-foreground hover:text-foreground'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
                         }`}
                 >
                     Entities ({entities?.length || 0})
@@ -173,8 +173,8 @@ export function FileExtractionDetails({
                 <button
                     onClick={() => setActiveTab('relationships')}
                     className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${activeTab === 'relationships'
-                            ? 'border-primary text-primary'
-                            : 'border-transparent text-muted-foreground hover:text-foreground'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
                         }`}
                 >
                     Relationships ({relationships?.length || 0})
@@ -182,8 +182,8 @@ export function FileExtractionDetails({
                 <button
                     onClick={() => setActiveTab('properties')}
                     className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${activeTab === 'properties'
-                            ? 'border-primary text-primary'
-                            : 'border-transparent text-muted-foreground hover:text-foreground'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
                         }`}
                 >
                     Properties
@@ -243,10 +243,7 @@ export function FileExtractionDetails({
                                     <span className="font-medium text-foreground truncate max-w-[150px]" title={rel.target_name}>
                                         {rel.target_name}
                                     </span>
-                                    <span className="ml-auto text-xs text-muted-foreground tabular-nums flex items-center gap-1" title="Confidence Score">
-                                        <span className="hidden sm:inline opacity-70">Score:</span>
-                                        {Math.round(rel.confidence * 100)}%
-                                    </span>
+                                    {/* Confidence score removed */}
                                 </div>
                             ))
                         ) : (
@@ -268,9 +265,7 @@ export function FileExtractionDetails({
                                                 {entity.type}
                                             </span>
                                         </div>
-                                        <span className="text-xs text-muted-foreground">
-                                            {Math.round(entity.confidence * 100)}% Conf.
-                                        </span>
+                                        {/* Confidence score removed */}
                                     </div>
                                     {entity.description ? (
                                         <div className="text-xs text-muted-foreground bg-background p-2 rounded border border-border/50">
@@ -363,7 +358,7 @@ function EntityPreviewRow({ entity, isEditing, onEdit, onSave, onCancel, readOnl
     }
 
     return (
-        <div className="flex items-center justify-between gap-2 p-1.5 bg-muted/30 rounded border border-transparent hover:border-border hover:bg-muted/50 transition-colors group">
+        <div className="flex items-center justify-between gap-2 p-1.5 rounded transition-colors group">
             <div className="flex items-center gap-2 min-w-0 flex-1">
                 <span className={`px-2 py-0.5 rounded text-xs font-medium border ${colorClass}`}>
                     {type}
@@ -371,10 +366,7 @@ function EntityPreviewRow({ entity, isEditing, onEdit, onSave, onCancel, readOnl
                 <span className="text-sm text-foreground truncate" title={name}>{name}</span>
             </div>
             <div className="flex items-center gap-1">
-                <span className="text-sm text-muted-foreground tabular-nums flex items-center gap-1" title="Confidence Score">
-                    <span className="hidden sm:inline opacity-70">Confidence Score:</span>
-                    {(entity.confidence * 100).toFixed(0)}%
-                </span>
+                {/* Confidence score removed */}
                 {!readOnly && (
                     <button
                         onClick={onEdit}

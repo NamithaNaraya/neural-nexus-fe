@@ -30,7 +30,9 @@ import {
     CheckCircle2,
     Clock,
     XCircle,
+    Inbox,
 } from "lucide-react";
+import api from "@/lib/api";
 
 // Types
 interface FolderData {
@@ -46,21 +48,21 @@ interface FolderData {
 interface UploadingFile {
     id: string;
     file: File;
-    status: 'uploading' | 'processing' | 'completed' | 'failed';
+    status: 'uploading' | 'processing' | 'completed' | 'failed' | 'ready_for_review';
     fileId?: string;
     progress: number;
     currentStage: number;
     error?: string;
+    extractionPreview?: any;
+    folder_id?: string;
 }
 
 // Pipeline stages
 const PIPELINE_STAGES = [
     { id: 'upload', label: 'Uploading', icon: FileUp, description: 'Sending file to server' },
-    { id: 'parsing', label: 'Parsing', icon: FileText, description: 'Extracting text content' },
-    { id: 'extraction', label: 'AI Extraction', icon: Brain, description: 'Identifying entities & relationships' },
-    { id: 'storage', label: 'Storing', icon: Database, description: 'Saving to databases' },
-    { id: 'graph', label: 'Graph Building', icon: Network, description: 'Creating knowledge graph' },
-    { id: 'complete', label: 'Complete', icon: Sparkles, description: 'Ready to explore!' },
+    { id: 'parsing', label: 'Parsing', icon: FileText, description: 'Extracting content' },
+    { id: 'extraction', label: 'Extraction', icon: Brain, description: 'AI processing' },
+    { id: 'review', label: 'Verify', icon: Database, description: 'Review & Ingest' },
 ];
 
 // Format relative time
@@ -114,6 +116,12 @@ function LibraryContent() {
     const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Past Text state
+    const [uploadType, setUploadType] = useState<'file' | 'text'>('file');
+    const [pastedText, setPastedText] = useState('');
+    const [pastedFilename, setPastedFilename] = useState('');
+    const [committingFileId, setCommittingFileId] = useState<string | null>(null);
+
     // API hooks
     const { data: folders, isLoading, error, refetch } = useFolders();
     const createFolderMutation = useCreateFolder();
@@ -156,34 +164,61 @@ function LibraryContent() {
             for (const file of processingFiles) {
                 if (!file.fileId) continue;
                 try {
-                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api/v1'}/files/${file.fileId}/status`, {
-                        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-                    });
-                    const data = await res.json();
+                    const data = await api.get(`/files/${file.fileId}/status`) as any;
 
                     setUploadingFiles(prev => prev.map(f => {
                         if (f.id !== file.id) return f;
 
-                        let currentStage = 2;
-                        if (data.status === 'processing') currentStage = 3;
-                        if (data.status === 'ready_for_review') currentStage = 4;
-                        if (data.status === 'completed') currentStage = 5;
+                        let currentStage = f.currentStage;
+                        let status = data.status;
+
+                        // Map backend progress to UI stages (0, 1, 2, 3)
+                        // Backend progress 0-25: Uploading (Stage 0)
+                        // Backend progress 26-50: Parsing (Stage 1)
+                        // Backend progress 51-75: Extraction (Stage 2)
+                        // Status 'ready_for_review': Ingest (Stage 3)
+                        // Status 'completed': Done (Progress 100)
+
+                        if (data.status === 'completed' || (data.progress && data.progress === 100)) {
+                            currentStage = 4; // Beyond stages
+                        } else if (data.status === 'ready_for_review') {
+                            currentStage = 3;
+                        } else if (data.progress && data.progress > 50) {
+                            currentStage = 2;
+                        } else if (data.progress && data.progress > 25) {
+                            currentStage = 1;
+                        } else {
+                            currentStage = 0;
+                        }
+
                         if (data.status === 'failed') {
                             return { ...f, status: 'failed', error: data.error_message || 'Processing failed' };
                         }
 
                         return {
                             ...f,
-                            status: data.status === 'completed' ? 'completed' : 'processing',
+                            status: status as any,
                             currentStage,
-                            progress: (currentStage / 5) * 100,
+                            progress: data.progress || (currentStage / 3) * 100,
                         };
                     }));
+
+                    // If status just became ready_for_review, fetch preview data
+                    if (data.status === 'ready_for_review' && file.status !== 'ready_for_review') {
+                        try {
+                            const preview = await api.get(`/files/${file.fileId}/extraction-preview`);
+                            setUploadingFiles(prev => prev.map(f =>
+                                f.id === file.id ? { ...f, extractionPreview: preview } : f
+                            ));
+                        } catch (err) {
+                            console.error('Failed to fetch preview:', err);
+                        }
+                    }
                 } catch (err) {
                     console.error('Failed to poll file status:', err);
                 }
             }
-        }, 5000);
+        }, 3000);
 
         return () => clearInterval(interval);
     }, [uploadingFiles]);
@@ -296,8 +331,8 @@ function LibraryContent() {
         setOpenMenuId(null);
     };
 
-    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement> | File[]) => {
+        const files = Array.isArray(e) ? e : e.target.files;
         if (!files || !selectedFolder) return;
 
         const newFiles: UploadingFile[] = Array.from(files).map(file => ({
@@ -306,6 +341,7 @@ function LibraryContent() {
             status: 'uploading',
             progress: 0,
             currentStage: 0,
+            folder_id: selectedFolder?.id,
         }));
 
         setUploadingFiles(prev => [...prev, ...newFiles]);
@@ -313,9 +349,9 @@ function LibraryContent() {
         // Upload each file
         for (const uploadFile of newFiles) {
             try {
-                // Stage 1: Uploading
+                // Stage 0: Uploading
                 setUploadingFiles(prev => prev.map(f =>
-                    f.id === uploadFile.id ? { ...f, currentStage: 0, progress: 10 } : f
+                    f.id === uploadFile.id ? { ...f, currentStage: 0, progress: 0 } : f
                 ));
 
                 const result = await uploadFileMutation.mutateAsync({
@@ -323,10 +359,10 @@ function LibraryContent() {
                     file: uploadFile.file
                 });
 
-                // Stage 2: Parsing started
+                // Stage 1: Parsing started
                 setUploadingFiles(prev => prev.map(f =>
                     f.id === uploadFile.id
-                        ? { ...f, status: 'processing', fileId: result.file_id, currentStage: 1, progress: 20 }
+                        ? { ...f, status: 'processing', fileId: result.file_id, currentStage: 1, progress: 33 }
                         : f
                 ));
 
@@ -342,6 +378,64 @@ function LibraryContent() {
         // Reset file input
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
+        }
+    };
+
+    // Handle text ingestion
+    const handleTextIngest = async () => {
+        if (!pastedText.trim() || !pastedFilename.trim() || !selectedFolder) return;
+
+        const textFileId = `text-${Date.now()}`;
+        const newFile: UploadingFile = {
+            id: textFileId,
+            file: new File([pastedText], pastedFilename, { type: 'text/plain' }),
+            status: 'uploading',
+            progress: 0,
+            currentStage: 0,
+            folder_id: selectedFolder.id,
+        };
+
+        setUploadingFiles(prev => [...prev, newFile]);
+        setUploadType('file'); // Switch back to see progress
+        setPastedText('');
+        setPastedFilename('');
+
+        try {
+            const result = await api.post<any>('/upload/text', {
+                filename: pastedFilename,
+                content: pastedText,
+                folder_id: selectedFolder.id
+            });
+
+            const fileId = result.file_id;
+
+            setUploadingFiles(prev => prev.map(f =>
+                f.id === textFileId
+                    ? { ...f, status: 'processing', fileId, currentStage: 1, progress: 33 }
+                    : f
+            ));
+
+        } catch (error: any) {
+            console.error("Text ingestion failed:", error);
+            setUploadingFiles(prev => prev.map(f =>
+                f.id === textFileId ? { ...f, status: 'failed', error: error.detail || 'Failed to ingest text' } : f
+            ));
+        }
+    };
+
+    const handleCommit = async (file: UploadingFile) => {
+        if (!file.fileId) return;
+        setCommittingFileId(file.id);
+        try {
+            await api.post(`/upload/${file.fileId}/approve`);
+            setUploadingFiles(prev => prev.map(f =>
+                f.id === file.id ? { ...f, status: 'completed', currentStage: 4, progress: 100 } : f
+            ));
+            refetch(); // Update library counts
+        } catch (err) {
+            console.error("Failed to commit:", err);
+        } finally {
+            setCommittingFileId(null);
         }
     };
 
@@ -745,30 +839,81 @@ function LibraryContent() {
                     <Modal onClose={() => setShowUploadModal(false)} wide>
                         <div className="flex items-center justify-between mb-6">
                             <div>
-                                <h3 className="text-xl font-semibold text-foreground">Upload to "{selectedFolder.name}"</h3>
-                                <p className="text-sm text-muted-foreground mt-1">Drag & drop files or click to browse</p>
+                                <h3 className="text-xl font-semibold text-foreground">Ingest Knowledge</h3>
+                                <p className="text-sm text-muted-foreground mt-1">Upload files or paste text to extract knowledge</p>
                             </div>
                             <button onClick={() => setShowUploadModal(false)} className="p-1 rounded-lg hover:bg-muted transition-colors">
                                 <X className="w-5 h-5 text-muted-foreground" />
                             </button>
                         </div>
 
-                        {/* Drop Zone */}
-                        <label className="block cursor-pointer">
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                multiple
-                                accept=".pdf,.txt,.docx,.doc,.md,.csv,.xlsx"
-                                onChange={handleFileSelect}
-                                className="hidden"
-                            />
-                            <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-emerald/50 hover:bg-muted/30 transition-all">
-                                <FileUp className="w-12 h-12 text-emerald mx-auto mb-4" />
-                                <p className="text-foreground font-medium mb-1">Click to upload files</p>
-                                <p className="text-sm text-muted-foreground">PDF, TXT, DOCX, MD, CSV, EXCEL supported</p>
+                        {/* Tab Switcher */}
+                        <div className="flex bg-muted/50 p-1 rounded-lg mb-6">
+                            <button
+                                onClick={() => setUploadType('file')}
+                                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${uploadType === 'file' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            >
+                                File Upload
+                            </button>
+                            <button
+                                onClick={() => setUploadType('text')}
+                                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${uploadType === 'text' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            >
+                                Paste Text
+                            </button>
+                        </div>
+
+                        {uploadType === 'file' ? (
+                            <div className="border-2 border-dashed border-border rounded-xl p-8 text-center transition-colors hover:border-emerald/50 group bg-muted/20">
+                                <input
+                                    type="file"
+                                    id="file-upload"
+                                    className="hidden"
+                                    multiple
+                                    accept=".pdf,.txt,.docx,.doc,.md,.csv,.xlsx"
+                                    onChange={(e) => {
+                                        if (e.target.files) handleFileSelect(Array.from(e.target.files));
+                                    }}
+                                />
+                                <label htmlFor="file-upload" className="cursor-pointer">
+                                    <div className="w-12 h-12 bg-emerald/10 text-emerald rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                                        <Upload className="w-6 h-6" />
+                                    </div>
+                                    <p className="text-foreground font-medium">Click to upload or drag and drop</p>
+                                    <p className="text-muted-foreground text-sm mt-1">PDF, CSV, TXT, Excel, Markdown (up to 50MB)</p>
+                                </label>
                             </div>
-                        </label>
+                        ) : (
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1 block">Document Title</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Enter a name for this content..."
+                                        className="w-full px-4 py-3 bg-muted/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald/50 transition-all font-medium"
+                                        value={pastedFilename}
+                                        onChange={(e) => setPastedFilename(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1 block">Content</label>
+                                    <textarea
+                                        placeholder="Paste or type your content here..."
+                                        className="w-full h-48 px-4 py-3 bg-muted/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald/50 transition-all resize-none font-sans"
+                                        value={pastedText}
+                                        onChange={(e) => setPastedText(e.target.value)}
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleTextIngest}
+                                    disabled={!pastedText.trim() || !pastedFilename.trim()}
+                                    className="w-full py-3 bg-emerald hover:bg-emerald-dark text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                                >
+                                    <Brain className="w-4 h-4" />
+                                    <span>Extract Knowledge</span>
+                                </button>
+                            </div>
+                        )}
 
                         {/* Pipeline Stages Legend */}
                         <div className="mt-6 mb-4">
@@ -804,9 +949,8 @@ function LibraryContent() {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                {file.status === 'uploading' && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
-                                                {file.status === 'processing' && <Clock className="w-4 h-4 text-amber-500" />}
                                                 {file.status === 'completed' && <CheckCircle2 className="w-4 h-4 text-emerald" />}
+                                                {file.status === 'ready_for_review' && <Inbox className="w-4 h-4 text-purple-500" />}
                                                 {file.status === 'failed' && <XCircle className="w-4 h-4 text-destructive" />}
                                             </div>
                                         </div>
@@ -844,13 +988,44 @@ function LibraryContent() {
                                             })}
                                         </div>
 
+                                        {/* Inline Extraction Preview */}
+                                        {file.status === 'ready_for_review' && file.extractionPreview && (
+                                            <div className="mt-4 p-4 bg-purple-500/5 border border-purple-500/20 rounded-lg">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <h4 className="text-sm font-semibold text-purple-600 flex items-center gap-2">
+                                                        <Sparkles className="w-4 h-4" />
+                                                        Knowledge Preview
+                                                    </h4>
+                                                    <span className="text-[10px] uppercase tracking-wider font-bold text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded">
+                                                        Awaiting Ingestion
+                                                    </span>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-3 mb-1">
+                                                    <div className="bg-background/50 p-2 rounded border border-purple-500/10 text-center">
+                                                        <p className="text-xl font-bold text-foreground">{file.extractionPreview.summary.total_entities}</p>
+                                                        <p className="text-[10px] text-muted-foreground uppercase">Entities</p>
+                                                    </div>
+                                                    <div className="bg-background/50 p-2 rounded border border-purple-500/10 text-center">
+                                                        <p className="text-xl font-bold text-foreground">{file.extractionPreview.summary.total_relationships}</p>
+                                                        <p className="text-[10px] text-muted-foreground uppercase">Relationships</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* Current Stage Label */}
                                         <p className="text-xs text-muted-foreground mt-2">
                                             {file.status === 'failed'
                                                 ? <span className="text-destructive">{file.error}</span>
                                                 : file.status === 'completed'
-                                                    ? <span className="text-emerald">Ready to explore in the graph!</span>
-                                                    : PIPELINE_STAGES[file.currentStage]?.description
+                                                    ? <span className="text-emerald font-medium flex items-center gap-1">
+                                                        <CheckCircle2 className="w-3 h-3" />
+                                                        Knowledge added to library!
+                                                    </span>
+                                                    : file.status === 'ready_for_review'
+                                                        ? <span className="text-purple-500 font-medium">Ready to be ingested into your database!</span>
+                                                        : PIPELINE_STAGES[file.currentStage]?.description
                                             }
                                         </p>
                                     </div>
@@ -859,17 +1034,34 @@ function LibraryContent() {
                         )}
 
                         {/* Footer */}
-                        <div className="flex gap-3 mt-6">
+                        <div className="flex flex-col sm:flex-row gap-3 mt-6">
                             <button onClick={() => { setShowUploadModal(false); refetch(); }} className="flex-1 px-4 py-3 border border-border rounded-lg text-foreground hover:bg-muted transition-colors">
-                                {uploadingFiles.some(f => f.status === 'completed') ? 'Done' : 'Close'}
+                                {uploadingFiles.some(f => f.status === 'completed' || f.status === 'ready_for_review') ? 'Close' : 'Cancel'}
                             </button>
-                            {uploadingFiles.some(f => f.status === 'completed') && (
+
+                            {uploadingFiles.some(f => f.status === 'ready_for_review') && (
                                 <button
-                                    onClick={() => { setShowUploadModal(false); router.push(`/graph?folder=${selectedFolder.id}`); }}
-                                    className="flex-1 px-4 py-3 bg-emerald hover:bg-emerald-dark text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+                                    onClick={() => {
+                                        setShowUploadModal(false);
+                                        // Find first folder with pending files or use current selection
+                                        const pendingFile = uploadingFiles.find(f => f.status === 'ready_for_review');
+                                        const targetFolderId = pendingFile?.folder_id || selectedFolder?.id;
+                                        router.push(`/folders/${targetFolderId}?tab=review`);
+                                    }}
+                                    className="flex-[2] px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 font-bold shadow-lg shadow-purple-600/20"
                                 >
-                                    <Network className="w-4 h-4" />
-                                    <span>View Graph</span>
+                                    <Inbox className="w-5 h-5" />
+                                    <span>Verify & Ingest ({uploadingFiles.filter(f => f.status === 'ready_for_review').length})</span>
+                                </button>
+                            )}
+
+                            {uploadingFiles.every(f => f.status === 'completed' || f.status === 'failed') && uploadingFiles.some(f => f.status === 'completed') && !uploadingFiles.some(f => f.status === 'ready_for_review') && (
+                                <button
+                                    onClick={() => { setShowUploadModal(false); router.push(`/folders/${selectedFolder?.id}`); }}
+                                    className="flex-[2] px-4 py-3 bg-emerald hover:bg-emerald-dark text-white rounded-lg transition-colors flex items-center justify-center gap-2 font-bold"
+                                >
+                                    <Network className="w-5 h-5" />
+                                    <span>View Ingested Knowledge</span>
                                 </button>
                             )}
                         </div>
@@ -894,7 +1086,7 @@ function Modal({ children, onClose, wide = false }: { children: React.ReactNode;
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className={`bg-card border border-border rounded-xl p-6 w-full ${wide ? 'max-w-2xl' : 'max-w-md'}`}
+                className={`bg-card border border-border rounded-xl p-6 w-full ${wide ? 'max-w-5xl' : 'max-w-md'} max-h-[90vh] overflow-y-auto`}
                 onClick={(e) => e.stopPropagation()}
             >
                 {children}

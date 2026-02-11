@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Header from '@/components/layout/Header';
-import { docAiApi } from '@/lib/api';
+import api, { docAiApi } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Folder,
@@ -18,6 +18,7 @@ import {
     Loader2,
     ChevronDown,
     ChevronRight,
+    Database,
     Users,
     Link2,
     CheckCircle2,
@@ -55,7 +56,19 @@ export default function FolderPage() {
     const [files, setFiles] = useState<FileData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'files' | 'review'>('files');
+
+    // Handle initial tab from URL
+    useEffect(() => {
+        const searchParams = new URLSearchParams(window.location.search);
+        const tab = searchParams.get('tab');
+        if (tab === 'review') {
+            setActiveTab('review');
+        } else if (tab === 'files') {
+            setActiveTab('files');
+        }
+    }, []);
     const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
+    const [committingFileId, setCommittingFileId] = useState<string | null>(null);
 
     // Fetch Folder Data
     useEffect(() => {
@@ -63,7 +76,7 @@ export default function FolderPage() {
             setIsLoading(true);
             try {
                 const [folderData, filesData] = await Promise.all([
-                    docAiApi.folders.get(folderId),
+                    docAiApi.folders.get(folderId) as Promise<FolderData>,
                     docAiApi.folders.getFiles(folderId) as Promise<FileData[]>
                 ]);
                 setFolder(folderData);
@@ -84,6 +97,21 @@ export default function FolderPage() {
 
     const handleOpenGraph = () => {
         router.push(`/graph?folder=${folderId}`);
+    };
+
+    const handleCommit = async (fileId: string) => {
+        setCommittingFileId(fileId);
+        try {
+            await api.post(`/upload/${fileId}/approve`);
+            // Refresh data
+            const filesRes = await api.get(`/folders/${folderId}/files`);
+            setFiles(filesRes as FileData[]);
+        } catch (err) {
+            console.error("Failed to commit:", err);
+            alert("Failed to commit knowledge. Please try again.");
+        } finally {
+            setCommittingFileId(null);
+        }
     };
 
     if (isLoading) {
@@ -151,14 +179,15 @@ export default function FolderPage() {
                     </div>
                 </div>
 
+
                 {/* Tabs */}
                 <div className="border-b border-border mb-6">
                     <div className="flex space-x-8">
                         <button
                             onClick={() => setActiveTab('files')}
                             className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'files'
-                                    ? 'border-primary text-foreground'
-                                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                                ? 'border-primary text-foreground'
+                                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                                 }`}
                         >
                             <List className="w-4 h-4" />
@@ -167,8 +196,8 @@ export default function FolderPage() {
                         <button
                             onClick={() => setActiveTab('review')}
                             className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'review'
-                                    ? 'border-primary text-foreground'
-                                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                                ? 'border-primary text-foreground'
+                                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                                 }`}
                         >
                             <Inbox className="w-4 h-4" />
@@ -177,16 +206,13 @@ export default function FolderPage() {
                     </div>
                 </div>
 
-                {/* Content */}
                 <div className="min-h-[500px]">
                     {activeTab === 'files' ? (
                         <div className="space-y-4">
                             {/* File List Header */}
-                            <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-muted/30 rounded-lg text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                <div className="col-span-4">Filename</div>
+                            <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                <div className="col-span-8">Filename</div>
                                 <div className="col-span-2">Status</div>
-                                <div className="col-span-2">Entities</div>
-                                <div className="col-span-2">Relationships</div>
                                 <div className="col-span-2 text-right">Date</div>
                             </div>
 
@@ -201,18 +227,18 @@ export default function FolderPage() {
                                     files.map((file) => (
                                         <div
                                             key={file.id}
-                                            className="bg-card border border-border rounded-xl overflow-hidden transition-all hover:border-primary/20"
+                                            className="border-b border-border transition-all hover:bg-muted/30"
                                         >
                                             <div
-                                                className="grid grid-cols-12 gap-4 px-4 py-4 items-center cursor-pointer hover:bg-muted/50 transition-colors"
+                                                className="grid grid-cols-12 gap-4 px-4 py-4 items-center cursor-pointer"
                                                 onClick={() => setExpandedFileId(expandedFileId === file.id ? null : file.id)}
                                             >
-                                                <div className="col-span-4 flex items-center gap-3">
-                                                    <div className={`p-2 rounded-lg ${expandedFileId === file.id ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                                                <div className="col-span-8 flex items-center gap-3">
+                                                    <div className={`p-1.5 rounded-lg ${expandedFileId === file.id ? 'bg-primary/10 text-primary' : 'text-muted-foreground'
                                                         }`}>
                                                         <FileText className="w-4 h-4" />
                                                     </div>
-                                                    <span className="font-medium truncate">{file.filename}</span>
+                                                    <span className="font-medium truncate text-sm">{file.filename}</span>
                                                     {expandedFileId === file.id ? (
                                                         <ChevronDown className="w-4 h-4 text-muted-foreground ml-2" />
                                                     ) : (
@@ -222,13 +248,7 @@ export default function FolderPage() {
                                                 <div className="col-span-2">
                                                     <StatusBadge status={file.status} />
                                                 </div>
-                                                <div className="col-span-2 text-sm text-muted-foreground tabular-nums">
-                                                    {file.node_count}
-                                                </div>
-                                                <div className="col-span-2 text-sm text-muted-foreground tabular-nums">
-                                                    {file.relationship_count}
-                                                </div>
-                                                <div className="col-span-2 text-right text-sm text-muted-foreground">
+                                                <div className="col-span-2 text-right text-sm text-muted-foreground font-medium">
                                                     {new Date(file.created_at).toLocaleDateString()}
                                                 </div>
                                             </div>
@@ -246,17 +266,31 @@ export default function FolderPage() {
                                                             <div className="flex items-center justify-between mb-4">
                                                                 <h3 className="font-semibold flex items-center gap-2">
                                                                     <List className="w-4 h-4 text-primary" />
-                                                                    Extracted Data Preview
+                                                                    Extracted Data Information
                                                                 </h3>
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    ID: {file.id}
-                                                                </span>
+                                                                {file.status === 'ready_for_review' && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleCommit(file.id);
+                                                                        }}
+                                                                        disabled={committingFileId === file.id}
+                                                                        className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg flex items-center gap-2 shadow-lg shadow-purple-600/20 transition-all disabled:opacity-50"
+                                                                    >
+                                                                        {committingFileId === file.id ? (
+                                                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                                        ) : (
+                                                                            <Database className="w-3.5 h-3.5" />
+                                                                        )}
+                                                                        Verify & Ingest
+                                                                    </button>
+                                                                )}
                                                             </div>
 
                                                             <FileExtractionDetails
                                                                 fileId={file.id}
-                                                                isEditable={false} // Completed files are read-only
-                                                                className="bg-background rounded-lg border border-border p-4"
+                                                                isEditable={file.status === 'ready_for_review'}
+                                                                className="bg-transparent"
                                                             />
                                                         </div>
                                                     </motion.div>
@@ -275,6 +309,10 @@ export default function FolderPage() {
                                 variant="inline"
                                 folderId={folderId}
                                 className="rounded-xl"
+                                onApprove={() => {
+                                    // Refresh file list if anything approved
+                                    docAiApi.folders.getFiles(folderId).then(data => setFiles(data as FileData[]));
+                                }}
                             />
                         </div>
                     )}
@@ -295,7 +333,15 @@ function StatusBadge({ status }: { status: string }) {
     };
 
     const style = styles[status] || styles.failed;
-    const label = status.replace(/_/g, ' ');
+
+    // Custom labels
+    const labels: Record<string, string> = {
+        ready_for_review: 'Awaiting Ingest',
+        completed: 'Ingested',
+        processing: 'AI Extraction',
+    };
+
+    const label = labels[status] || status.replace(/_/g, ' ');
 
     return (
         <span className={`px-2 py-0.5 rounded-md text-xs font-medium border uppercase tracking-wider ${style}`}>
