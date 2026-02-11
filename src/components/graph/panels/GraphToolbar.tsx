@@ -7,6 +7,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { GraphViewMode } from '../types';
 import {
@@ -28,6 +29,8 @@ import {
     Eye,
     Circle,
     List,
+    ArrowLeft,
+    Plus,
 } from 'lucide-react';
 import { AlgorithmDrawer } from './AlgorithmDrawer';
 import { AnalyticsScopeModal } from '../modals/AnalyticsScopeModal';
@@ -45,6 +48,7 @@ interface GraphToolbarProps {
     onCollapseAll?: () => void;
     onExport?: () => void;
     onStartTour?: () => void;
+    onCreateNode?: () => void;
     showFilters: boolean;
     hasExpandedNodes?: boolean;
     folderId?: string;
@@ -66,6 +70,7 @@ export function GraphToolbar({
     onCollapseAll,
     onExport,
     onStartTour,
+    onCreateNode,
     showFilters,
 
     hasExpandedNodes = false,
@@ -77,6 +82,7 @@ export function GraphToolbar({
     selectedCount = 0,
     isSidebarOpen = false,
 }: GraphToolbarProps) {
+    const router = useRouter();
     const [showAlgorithmDrawer, setShowAlgorithmDrawer] = useState(false);
     const [showScopeModal, setShowScopeModal] = useState(false);
     const [includeNeighbors, setIncludeNeighbors] = useState(false);
@@ -96,8 +102,16 @@ export function GraphToolbar({
     return (
         <>
             <div className="absolute top-6 left-6 right-6 z-40 h-16 px-6 flex items-center glass-strong rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-white/20 transition-all duration-500 hover:shadow-[0_12px_48px_rgba(168,85,247,0.15)] group/toolbar">
-                {/* Left Section: View Modes & Filters */}
-                <div className="flex items-center gap-4">
+                {/* Left Section: Back, View Modes & Filters */}
+                <div className="flex items-center gap-1.5">
+                    <button
+                        onClick={() => router.push('/library')}
+                        className="p-2.5 rounded-full bg-muted/20 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-all border border-white/5 group/back"
+                        title="Back to Library"
+                    >
+                        <ArrowLeft className="w-5 h-5 transition-transform group-hover/back:-translate-x-1" />
+                    </button>
+
                     {/* View Mode Toggle - Horizontal */}
                     <div className="flex items-center gap-1 bg-muted/20 p-1 rounded-full border border-white/5">
                         <ViewModeButton
@@ -149,6 +163,15 @@ export function GraphToolbar({
                 {/* Right Section: Utilities & Stats */}
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
+                        {onCreateNode && (
+                            <ToolbarButton
+                                onClick={onCreateNode}
+                                icon={<Plus className="w-4 h-4" />}
+                                title="Create New Node"
+                                className="text-primary hover:bg-primary/10 border-primary/20"
+                            />
+                        )}
+
                         <ToolbarButton
                             onClick={() => setShowScopeModal(true)}
                             icon={<Zap className="w-4 h-4" />}

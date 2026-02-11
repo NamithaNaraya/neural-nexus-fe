@@ -32,6 +32,7 @@ import {
     XCircle,
     Inbox,
 } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
 import api from "@/lib/api";
 
 // Types
@@ -117,8 +118,9 @@ function LibraryContent() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Past Text state
-    const [uploadType, setUploadType] = useState<'file' | 'text'>('file');
+    const [uploadType, setUploadType] = useState<'file' | 'text' | 'cypher'>('file');
     const [pastedText, setPastedText] = useState('');
+    const [pastedCypher, setPastedCypher] = useState('');
     const [pastedFilename, setPastedFilename] = useState('');
     const [committingFileId, setCommittingFileId] = useState<string | null>(null);
 
@@ -419,6 +421,42 @@ function LibraryContent() {
             console.error("Text ingestion failed:", error);
             setUploadingFiles(prev => prev.map(f =>
                 f.id === textFileId ? { ...f, status: 'failed', error: error.detail || 'Failed to ingest text' } : f
+            ));
+        }
+    };
+
+    const handleCypherIngest = async () => {
+        if (!pastedCypher.trim() || !selectedFolder) return;
+
+        const tempId = Math.random().toString(36).substring(7);
+        const newFile: UploadingFile = {
+            id: tempId,
+            file: new File([], pastedFilename || 'Direct Cypher Ingestion'),
+            status: 'processing',
+            progress: 10,
+            currentStage: 2, // Skip upload/parsing
+            folder_id: selectedFolder.id
+        };
+
+        setUploadingFiles(prev => [...prev, newFile]);
+
+        try {
+            const data = await api.post('/upload/cypher', {
+                query: pastedCypher,
+                folder_id: selectedFolder.id,
+                filename: pastedFilename || 'Direct Cypher Ingestion'
+            }) as any;
+
+            setUploadingFiles(prev => prev.map(f =>
+                f.id === tempId ? { ...f, fileId: data.file_id, status: 'completed', progress: 100, currentStage: 4 } : f
+            ));
+            setPastedCypher('');
+            setPastedFilename('');
+            refetch();
+        } catch (err) {
+            console.error('Cypher ingestion failed:', err);
+            setUploadingFiles(prev => prev.map(f =>
+                f.id === tempId ? { ...f, status: 'failed', error: (err as any).detail || 'Ingestion failed' } : f
             ));
         }
     };
@@ -847,73 +885,140 @@ function LibraryContent() {
                             </button>
                         </div>
 
-                        {/* Tab Switcher */}
-                        <div className="flex bg-muted/50 p-1 rounded-lg mb-6">
+                        {/* Horizontal Tab Switcher */}
+                        <div className="flex bg-muted/50 p-1.5 rounded-xl mb-6">
                             <button
                                 onClick={() => setUploadType('file')}
-                                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${uploadType === 'file' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${uploadType === 'file'
+                                        ? 'bg-background text-foreground shadow-sm ring-1 ring-border/50'
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                                    }`}
                             >
+                                <Upload className="w-4 h-4" />
                                 File Upload
                             </button>
                             <button
                                 onClick={() => setUploadType('text')}
-                                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${uploadType === 'text' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${uploadType === 'text'
+                                        ? 'bg-background text-foreground shadow-sm ring-1 ring-border/50'
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                                    }`}
                             >
+                                <FileText className="w-4 h-4" />
                                 Paste Text
+                            </button>
+                            <button
+                                onClick={() => setUploadType('cypher')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${uploadType === 'cypher'
+                                        ? 'bg-background text-foreground shadow-sm ring-1 ring-border/50'
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                                    }`}
+                            >
+                                <Database className="w-4 h-4" />
+                                Direct Cypher
                             </button>
                         </div>
 
-                        {uploadType === 'file' ? (
-                            <div className="border-2 border-dashed border-border rounded-xl p-8 text-center transition-colors hover:border-emerald/50 group bg-muted/20">
-                                <input
-                                    type="file"
-                                    id="file-upload"
-                                    className="hidden"
-                                    multiple
-                                    accept=".pdf,.txt,.docx,.doc,.md,.csv,.xlsx"
-                                    onChange={(e) => {
-                                        if (e.target.files) handleFileSelect(Array.from(e.target.files));
-                                    }}
-                                />
-                                <label htmlFor="file-upload" className="cursor-pointer">
-                                    <div className="w-12 h-12 bg-emerald/10 text-emerald rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                                        <Upload className="w-6 h-6" />
-                                    </div>
-                                    <p className="text-foreground font-medium">Click to upload or drag and drop</p>
-                                    <p className="text-muted-foreground text-sm mt-1">PDF, CSV, TXT, Excel, Markdown (up to 50MB)</p>
-                                </label>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1 block">Document Title</label>
+                        {/* Content Area with Fixed Height */}
+                        <div className="h-[450px] overflow-y-auto px-1">
+                            {uploadType === 'file' ? (
+                                <div className="border-2 border-dashed border-border rounded-xl p-8 text-center transition-colors hover:border-emerald-500/50 group bg-muted/20 h-full flex flex-col items-center justify-center">
                                     <input
-                                        type="text"
-                                        placeholder="Enter a name for this content..."
-                                        className="w-full px-4 py-3 bg-muted/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald/50 transition-all font-medium"
-                                        value={pastedFilename}
-                                        onChange={(e) => setPastedFilename(e.target.value)}
+                                        type="file"
+                                        id="file-upload"
+                                        className="hidden"
+                                        multiple
+                                        accept=".pdf,.txt,.docx,.doc,.md,.csv,.xlsx"
+                                        onChange={(e) => {
+                                            if (e.target.files) handleFileSelect(Array.from(e.target.files));
+                                        }}
                                     />
+                                    <label htmlFor="file-upload" className="cursor-pointer">
+                                        <div className="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                                            <Upload className="w-8 h-8" />
+                                        </div>
+                                        <p className="text-foreground font-semibold text-lg">Click to upload or drag and drop</p>
+                                        <p className="text-muted-foreground text-sm mt-2">PDF, CSV, TXT, Excel, Markdown (up to 50MB)</p>
+                                    </label>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1 block">Content</label>
-                                    <textarea
-                                        placeholder="Paste or type your content here..."
-                                        className="w-full h-48 px-4 py-3 bg-muted/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald/50 transition-all resize-none font-sans"
-                                        value={pastedText}
-                                        onChange={(e) => setPastedText(e.target.value)}
-                                    />
+                            ) : uploadType === 'text' ? (
+                                <div className="space-y-4 h-full flex flex-col">
+                                    <div>
+                                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Document Title</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Enter a name for this content..."
+                                            className="w-full px-4 py-3 bg-muted/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-medium"
+                                            value={pastedFilename}
+                                            onChange={(e) => setPastedFilename(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex-1 min-h-0 flex flex-col">
+                                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Content</label>
+                                        <textarea
+                                            placeholder="Paste or type your content here..."
+                                            className="w-full flex-1 px-4 py-3 bg-muted/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all resize-none font-sans leading-relaxed"
+                                            value={pastedText}
+                                            onChange={(e) => setPastedText(e.target.value)}
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={handleTextIngest}
+                                        disabled={!pastedText.trim() || !pastedFilename.trim()}
+                                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg shadow-blue-600/20"
+                                    >
+                                        <Brain className="w-4 h-4" />
+                                        <span>Extract Knowledge</span>
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={handleTextIngest}
-                                    disabled={!pastedText.trim() || !pastedFilename.trim()}
-                                    className="w-full py-3 bg-emerald hover:bg-emerald-dark text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                                >
-                                    <Brain className="w-4 h-4" />
-                                    <span>Extract Knowledge</span>
-                                </button>
-                            </div>
-                        )}
+                            ) : uploadType === 'cypher' ? (
+                                <div className="space-y-4 h-full flex flex-col">
+                                    <div>
+                                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Ingestion Name</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Enter a name for this Cypher transaction..."
+                                            className="w-full px-4 py-3 bg-muted/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all font-medium"
+                                            value={pastedFilename}
+                                            onChange={(e) => setPastedFilename(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex-1 min-h-0 flex flex-col relative">
+                                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Cypher Query</label>
+                                        <div className="relative flex-1">
+                                            <textarea
+                                                placeholder="CREATE (n:Entity {id: randomUUID(), name: 'Sample', type: 'Concept', folder_id: $folder_id, file_ids: [$file_id]})"
+                                                className="w-full h-full px-4 py-3 bg-muted/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all resize-none font-mono text-sm leading-relaxed"
+                                                value={pastedCypher}
+                                                onChange={(e) => setPastedCypher(e.target.value)}
+                                            />
+                                            <div className="absolute bottom-3 right-3 flex gap-2">
+                                                <div className="px-2 py-1 bg-background/80 backdrop-blur border border-border rounded text-[10px] text-muted-foreground font-mono">
+                                                    $file_id, $folder_id available
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={handleCypherIngest}
+                                        disabled={!pastedCypher.trim()}
+                                        className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg shadow-amber-600/20"
+                                    >
+                                        <Database className="w-4 h-4" />
+                                        <span>Execute Cypher Ingestion</span>
+                                    </button>
+                                    <div className="p-3 bg-amber-500/10 rounded-lg flex items-start gap-3">
+                                        <Sparkles className="w-4 h-4 text-amber-600 mt-0.5" />
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-medium text-amber-900 dark:text-amber-100">Automated Vectorization</p>
+                                            <p className="text-[10px] text-amber-800/80 dark:text-amber-200/80 leading-snug">
+                                                New nodes created by this query will be automatically detected and sent to the embedding agent for vector generation. FastRP structural embeddings will also be updated.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
 
                         {/* Pipeline Stages Legend */}
                         <div className="mt-6 mb-4">
@@ -1073,27 +1178,6 @@ function LibraryContent() {
 }
 
 // Reusable Modal Component
-function Modal({ children, onClose, wide = false }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) {
-    return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-            onClick={onClose}
-        >
-            <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                className={`bg-card border border-border rounded-xl p-6 w-full ${wide ? 'max-w-5xl' : 'max-w-md'} max-h-[90vh] overflow-y-auto`}
-                onClick={(e) => e.stopPropagation()}
-            >
-                {children}
-            </motion.div>
-        </motion.div>
-    );
-}
 
 export default function LibraryPage() {
     return (

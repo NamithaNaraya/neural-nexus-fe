@@ -26,6 +26,9 @@ import {
     Search,
     Users,
     Link2,
+    Terminal,
+    Code,
+    Sparkles,
 } from 'lucide-react';
 import api, { docAiApi } from '@/lib/api';
 import { Database } from 'lucide-react';
@@ -306,6 +309,41 @@ function FileReviewCard({
     onApprove,
     onReject,
 }: FileReviewCardProps) {
+    const [showCypherConsole, setShowCypherConsole] = useState(false);
+    const [cypherQuery, setCypherQuery] = useState('');
+    const [isExecuting, setIsExecuting] = useState(false);
+    const [executionResult, setExecutionResult] = useState<{ success: boolean; message: string } | null>(null);
+
+    const handleExecuteCypher = async () => {
+        if (!cypherQuery.trim()) return;
+        setIsExecuting(true);
+        setExecutionResult(null);
+
+        try {
+            const data = await api.post('/upload/cypher', {
+                query: cypherQuery,
+                folder_id: file.folder_id,
+                file_id: file.id,
+                filename: file.filename
+            }) as any;
+
+            setExecutionResult({
+                success: true,
+                message: data.message || 'Data appended successfully!'
+            });
+            setCypherQuery('');
+            // Optional: trigger refresh of FileExtractionDetails
+        } catch (err) {
+            console.error('Cypher execution failed:', err);
+            setExecutionResult({
+                success: false,
+                message: (err as any).detail || 'Execution failed'
+            });
+        } finally {
+            setIsExecuting(false);
+        }
+    };
+
     return (
         <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
             {/* Header */}
@@ -360,6 +398,59 @@ function FileReviewCard({
                                 isEditable={true}
                                 className="mb-4"
                             />
+
+                            {/* Cypher Console Toggle */}
+                            <div className="mb-4">
+                                <button
+                                    onClick={() => setShowCypherConsole(!showCypherConsole)}
+                                    className={`flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${showCypherConsole
+                                        ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30'
+                                        : 'bg-muted text-muted-foreground hover:text-foreground'
+                                        }`}
+                                >
+                                    <Terminal className="w-3.5 h-3.5" />
+                                    {showCypherConsole ? 'Close Cypher Console' : 'Append Knowledge via Cypher'}
+                                </button>
+
+                                <AnimatePresence>
+                                    {showCypherConsole && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            className="mt-3 space-y-3 overflow-hidden"
+                                        >
+                                            <div className="relative">
+                                                <textarea
+                                                    value={cypherQuery}
+                                                    onChange={(e) => setCypherQuery(e.target.value)}
+                                                    placeholder="CREATE (n:Entity {id: randomUUID(), name: 'New Concept', type: 'Concept', folder_id: $folder_id, file_ids: [$file_id]})"
+                                                    className="w-full h-32 px-3 py-2 bg-muted/50 border border-border rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-none"
+                                                />
+                                                <div className="absolute bottom-2 right-2 px-2 py-0.5 bg-background/80 backdrop-blur rounded text-[10px] text-muted-foreground border border-border">
+                                                    $file_id, $folder_id available
+                                                </div>
+                                            </div>
+
+                                            {executionResult && (
+                                                <div className={`p-2 rounded flex items-center gap-2 text-[11px] ${executionResult.success ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                                                    {executionResult.success ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                                    {executionResult.message}
+                                                </div>
+                                            )}
+
+                                            <button
+                                                onClick={handleExecuteCypher}
+                                                disabled={isExecuting || !cypherQuery.trim()}
+                                                className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                            >
+                                                {isExecuting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
+                                                Execute & Append
+                                            </button>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
 
                             {/* Actions */}
                             <div className="flex gap-2">

@@ -191,9 +191,11 @@ export const endpoints = {
     // Files
     files: {
         upload: '/upload',
+        uploadText: '/upload/text',
+        uploadCypher: '/upload/cypher',
         list: (folderId: string) => `/folders/${folderId}/files`,
         get: (id: string) => `/files/${id}`,
-        delete: (id: string) => `/deletion/file/${id}`,
+        delete: (id: string) => `/files/${id}`,
         status: (id: string) => `/files/${id}/status`,
         pending: '/files/pending',
         preview: (id: string) => `/files/${id}/extraction-preview`,
@@ -365,6 +367,10 @@ export const docAiApi = {
 
         // Get file status
         getStatus: (fileId: string) => api.get(endpoints.files.status(fileId)),
+
+        // Ingest data via Cypher
+        ingestCypher: (data: { query: string; folder_id: string; filename?: string; file_id?: string }) =>
+            api.post(endpoints.files.uploadCypher, data),
 
         // Delete file
         deleteFile: (fileId: string) => api.delete(endpoints.files.delete(fileId)),

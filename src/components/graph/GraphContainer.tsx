@@ -76,36 +76,13 @@ function GraphLoadingState({ message }: { message: string }) {
 }
 
 // Empty state component
-function GraphEmptyState({ folderId }: { folderId?: string }) {
-    const router = useRouter();
-
+function GraphEmptyState() {
     return (
-        <div className="absolute inset-0 flex items-center justify-center bg-transparent overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-rose-500/5 opacity-50" />
-            <div className="text-center max-w-lg px-8 py-12 glass-strong rounded-[3rem] border border-white/10 shadow-2xl relative z-10">
-                <div className="w-24 h-24 mx-auto mb-8 rounded-3xl bg-gradient-to-br from-primary via-orange-500 to-rose-500 flex items-center justify-center shadow-2xl shadow-primary/20 hover:rotate-6 transition-transform duration-500">
-                    <Zap className="w-10 h-10 text-white" />
-                </div>
-                <h3 className="text-2xl font-black text-foreground mb-4 tracking-tighter uppercase font-heading">Void Detected</h3>
-                <p className="text-sm text-muted-foreground/80 mb-8 font-medium leading-relaxed italic">
-                    The neural pathways are currently dark. Synchronize data streams to begin knowledge extraction.
+        <div className="absolute inset-0 flex items-center justify-center bg-transparent">
+            <div className="text-center">
+                <p className="text-sm text-muted-foreground/60 font-medium tracking-tight">
+                    No graph data found in this scope.
                 </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <button
-                        onClick={() => router.push('/library')}
-                        className="flex items-center justify-center gap-3 px-8 py-4 bg-primary text-white rounded-2xl hover:bg-primary/90 transition-all font-black text-[11px] uppercase tracking-widest shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-1"
-                    >
-                        <Zap className="w-4 h-4" />
-                        Initialize Ingestion
-                    </button>
-                    <button
-                        onClick={() => router.push('/library')}
-                        className="flex items-center justify-center gap-3 px-8 py-4 glass hover:bg-white/10 text-foreground rounded-2xl transition-all font-black text-[11px] uppercase tracking-widest border border-white/10 hover:-translate-y-1"
-                    >
-                        <FolderTree className="w-4 h-4" />
-                        Sync Librarian
-                    </button>
-                </div>
             </div>
         </div>
     );
@@ -393,6 +370,12 @@ export function GraphContainer({
     }, [clearSelection]);
 
     // CRUD Handlers
+    const handleCreateNode = useCallback(() => {
+        setEditingNode(null);
+        setNodeEditorMode('create');
+        setShowNodeEditor(true);
+    }, []);
+
     const handleEditNode = useCallback((nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
         if (node) {
@@ -512,6 +495,7 @@ export function GraphContainer({
                     totalLinkCount={links.length}
                     selectedCount={selectedNodes.length}
                     isSidebarOpen={showNodeDetail}
+                    onCreateNode={handleCreateNode}
                 />
             )}
 
@@ -520,9 +504,7 @@ export function GraphContainer({
                 {isGraphLoading ? (
                     <GraphLoadingState message="Processing neural pathways..." />
                 ) : !hasData ? (
-                    <GraphEmptyState
-                        folderId={folderId}
-                    />
+                    <GraphEmptyState />
                 ) : (
                     <GraphErrorBoundary>
                         <AnimatePresence mode="wait">
@@ -656,6 +638,7 @@ export function GraphContainer({
                         onDelete={() => handleDeleteNode(selectedNodeForDetail.id)}
                         onExpand={handleNodeDoubleClick}
                         onFocus={(id) => zoomToNode?.(id)}
+                        onCreateNode={handleCreateNode}
                         onInitiateAnalysis={(node) => {
                             console.log('Initiating analysis for node:', node.name);
                         }}

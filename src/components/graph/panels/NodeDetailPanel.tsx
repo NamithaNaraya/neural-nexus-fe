@@ -13,7 +13,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { GraphNode, useGraphStore } from '@/store/graphStore';
-import { graphApi } from '@/lib/api/graph';
+import { graphApi, NodeDetails } from '@/lib/api/graph';
 import { NODE_TYPE_COLORS } from '../types';
 import {
     X,
@@ -63,9 +63,10 @@ interface NodeDetailPanelProps {
     onExpand?: (nodeId: string) => void;
     onFocus?: (nodeId: string) => void;
     onInitiateAnalysis?: (node: GraphNode) => void;
+    onCreateNode?: () => void;
 }
 
-export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onFocus, onInitiateAnalysis }: NodeDetailPanelProps) {
+export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onFocus, onInitiateAnalysis, onCreateNode }: NodeDetailPanelProps) {
     const { nodes, links, selectNode, updateNode, zoomToNode, addLink } = useGraphStore();
 
     // Edit state
@@ -83,6 +84,8 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
     const [isCreatingRel, setIsCreatingRel] = useState(false);
     const [availableRelTypes, setAvailableRelTypes] = useState<string[]>([]);
     const [availableNodeTypes, setAvailableNodeTypes] = useState<string[]>([]);
+    const [details, setDetails] = useState<NodeDetails | null>(null);
+    const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
     // Filter nodes for relationship search
     const filteredNodes = useMemo(() => {
@@ -102,6 +105,20 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
         setEditDescription(node.description || '');
         setIsEditing(false);
         setIsRelating(false);
+
+        // Fetch detailed metadata
+        const fetchNodeDetails = async () => {
+            setIsLoadingDetails(true);
+            try {
+                const response = await graphApi.getNodeDetails(node.id);
+                setDetails(response);
+            } catch (error) {
+                console.error('Failed to fetch node details:', error);
+            } finally {
+                setIsLoadingDetails(false);
+            }
+        };
+        fetchNodeDetails();
     }, [node]);
 
     // Fetch dynamic types
@@ -277,12 +294,23 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                             )}
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2.5 rounded-2xl hover:bg-white/10 transition-all duration-300 text-muted-foreground hover:text-foreground border border-transparent hover:border-white/10"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                        {onCreateNode && (
+                            <button
+                                onClick={onCreateNode}
+                                className="px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 transition-all text-primary text-[10px] font-black uppercase tracking-widest border border-primary/20"
+                                title="Create New Node"
+                            >
+                                NEW
+                            </button>
+                        )}
+                        <button
+                            onClick={onClose}
+                            className="p-2.5 rounded-2xl hover:bg-white/10 transition-all duration-300 text-muted-foreground hover:text-foreground border border-transparent hover:border-white/10"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Quick Actions */}
@@ -525,10 +553,25 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                 icon={<Share2 className="w-3 h-3" />}
                             />
                         )}
-                        {node.fileId && (
+                        {(details?.source_files || []).length > 0 && (
+                            <div className="space-y-2 mt-4">
+                                <h5 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-3">
+                                    Source Artifacts
+                                </h5>
+                                {details?.source_files.map((filename, i) => (
+                                    <PropertyRow
+                                        key={i}
+                                        label={`File ${i + 1}`}
+                                        value={filename}
+                                        icon={<FileText className="w-3 h-3 text-primary" />}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                        {!details && node.fileId && (
                             <PropertyRow
                                 label="Source File"
-                                value={node.fileId ? (node.fileId.slice(0, 8) + '...') : 'Unknown'}
+                                value={node.fileId.slice(0, 8) + '...'}
                                 icon={<FileText className="w-3 h-3" />}
                             />
                         )}

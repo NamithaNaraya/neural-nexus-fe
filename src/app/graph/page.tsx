@@ -15,7 +15,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
 import { useGraphStore } from '@/store/graphStore';
-import { useFolderGraph } from '@/hooks/useApi';
+import { useFolderGraph, useFileGraph } from '@/hooks/useApi';
 import { GraphContainer } from '@/components/graph/GraphContainer';
 import { Header } from '@/components/layout/Header';
 import {
@@ -28,12 +28,18 @@ function GraphContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const folderId = searchParams.get('folder');
+    const fileId = searchParams.get('file');
 
     const { isAuthenticated } = useAuthStore();
     const { setGraphData, setGraphLoading, setActiveFolder, clearGraph } = useGraphStore();
 
-    // Fetch graph data
-    const { data: graphData, isLoading, error } = useFolderGraph(folderId || '');
+    // Fetch graph data - use folder or file graph
+    const { data: folderGraph, isLoading: folderLoading, error: folderError } = useFolderGraph(folderId || '');
+    const { data: fileGraph, isLoading: fileLoading, error: fileError } = useFileGraph(fileId || '');
+
+    const graphData = fileId ? fileGraph : folderGraph;
+    const isLoading = fileId ? fileLoading : folderLoading;
+    const error = fileId ? fileError : folderError;
 
     // Auth check
     useEffect(() => {
@@ -168,6 +174,7 @@ function GraphContent() {
     return (
         <GraphContainer
             folderId={folderId}
+            fileId={fileId || undefined}
             initialMode="2d"
             showToolbar
             showSidebar

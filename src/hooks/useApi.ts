@@ -167,6 +167,19 @@ export function useFileStatus(fileId: string) {
     });
 }
 
+export function useDeleteFile() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (fileId: string) => api.delete(endpoints.files.delete(fileId)),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['files'] });
+            // We might also want to invalidate folder stats if the backend updates them
+            queryClient.invalidateQueries({ queryKey: ['folders'] });
+        },
+    });
+}
+
 export function useUploadFile() {
     const queryClient = useQueryClient();
 

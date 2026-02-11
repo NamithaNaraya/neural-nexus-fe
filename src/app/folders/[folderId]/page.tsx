@@ -1,9 +1,12 @@
 'use client';
 
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Header from '@/components/layout/Header';
+import { Header } from "@/components/layout/Header";
+import { FolderSettingsModal } from "@/components/folder/FolderSettingsModal";
 import api, { docAiApi } from '@/lib/api';
+import { useFolders, useFolder, useCreateFolder, useDeleteFolder, useUpdateFolder, useShareFolder, useUploadFile, useFiles, useFileStatus, useDeleteFile } from "@/hooks/useApi";
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Folder,
@@ -22,7 +25,8 @@ import {
     Users,
     Link2,
     CheckCircle2,
-    AlertTriangle
+    AlertTriangle,
+    Plus
 } from 'lucide-react';
 import { ReviewInboxPanel } from '@/components/graph/panels/ReviewInboxPanel';
 import { FileExtractionDetails } from '@/components/shared/FileExtractionDetails';
@@ -54,8 +58,11 @@ export default function FolderPage() {
 
     const [folder, setFolder] = useState<FolderData | null>(null);
     const [files, setFiles] = useState<FileData[]>([]);
+    const { mutate: uploadFile, isPending: isUploading } = useUploadFile();
+    const deleteFileMutation = useDeleteFile();
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'files' | 'review'>('files');
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
 
     // Handle initial tab from URL
     useEffect(() => {
@@ -102,7 +109,7 @@ export default function FolderPage() {
     const handleCommit = async (fileId: string) => {
         setCommittingFileId(fileId);
         try {
-            await api.post(`/upload/${fileId}/approve`);
+            await api.post(`/ upload / ${fileId}/approve`);
             // Refresh data
             const filesRes = await api.get(`/folders/${folderId}/files`);
             setFiles(filesRes as FileData[]);
@@ -165,7 +172,10 @@ export default function FolderPage() {
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <button className="p-2 text-muted-foreground hover:bg-muted rounded-lg transition-colors">
+                            <button
+                                onClick={() => setShowSettingsModal(true)}
+                                className="p-2 text-muted-foreground hover:bg-muted rounded-lg transition-colors"
+                            >
                                 <Settings className="w-5 h-5" />
                             </button>
                             <button
@@ -173,7 +183,7 @@ export default function FolderPage() {
                                 className="px-6 py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 flex items-center gap-2"
                             >
                                 <PlayCircle className="w-5 h-5" />
-                                Open Graph View
+                                Open Full Graph
                             </button>
                         </div>
                     </div>
@@ -211,9 +221,10 @@ export default function FolderPage() {
                         <div className="space-y-4">
                             {/* File List Header */}
                             <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                <div className="col-span-8">Filename</div>
-                                <div className="col-span-2">Status</div>
+                                <div className="col-span-7">Filename</div>
+                                <div className="col-span-1">Status</div>
                                 <div className="col-span-2 text-right">Date</div>
+                                <div className="col-span-2 text-right px-4">Actions</div>
                             </div>
 
                             {/* Files */}
@@ -233,7 +244,7 @@ export default function FolderPage() {
                                                 className="grid grid-cols-12 gap-4 px-4 py-4 items-center cursor-pointer"
                                                 onClick={() => setExpandedFileId(expandedFileId === file.id ? null : file.id)}
                                             >
-                                                <div className="col-span-8 flex items-center gap-3">
+                                                <div className="col-span-7 flex items-center gap-3">
                                                     <div className={`p-1.5 rounded-lg ${expandedFileId === file.id ? 'bg-primary/10 text-primary' : 'text-muted-foreground'
                                                         }`}>
                                                         <FileText className="w-4 h-4" />
@@ -245,11 +256,42 @@ export default function FolderPage() {
                                                         <ChevronRight className="w-4 h-4 text-muted-foreground ml-2 opacity-0 group-hover:opacity-100" />
                                                     )}
                                                 </div>
-                                                <div className="col-span-2">
+                                                <div className="col-span-1">
                                                     <StatusBadge status={file.status} />
                                                 </div>
                                                 <div className="col-span-2 text-right text-sm text-muted-foreground font-medium">
                                                     {new Date(file.created_at).toLocaleDateString()}
+                                                </div>
+                                                <div className="col-span-2 text-right px-2 flex items-center justify-end gap-2">
+                                                    {file.status === 'completed' && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                router.push(`/graph?folder=${folderId}&file=${file.id}`);
+                                                            }}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded-md transition-colors text-xs font-semibold"
+                                                        >
+                                                            <PlayCircle className="w-3.5 h-3.5" />
+                                                            View Graph
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (confirm('Are you sure you want to delete this file?')) {
+                                                                deleteFileMutation.mutate(file.id);
+                                                            }
+                                                        }}
+                                                        disabled={deleteFileMutation.isPending}
+                                                        className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                                                        title="Delete File"
+                                                    >
+                                                        {deleteFileMutation.isPending ? (
+                                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                                        ) : (
+                                                            <Trash2 className="w-4 h-4" />
+                                                        )}
+                                                    </button>
                                                 </div>
                                             </div>
 

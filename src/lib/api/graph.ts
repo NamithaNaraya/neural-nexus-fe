@@ -17,13 +17,12 @@ export interface NodeDetails {
     id: string;
     name: string;
     type: string;
-    description?: string;
-    properties?: Record<string, unknown>;
-    relationships?: Array<{
-        type: string;
-        target: string;
-        targetName: string;
-    }>;
+    description: string;
+    properties: Record<string, unknown>;
+    source_files: string[];
+    created_at: string;
+    created_by: string;
+    connection_count: number;
 }
 
 export const graphApi = {
