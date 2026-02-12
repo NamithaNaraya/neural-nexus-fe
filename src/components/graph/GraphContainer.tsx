@@ -252,15 +252,18 @@ export function GraphContainer({
 
     // Handlers
     const handleNodeDoubleClick = useCallback(async (nodeId: string) => {
-        console.log('Node Isolation Triggered:', nodeId);
-        setIsolatedNode(nodeId);
+        console.log('Progressive Node Expansion:', nodeId);
+
+        // Select the expanded node (highlight it + neighbors)
+        const { selectNodeWithNeighbors } = useGraphStore.getState();
+        selectNodeWithNeighbors(nodeId);
 
         try {
             const data = await expandMutation.mutateAsync({ nodeId });
             console.log('Expansion result:', data);
 
             if (data.nodes && data.nodes.length > 0) {
-                // Prepare nodes and links for atomic store update
+                // Prepare new nodes and links
                 const newNodes: GraphNode[] = data.nodes.map(node => ({
                     id: node.id,
                     name: node.name,
@@ -280,18 +283,22 @@ export function GraphContainer({
 
                 console.log(`Adding ${newNodes.length} nodes and ${newLinks.length} relations to graph`);
 
-                const { addNodesAndLinks, addToDiscovery } = useGraphStore.getState();
+                const { addNodesAndLinks, expandNode, addToDiscovery } = useGraphStore.getState();
                 addNodesAndLinks(newNodes, newLinks);
 
-                // Discovery: Add new neighbors to discovery set so they become visible
+                // Track expansion so we know which nodes were added from this expansion
+                expandNode(nodeId, newNodes.map(n => n.id));
+
+                // Add to discovery set so they stay visible
                 addToDiscovery(newNodes.map(n => n.id));
+                addToDiscovery(nodeId);
             } else {
                 console.warn('Expansion returned no new nodes');
             }
         } catch (err) {
             console.error('Expansion failed:', err);
         }
-    }, [expandMutation, setIsolatedNode]);
+    }, [expandMutation]);
 
     // Unified Click (Left or Right): Show Detail Sidebar
     const handleNodeClick = useCallback((nodeId: string, event?: any) => {
@@ -431,10 +438,17 @@ export function GraphContainer({
 
     const confirmDeleteNode = useCallback(async () => {
         if (!deleteTargetNode) return;
-        // Use the base api client for node deletion
-        await api.delete(`/graph/node/${deleteTargetNode.id}`);
-        const { removeNode } = useGraphStore.getState();
-        removeNode(deleteTargetNode.id);
+        try {
+            await api.delete(`/graph/nodes/${deleteTargetNode.id}`);
+            const { removeNode } = useGraphStore.getState();
+            removeNode(deleteTargetNode.id);
+            setShowDeleteConfirm(false);
+            setDeleteTargetNode(null);
+            setShowNodeDetail(false);
+            setSelectedNodeForDetail(null);
+        } catch (err) {
+            console.error('Delete node failed:', err);
+        }
     }, [deleteTargetNode]);
 
     const toggleImmersive = useCallback(() => {

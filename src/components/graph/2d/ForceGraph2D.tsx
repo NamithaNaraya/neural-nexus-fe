@@ -601,8 +601,8 @@ export function ForceGraph2D({
         const svg = d3.select(svgRef.current);
 
         // Calculate neighborhood for dimming effect
-        // ONLY dim on hover, not on selection (as requested by user)
-        const focusNodeId = hoveredNode;
+        // Dim on BOTH hover AND selection for focus during expansion
+        const focusNodeId = hoveredNode || (selectedNodes.length === 1 ? selectedNodes[0] : null);
         const neighbors = new Set<string>();
 
         // Analytics scope neighbors
@@ -618,12 +618,14 @@ export function ForceGraph2D({
 
         if (focusNodeId) {
             neighbors.add(focusNodeId);
+            // Include all selected nodes as neighbors too
+            selectedNodes.forEach(id => neighbors.add(id));
             d3Links.forEach(link => {
                 const sourceId = typeof link.source === 'string' ? link.source : (link.source as D3Node).id;
                 const targetId = typeof link.target === 'string' ? link.target : (link.target as D3Node).id;
 
-                if (sourceId === focusNodeId) neighbors.add(targetId);
-                if (targetId === focusNodeId) neighbors.add(sourceId);
+                if (sourceId === focusNodeId || selectedNodes.includes(sourceId)) neighbors.add(targetId);
+                if (targetId === focusNodeId || selectedNodes.includes(targetId)) neighbors.add(sourceId);
             });
         }
 
@@ -636,26 +638,26 @@ export function ForceGraph2D({
                 const isFocused = focusNodeId && neighbors.has(d.id);
                 const shouldDim = focusNodeId && !isFocused;
 
-                // Selection Boldness - Deep Black for Analytics, Emerald for Standard
+                // Selection styling
                 const selectionColor = analyticSelectionActive ? '#000000' : '#10B981';
-                const strokeWidth = isSelected ? (analyticSelectionActive ? 4 : 4) : 2;
-                const strokeOpacity = isSelected ? (analyticSelectionActive ? 1 : 0.8) : (isAnalyticNeighbor ? 0.4 : 1);
+                const strokeWidth = isSelected ? 4 : 2;
+                const strokeOpacity = isSelected ? 0.8 : (isAnalyticNeighbor ? 0.4 : 1);
 
                 group.select('.node-circle')
                     .attr('stroke', isSelected ? selectionColor : (isAnalyticNeighbor ? selectionColor : strokeColor))
                     .attr('stroke-width', isSelected ? strokeWidth : (isAnalyticNeighbor ? 5 : 2))
-                    .attr('opacity', shouldDim ? 0.2 : (isSelected && analyticSelectionActive ? 1 : (isSelected ? 1 : 1)))
+                    .attr('opacity', shouldDim ? 0.15 : 1)
                     .attr('stroke-opacity', strokeOpacity)
                     .attr('stroke-dasharray', isAnalyticNeighbor && !isSelected ? '6,3' : 'none');
 
                 group.select('.glow-ring')
-                    .attr('stroke-opacity', isSelected ? (analyticSelectionActive ? 0.2 : 0.8) : (isAnalyticNeighbor ? 0.4 : 0))
+                    .attr('stroke-opacity', isSelected ? (analyticSelectionActive ? 0.2 : 0.6) : (isAnalyticNeighbor ? 0.4 : 0))
                     .attr('stroke', isSelected || isAnalyticNeighbor ? selectionColor : 'none')
                     .attr('r', isSelected ? getNodeSize(d) + 12 : getNodeSize(d) + 8);
 
                 group.select('.node-label')
-                    .attr('opacity', shouldDim ? 0.2 : 1)
-                    .attr('font-weight', isSelected || isAnalyticNeighbor ? '900' : '500')
+                    .attr('opacity', shouldDim ? 0.1 : 1)
+                    .attr('font-weight', isSelected || isAnalyticNeighbor ? '700' : '500')
                     .text((node: any) => (isSelected || isFocused) ? node.name : (node.name.length > 12 ? node.name.slice(0, 12) + '…' : node.name));
             });
 
@@ -665,25 +667,24 @@ export function ForceGraph2D({
                 const sourceId = typeof d.source === 'string' ? d.source : (d.source as D3Node).id;
                 const targetId = typeof d.target === 'string' ? d.target : (d.target as D3Node).id;
 
-                // BLACK CORRELATION: If both ends are selected in analytics mode
                 if (analyticSelectionActive && selectedNodes.includes(sourceId) && selectedNodes.includes(targetId)) {
                     return '#000000';
                 }
-                return '#94a3b8'; // Default slate-400
+                return '#94a3b8';
             })
             .attr('stroke-opacity', d => {
                 const sourceId = typeof d.source === 'string' ? d.source : (d.source as D3Node).id;
                 const targetId = typeof d.target === 'string' ? d.target : (d.target as D3Node).id;
 
-                const isLinkFocused = focusNodeId && (sourceId === focusNodeId || targetId === focusNodeId);
+                const isLinkFocused = focusNodeId && (neighbors.has(sourceId) && neighbors.has(targetId));
                 const isCorrelation = analyticSelectionActive && selectedNodes.includes(sourceId) && selectedNodes.includes(targetId);
 
                 if (isCorrelation) return 1;
-                if (isLinkFocused) return 0.8;
-                if (focusNodeId) return 0.05; // Dim heavily if something else is focused
+                if (isLinkFocused) return 0.6;
+                if (focusNodeId) return 0.04;
 
-                if (selectedNodes.includes(sourceId) || selectedNodes.includes(targetId)) return 0.8;
-                return 0.4;
+                if (selectedNodes.includes(sourceId) || selectedNodes.includes(targetId)) return 0.6;
+                return 0.3;
             })
             .attr('stroke-width', d => {
                 const sourceId = typeof d.source === 'string' ? d.source : (d.source as D3Node).id;
@@ -691,9 +692,18 @@ export function ForceGraph2D({
 
                 const isCorrelation = analyticSelectionActive && selectedNodes.includes(sourceId) && selectedNodes.includes(targetId);
                 if (isCorrelation) return 2.5;
-                if (focusNodeId && (sourceId === focusNodeId || targetId === focusNodeId)) return 3;
-                if (selectedNodes.includes(sourceId) || selectedNodes.includes(targetId)) return 3;
-                return 2;
+                if (focusNodeId && (neighbors.has(sourceId) && neighbors.has(targetId))) return 2.5;
+                if (selectedNodes.includes(sourceId) || selectedNodes.includes(targetId)) return 2.5;
+                return 1.5;
+            });
+
+        // Update link labels - only show for focused connections
+        svg.selectAll<SVGTextElement, D3Link>('.link-label')
+            .attr('opacity', d => {
+                const sourceId = typeof d.source === 'string' ? d.source : (d.source as D3Node).id;
+                const targetId = typeof d.target === 'string' ? d.target : (d.target as D3Node).id;
+                const isLinkFocused = focusNodeId && (neighbors.has(sourceId) && neighbors.has(targetId));
+                return isLinkFocused ? 1 : 0;
             });
 
     }, [selectedNodes, hoveredNode, strokeColor, d3Links, analyticSelectionActive]);
