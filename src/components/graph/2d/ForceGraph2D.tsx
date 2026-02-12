@@ -330,30 +330,31 @@ export function ForceGraph2D({
         defs.append('marker')
             .attr('id', 'arrow-marker')
             .attr('viewBox', '0 -5 10 10')
-            .attr('refX', 25) // Offset from target node
+            .attr('refX', 28) // Further offset for cleaner line termination
             .attr('refY', 0)
-            .attr('markerWidth', 6)
-            .attr('markerHeight', 6)
+            .attr('markerWidth', 8)
+            .attr('markerHeight', 8)
             .attr('orient', 'auto')
             .append('path')
-            .attr('fill', '#ffffff80')
+            .attr('fill', isDark ? '#ffffff30' : '#00000020')
             .attr('d', 'M0,-5L10,0L0,5');
 
-        // Glow filter for nodes
-        const filter = defs.append('filter')
-            .attr('id', 'node-glow')
-            .attr('x', '-100%')
-            .attr('y', '-100%')
-            .attr('width', '300%')
-            .attr('height', '300%');
+        // Glow filter for nodes (Outer)
+        const outerFilter = defs.append('filter')
+            .attr('id', 'node-glow-outer')
+            .attr('x', '-50%')
+            .attr('y', '-50%')
+            .attr('width', '200%')
+            .attr('height', '200%');
 
-        filter.append('feGaussianBlur')
+        outerFilter.append('feGaussianBlur')
             .attr('stdDeviation', '4')
-            .attr('result', 'coloredBlur');
+            .attr('result', 'blur');
 
-        const feMerge = filter.append('feMerge');
-        feMerge.append('feMergeNode').attr('in', 'coloredBlur');
-        feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+        outerFilter.append('feComposite')
+            .attr('in', 'SourceGraphic')
+            .attr('in2', 'blur')
+            .attr('operator', 'over');
 
         // Create link labels group (relationship names)
         const linkLabelsGroup = container.append('g').attr('class', 'link-labels');
@@ -362,15 +363,16 @@ export function ForceGraph2D({
             .join('text')
             .attr('class', 'link-label')
             .attr('text-anchor', 'middle')
-            .attr('fill', isDark ? '#94A3B8' : '#64748B') // Visible on both backgrounds
+            .attr('fill', isDark ? '#94A3B8' : '#64748B')
             .attr('font-size', '10px')
-            .attr('font-weight', '500')
+            .attr('font-weight', '600')
             .attr('pointer-events', 'none')
-            .attr('dy', -6)
+            .attr('dy', -8)
             .attr('paint-order', 'stroke')
-            .attr('stroke', isDark ? '#0A0C10' : '#F8FAFC') // Background color stroke for readability
-            .attr('stroke-width', 3)
-            .text(d => d.type ? (d.type.length > 18 ? d.type.slice(0, 15) + '...' : d.type) : '');
+            .attr('stroke', isDark ? '#0A0C10' : '#F8FAFC')
+            .attr('stroke-width', 4)
+            .attr('opacity', 0)
+            .text(d => d.type ? (d.type.length > 20 ? d.type.slice(0, 17) + '...' : d.type) : '');
 
         // Create node groups
         const nodeGroups = nodesGroup.selectAll<SVGGElement, D3Node>('g')
@@ -381,7 +383,6 @@ export function ForceGraph2D({
             .call(d3.drag<SVGGElement, D3Node>()
                 .clickDistance(5)
                 .on('start', (event, d) => {
-                    // Reheat simulation during drag for smooth movement
                     if (!event.active) simulation.alphaTarget(0.3).restart();
                     d.fx = d.x;
                     d.fy = d.y;
@@ -391,12 +392,9 @@ export function ForceGraph2D({
                     d.fy = event.y;
                 })
                 .on('end', (event, d) => {
-                    // Cool down simulation
                     if (!event.active) simulation.alphaTarget(0);
-                    // Keep node fixed where dragged
                     d.fx = d.x;
                     d.fy = d.y;
-                    // Save position for persistence, including fixed coordinates
                     nodeStateRef.current.set(d.id, {
                         x: d.x!,
                         y: d.y!,
@@ -408,38 +406,49 @@ export function ForceGraph2D({
                 })
             );
 
-        // Add outer glow circle for selected nodes
+        // Add outer aura circle for selected/hovered nodes
         nodeGroups.append('circle')
             .attr('class', 'glow-ring')
-            .attr('r', d => getNodeSize(d) + 8)
+            .attr('r', d => getNodeSize(d) + 12)
             .attr('fill', 'none')
             .attr('stroke', d => getNodeColor(d))
-            .attr('stroke-width', 3)
+            .attr('stroke-width', 2)
             .attr('stroke-opacity', 0)
-            .style('filter', 'url(#node-glow)');
+            .attr('stroke-dasharray', '4,2');
 
-        // Add main circles to nodes
-        nodeGroups.append('circle')
+        // Add main circles to nodes - PREMIUM GLASS LOOK
+        const nodeCircles = nodeGroups.append('circle')
             .attr('class', 'node-circle')
             .attr('r', d => getNodeSize(d))
             .attr('fill', d => getNodeColor(d))
-            .attr('stroke', strokeColor)
+            .attr('stroke', isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)')
             .attr('stroke-width', 2);
 
-        // Add labels to nodes - BELOW the node, not overlapping
+        // Add an inner highlight for that "super" glass effect
+        nodeGroups.append('circle')
+            .attr('class', 'node-inner-glow')
+            .attr('r', d => getNodeSize(d) * 0.7)
+            .attr('fill', 'white')
+            .attr('fill-opacity', 0.15)
+            .attr('pointer-events', 'none');
+
+        // Add labels to nodes - Cleaner typography
         nodeGroups.append('text')
             .attr('class', 'node-label')
-            .attr('dy', d => getNodeSize(d) + 16)
+            .attr('dy', d => getNodeSize(d) + 18)
             .attr('text-anchor', 'middle')
             .attr('fill', textColor)
-            .attr('font-size', '11px')
-            .attr('font-weight', '500')
+            .attr('font-size', '12px')
+            .attr('font-weight', '600')
             .attr('pointer-events', 'none')
+            .attr('paint-order', 'stroke')
+            .attr('stroke', isDark ? '#0A0C10' : '#F8FAFC')
+            .attr('stroke-width', 3)
             .text(d => {
                 const isSelected = selectedNodes.includes(d.id);
                 const isHovered = hoveredNode === d.id;
                 if (isSelected || isHovered) return d.name;
-                return d.name.length > 12 ? d.name.slice(0, 12) + '…' : d.name;
+                return d.name.length > 14 ? d.name.slice(0, 12) + '…' : d.name;
             });
 
         // Event handlers

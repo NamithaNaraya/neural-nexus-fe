@@ -210,6 +210,11 @@ export const useGraphStore = create<GraphState>()(
             nodeTypes: [],
             linkTypes: [],
             layoutComplete: false,
+            discoveredNodeIds: new Set(),
+            expandedNodes: new Set(),
+            expandedChildren: new Map(),
+            targetNode: null,
+            isolatedNodeId: null
         }),
 
         // Selection
@@ -344,23 +349,25 @@ export const useGraphStore = create<GraphState>()(
             }
 
             return nodes.filter((node) => {
-                // DISCOVERY OVERRIDE: If the node was explicitly discovered/clicked, it's always visible
-                if (get().discoveredNodeIds.has(node.id)) {
-                    return true;
-                }
-
+                // HARD FILTERS: Type and File must always match if active
                 // Filter by node type
                 if (filters.nodeTypes.length > 0 && !filters.nodeTypes.includes(node.type)) {
                     return false;
                 }
 
-                // Filter by minimum degree
-                if (filters.minDegree > 0 && (node.degree || 0) < filters.minDegree) {
+                // Filter by file IDs
+                if (filters.fileIds.length > 0 && node.fileId && !filters.fileIds.includes(node.fileId)) {
                     return false;
                 }
 
-                // Filter by file IDs
-                if (filters.fileIds.length > 0 && node.fileId && !filters.fileIds.includes(node.fileId)) {
+                // DISCOVERY OVERRIDE: If the node was explicitly discovered/clicked, it's visible (unless type/file filtered)
+                if (get().discoveredNodeIds.has(node.id)) {
+                    return true;
+                }
+
+                // SOFT FILTERS: Apply to undiscovered nodes
+                // Filter by minimum degree
+                if (filters.minDegree > 0 && (node.degree || 0) < filters.minDegree) {
                     return false;
                 }
 

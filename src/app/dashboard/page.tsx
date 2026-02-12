@@ -99,26 +99,33 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Stats Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {isLoading ? (
                         [1, 2, 3, 4].map((i) => (
-                            <div key={i} className="glass rounded-xl p-4 animate-pulse h-24" />
+                            <div key={i} className="glass rounded-2xl p-6 animate-pulse h-28" />
                         ))
                     ) : (
                         stats.map((stat, index) => (
                             <div
                                 key={stat.label}
-                                className="glass rounded-xl p-4 card-interactive"
+                                className="glass-strong rounded-2xl p-6 card-interactive border border-white/5 bg-gradient-to-br from-white/5 to-transparent shadow-xl"
                                 style={{ animationDelay: `${index * 100}ms` }}
                             >
-                                <div className="text-xs text-muted-foreground uppercase tracking-wider">
+                                <div className="text-[10px] text-muted-foreground/60 uppercase tracking-[0.2em] font-black">
                                     {stat.label}
                                 </div>
-                                <div className="mt-2 flex items-end justify-between">
-                                    <span className="text-2xl font-bold">{stat.value}</span>
-                                    <span className={`text-xs ${stat.trend === 'up' ? 'text-emerald-400' : 'text-red-400'}`}>
-                                        {stat.change}
+                                <div className="mt-3 flex items-baseline justify-between">
+                                    <span className="text-3xl font-black tracking-tight text-foreground drop-shadow-sm">{stat.value}</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${stat.trend === 'up' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                        }`}>
+                                        {stat.trend === 'up' ? '↑' : '↓'} {stat.change}
                                     </span>
+                                </div>
+                                <div className="mt-4 w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full ${stat.trend === 'up' ? 'bg-emerald-500' : 'bg-purple-500'}`}
+                                        style={{ width: '65%', opacity: 0.5 }}
+                                    />
                                 </div>
                             </div>
                         ))
@@ -126,75 +133,86 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Main Content Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Graph Preview */}
-                    <div className="lg:col-span-2 glass rounded-xl p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="font-semibold">Knowledge Graph</h2>
-                            <div className="flex gap-1">
+                    <div className="lg:col-span-2 glass-strong rounded-3xl p-8 border border-white/5 shadow-2xl relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 blur-[100px] -mr-32 -mt-32 rounded-full" />
+
+                        <div className="flex items-center justify-between mb-8 relative z-10">
+                            <div>
+                                <h2 className="text-lg font-black tracking-tight uppercase">Knowledge Universe</h2>
+                                <p className="text-xs text-muted-foreground mt-1">Real-time graph distribution</p>
+                            </div>
+                            <div className="flex gap-1.5 bg-black/20 p-1.5 rounded-xl border border-white/5">
                                 {(['3d', '2d', 'charts'] as const).map((mode) => (
                                     <button
                                         key={mode}
                                         onClick={() => setViewMode(mode)}
                                         className={`
-                                            px-3 py-1 rounded-lg text-xs font-medium transition-colors
+                                            px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all
                                             ${viewMode === mode
-                                                ? 'bg-emerald-500/20 text-emerald-400'
-                                                : 'hover:bg-white/10'
+                                                ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-105'
+                                                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
                                             }
                                         `}
                                     >
-                                        {mode.toUpperCase()}
+                                        {mode}
                                     </button>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Graph Placeholder */}
-                        <div className="relative h-[400px] rounded-lg bg-neural-bg/50 overflow-hidden neural-border">
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                {/* Animated Graph Placeholder */}
-                                <div className="relative">
-                                    {/* Central Node */}
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-electric animate-pulse-neural flex items-center justify-center">
-                                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                                        </svg>
+                        {/* Enhanced Graph Visual */}
+                        <div className="relative h-[450px] rounded-2xl bg-black/20 overflow-hidden border border-white/5 flex items-center justify-center group/workspace">
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.05)_0%,transparent_70%)]" />
+
+                            {/* Neural Orb Visualization */}
+                            <div className="relative flex items-center justify-center">
+                                {/* Orbit Rings */}
+                                <div className="absolute w-64 h-64 rounded-full border border-primary/10 animate-[spin_10s_linear_infinite]" />
+                                <div className="absolute w-96 h-96 rounded-full border border-cyan-500/5 animate-[spin_15s_linear_infinite_reverse]" />
+
+                                {/* Central Core */}
+                                <div className="relative z-10 w-20 h-20 rounded-full bg-gradient-to-tr from-primary to-cyan-400 flex items-center justify-center shadow-[0_0_50px_rgba(168,85,247,0.4)] animate-pulse-neural">
+                                    <div className="w-16 h-16 rounded-full border border-white/20 flex items-center justify-center">
+                                        <div className="w-2 h-2 rounded-full bg-white animate-ping" />
                                     </div>
-
-                                    {/* Orbiting Nodes */}
-                                    {[0, 1, 2, 3, 4, 5].map((i) => (
-                                        <div
-                                            key={i}
-                                            className="absolute w-6 h-6 rounded-full"
-                                            style={{
-                                                background: ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'][i],
-                                                top: `${50 + 80 * Math.sin((i * Math.PI) / 3)}%`,
-                                                left: `${50 + 80 * Math.cos((i * Math.PI) / 3)}%`,
-                                                transform: 'translate(-50%, -50%)',
-                                                animation: `float ${3 + i * 0.5}s ease-in-out infinite`,
-                                                animationDelay: `${i * 0.2}s`,
-                                            }}
-                                        />
-                                    ))}
                                 </div>
 
-                                {/* CTA Overlay */}
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 hover:opacity-100 transition-opacity">
-                                    <button
-                                        onClick={() => router.push('/library')}
-                                        className="btn-neural"
-                                    >
-                                        Open Graph Library
-                                    </button>
-                                </div>
+                                {/* Floating Data Points */}
+                                {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                                    <div
+                                        key={i}
+                                        className="absolute w-3 h-3 rounded-full blur-[1px]"
+                                        style={{
+                                            background: i % 2 === 0 ? '#A855F7' : '#22D3EE',
+                                            top: `${50 + 120 * Math.sin((i * Math.PI) / 4)}%`,
+                                            left: `${50 + 120 * Math.cos((i * Math.PI) / 4)}%`,
+                                            transform: 'translate(-50%, -50%)',
+                                            animation: `float ${4 + i}s ease-in-out infinite`,
+                                            boxShadow: `0 0 15px ${i % 2 === 0 ? '#A855F7' : '#22D3EE'}80`,
+                                        }}
+                                    />
+                                ))}
                             </div>
 
-                            {/* Graph Stats */}
-                            <div className="absolute bottom-4 left-4 right-4 flex justify-between text-xs text-muted-foreground font-mono">
-                                <span>SYSTEM_READY</span>
-                                <span>HYBRID_RAG_ACTIVE</span>
-                                <span>{nodeCount || stats.find(s => s.label === 'Total Nodes')?.value || 0} NODES</span>
+                            {/* CTA Overlay - CLEANER */}
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/workspace:opacity-100 transition-all duration-500 backdrop-blur-sm">
+                                <button
+                                    onClick={() => router.push('/library')}
+                                    className="px-8 py-3 bg-white text-black font-black uppercase tracking-[0.2em] text-xs rounded-full hover:scale-110 active:scale-95 transition-all shadow-2xl"
+                                >
+                                    Explore Graph
+                                </button>
+                            </div>
+
+                            {/* Bottom Labels */}
+                            <div className="absolute bottom-6 left-8 right-8 flex justify-between items-center text-[10px] text-muted-foreground/40 font-black tracking-[0.3em] uppercase">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    Neural Core Active
+                                </div>
+                                <div>v2.0.4 // Cluster Stable</div>
                             </div>
                         </div>
                     </div>

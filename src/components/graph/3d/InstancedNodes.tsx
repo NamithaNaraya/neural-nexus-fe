@@ -244,21 +244,22 @@ export function InstancedNodes({
 
     return (
         <group>
-            {/* Glow layer (rendered behind) */}
+            {/* Glow layer (rendered behind) - More subtle aura */}
             <instancedMesh
                 ref={glowMeshRef}
                 args={[undefined, undefined, nodes.length]}
                 frustumCulled={false}
             >
-                <sphereGeometry args={[1, 8, 8]} />
+                <sphereGeometry args={[1, 12, 12]} />
                 <meshBasicMaterial
                     transparent
-                    opacity={0.15}
+                    opacity={0.12}
                     depthWrite={false}
+                    blending={THREE.AdditiveBlending}
                 />
             </instancedMesh>
 
-            {/* Main nodes */}
+            {/* Main nodes - Classic & Super Physical Material */}
             <instancedMesh
                 ref={meshRef}
                 args={[undefined, undefined, nodes.length]}
@@ -266,11 +267,15 @@ export function InstancedNodes({
                 onClick={handleClick}
                 frustumCulled={false}
             >
-                <sphereGeometry args={[1, 16, 16]} />
-                <meshStandardMaterial
-                    metalness={0.3}
-                    roughness={0.7}
-                    emissiveIntensity={0.2}
+                <sphereGeometry args={[1, 20, 20]} />
+                <meshPhysicalMaterial
+                    metalness={0.6}
+                    roughness={0.2}
+                    clearcoat={1.0}
+                    clearcoatRoughness={0.1}
+                    sheen={1}
+                    sheenRoughness={0.1}
+                    sheenColor={new THREE.Color('#ffffff')}
                 />
             </instancedMesh>
         </group>

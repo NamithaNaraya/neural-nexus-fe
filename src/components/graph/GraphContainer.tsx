@@ -314,14 +314,10 @@ export function GraphContainer({
 
         // AUTO-NEIGHBOR LOGIC: If in analytics mode
         if (analyticSelectionActive) {
-            if (selectedNodes.includes(nodeId)) {
-                // If already selected, deselect it (toggle)
-                selectNode(nodeId, true);
-            } else {
-                // If not selected, select node + neighbors (Chained Expansion)
-                const { selectNodeWithNeighbors } = useGraphStore.getState();
-                selectNodeWithNeighbors(nodeId);
-            }
+            // ALWAYS select node + neighbors (Chained Expansion)
+            // Even if already selected, we want to ensure its neighbors are also included
+            const { selectNodeWithNeighbors } = useGraphStore.getState();
+            selectNodeWithNeighbors(nodeId);
         } else {
             // Default behavior: just toggle this node
             selectNode(nodeId, isMulti);
