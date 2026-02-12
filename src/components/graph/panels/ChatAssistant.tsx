@@ -136,6 +136,41 @@ export function ChatAssistant() {
         }
     };
 
+    // Sync sessions from backend on mount
+    useEffect(() => {
+        const syncSessions = async () => {
+            try {
+                const backendSessions = (await docAiApi.query.listSessions()) as any[];
+                if (backendSessions && backendSessions.length > 0) {
+                    // This could be used to populate a session selector if added later
+                }
+            } catch (error) {
+                console.error('Failed to sync sessions:', error);
+            }
+        };
+        syncSessions();
+    }, []);
+
+    const handleDeleteSession = async () => {
+        if (!currentSessionId) return;
+
+        if (window.confirm('Are you sure you want to delete this conversation permanently?')) {
+            try {
+                await docAiApi.query.deleteSession(currentSessionId);
+                deleteSession(currentSessionId);
+
+                // Create a fresh session if all are gone
+                if (sessions.length <= 1) {
+                    createSession();
+                }
+            } catch (error) {
+                console.error('Failed to delete session:', error);
+                alert('Session removed locally.');
+                deleteSession(currentSessionId);
+            }
+        }
+    };
+
     const focusNode = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
         if (node) {
@@ -144,8 +179,66 @@ export function ChatAssistant() {
         }
     };
 
+    // Helper to render formatted text with simple markdown-like support
+    const FormattedMessage = ({ content }: { content: string }) => {
+        const lines = content.split('\n');
+
+        return (
+            <div className="space-y-4">
+                {lines.map((line, idx) => {
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine) return <div key={idx} className="h-2" />;
+
+                    // Headers: ### Header or **Header** on its own line
+                    if (trimmedLine.startsWith('###') || (trimmedLine.startsWith('**') && trimmedLine.endsWith('**') && trimmedLine.length < 50)) {
+                        const text = trimmedLine.replace(/^###\s*|\*\*/g, '');
+                        return (
+                            <h4 key={idx} className="text-xs font-black uppercase tracking-[0.15em] text-primary/90 mt-6 mb-2 first:mt-0">
+                                {text}
+                            </h4>
+                        );
+                    }
+
+                    // Bullet points: * Item or - Item
+                    if (trimmedLine.startsWith('* ') || trimmedLine.startsWith('- ')) {
+                        const parts = trimmedLine.substring(2).split('**');
+                        return (
+                            <div key={idx} className="flex gap-3 pl-2 group">
+                                <div className="mt-2 w-1.5 h-1.5 rounded-full bg-primary/40 shrink-0 group-hover:scale-125 transition-transform" />
+                                <p className="text-sm leading-relaxed text-foreground/90">
+                                    {parts.map((part, pIdx) => (
+                                        pIdx % 2 === 1 ? <strong key={pIdx} className="text-primary/90 font-bold">{part}</strong> : part
+                                    ))}
+                                </p>
+                            </div>
+                        );
+                    }
+
+                    // "Why:" specifically highlighted
+                    if (trimmedLine.toLowerCase().startsWith('why:') || trimmedLine.includes('*Why:*')) {
+                        return (
+                            <div key={idx} className="bg-primary/5 border-l-2 border-primary/30 p-3 rounded-r-xl my-2 italic text-xs text-muted-foreground/80 leading-relaxed shadow-sm">
+                                {trimmedLine.replace(/\*Why:\*/g, 'Why:')}
+                            </div>
+                        );
+                    }
+
+                    // Standard paragraph
+                    const parts = line.split('**');
+                    return (
+                        <p key={idx} className="text-sm leading-relaxed text-foreground/80">
+                            {parts.map((part, pIdx) => (
+                                pIdx % 2 === 1 ? <strong key={pIdx} className="text-primary font-bold">{part}</strong> : part
+                            ))}
+                        </p>
+                    );
+                })}
+            </div>
+        );
+    };
+
     return (
-        <div className={`fixed bottom-6 right-6 z-[60] flex flex-col items-end pointer-events-none`}>
+        <div className={`fixed ${(!isMinimized && isExpanded) ? 'inset-0' : 'bottom-6 right-6'} z-[60] flex flex-col items-end pointer-events-none transition-all duration-500`}>
             {/* Chat Window */}
             <AnimatePresence>
                 {!isMinimized && (
@@ -153,7 +246,7 @@ export function ChatAssistant() {
                         initial={{ opacity: 0, y: 20, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                        className={`pointer-events-auto bg-card/80 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl overflow-hidden flex flex-col mb-4 transition-all duration-300 ${isExpanded ? 'w-[600px] h-[70vh]' : 'w-96 h-[500px]'
+                        className={`pointer-events-auto bg-card/95 backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col transition-all duration-500 ease-in-out ${isExpanded ? 'w-full h-full rounded-none m-0' : 'w-[450px] h-[600px] rounded-2xl mb-4 border border-white/10'
                             }`}
                     >
                         {/* Header */}
@@ -163,48 +256,34 @@ export function ChatAssistant() {
                                     <Bot size={18} />
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-bold tracking-tight">AI Neural Assistant</h3>
+                                    <h3 className={`font-bold tracking-tight transition-all ${isExpanded ? 'text-lg' : 'text-sm'}`}>AI Neural Assistant</h3>
                                     <div className="flex items-center gap-1">
                                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                        <span className="text-[10px] text-muted-foreground uppercase font-medium">Hybrid RAG Online</span>
+                                        <span className="text-[10px] text-muted-foreground uppercase font-medium tracking-wider">Hybrid RAG Online</span>
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-1">
-                                <button
-                                    onClick={() => setIsExpanded(!isExpanded)}
-                                    className="p-2 hover:bg-white/5 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
-                                >
-                                    {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                                </button>
-                                <button
-                                    onClick={() => setIsMinimized(true)}
-                                    className="p-2 hover:bg-white/5 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
-                                >
-                                    <ChevronDown size={20} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Scope Indicator & Toggle */}
-                        <div className="px-4 py-2 bg-muted/30 border-b border-white/5 flex items-center justify-between">
-                            <div className="flex items-center gap-1.5 overflow-hidden">
-                                <Target size={12} className={useGlobalSearch ? "text-muted-foreground" : "text-primary"} />
-                                <span className="text-[10px] font-bold uppercase tracking-wider truncate">
-                                    {currentScopeLabel}
-                                </span>
-                            </div>
                             <button
-                                type="button"
-                                onClick={() => setUseGlobalSearch(!useGlobalSearch)}
-                                className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-tighter transition-all ${useGlobalSearch
-                                        ? 'bg-zinc-800 text-muted-foreground'
-                                        : 'bg-primary/20 text-primary border border-primary/30'
-                                    }`}
+                                onClick={handleDeleteSession}
+                                className="p-2 hover:bg-red-500/10 rounded-lg transition-colors text-muted-foreground hover:text-red-400 group"
+                                title="Delete Conversation"
                             >
-                                {useGlobalSearch ? "Enable Context" : "Go Global"}
+                                <Trash2 size={16} />
+                            </button>
+                            <button
+                                onClick={() => setIsExpanded(!isExpanded)}
+                                className="p-2 hover:bg-white/5 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                            >
+                                {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                            </button>
+                            <button
+                                onClick={() => setIsMinimized(true)}
+                                className="p-2 hover:bg-white/5 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                            >
+                                <ChevronDown size={20} />
                             </button>
                         </div>
+
 
                         {/* History / Sessions (Collapsible) */}
                         <div className="flex-1 flex overflow-hidden">
@@ -212,7 +291,7 @@ export function ChatAssistant() {
                             <div className="flex-1 flex flex-col min-w-0">
                                 <div
                                     ref={scrollRef}
-                                    className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10"
+                                    className={`flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10 transition-all ${isExpanded ? 'max-w-4xl mx-auto w-full px-8' : ''}`}
                                 >
                                     {currentSession?.messages.length === 0 && (
                                         <div className="h-full flex flex-col items-center justify-center text-center px-6">
@@ -240,11 +319,11 @@ export function ChatAssistant() {
                                                 {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
                                             </div>
                                             <div className={`flex flex-col max-w-[85%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                                <div className={`px-4 py-2.5 rounded-2xl text-sm ${msg.role === 'user'
+                                                <div className={`px-5 py-4 rounded-2xl text-sm shadow-xl ${msg.role === 'user'
                                                     ? 'bg-primary text-primary-foreground rounded-tr-none'
-                                                    : 'bg-muted/50 border border-white/5 rounded-tl-none shadow-sm'
+                                                    : 'bg-card/40 border border-white/5 rounded-tl-none ring-1 ring-white/5'
                                                     }`}>
-                                                    {msg.content}
+                                                    {msg.role === 'user' ? msg.content : <FormattedMessage content={msg.content} />}
                                                 </div>
 
                                                 {/* Citations */}
@@ -284,8 +363,8 @@ export function ChatAssistant() {
                                 </div>
 
                                 {/* Input */}
-                                <div className="p-4 border-t border-white/10 bg-muted/20">
-                                    <form onSubmit={handleSend} className="relative">
+                                <div className={`p-4 border-t border-white/10 bg-muted/20 transition-all ${isExpanded ? 'flex flex-col items-center py-8' : ''}`}>
+                                    <form onSubmit={handleSend} className={`relative transition-all ${isExpanded ? 'max-w-4xl w-full' : 'w-full'}`}>
                                         <input
                                             type="text"
                                             value={input}
@@ -316,10 +395,10 @@ export function ChatAssistant() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setIsMinimized(!isMinimized)}
-                className={`pointer-events-auto w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl transition-all duration-300 relative group ${isMinimized
+                className={`pointer-events-auto w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl transition-all duration-300 relative group ${(!isMinimized && isExpanded) ? 'hidden' : (isMinimized
                     ? 'bg-primary text-primary-foreground rotate-0'
                     : 'bg-card text-foreground rotate-90 border border-white/10'
-                    }`}
+                )}`}
             >
                 {isMinimized ? (
                     <MessageSquare size={24} />

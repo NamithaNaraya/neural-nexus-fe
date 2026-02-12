@@ -435,7 +435,12 @@ export function ForceGraph2D({
             .attr('font-size', '11px')
             .attr('font-weight', '500')
             .attr('pointer-events', 'none')
-            .text(d => d.name.length > 12 ? d.name.slice(0, 12) + '…' : d.name);
+            .text(d => {
+                const isSelected = selectedNodes.includes(d.id);
+                const isHovered = hoveredNode === d.id;
+                if (isSelected || isHovered) return d.name;
+                return d.name.length > 12 ? d.name.slice(0, 12) + '…' : d.name;
+            });
 
         // Event handlers
         nodeGroups
@@ -624,7 +629,7 @@ export function ForceGraph2D({
 
         // Update node styles
         svg.selectAll<SVGGElement, D3Node>('.node-group')
-            .each(function (d) {
+            .each(function (d: any) {
                 const group = d3.select(this);
                 const isSelected = selectedNodes.includes(d.id);
                 const isAnalyticNeighbor = analyticsNeighbors.has(d.id);
@@ -650,7 +655,8 @@ export function ForceGraph2D({
 
                 group.select('.node-label')
                     .attr('opacity', shouldDim ? 0.2 : 1)
-                    .attr('font-weight', isSelected || isAnalyticNeighbor ? '900' : '500');
+                    .attr('font-weight', isSelected || isAnalyticNeighbor ? '900' : '500')
+                    .text((node: any) => (isSelected || isFocused) ? node.name : (node.name.length > 12 ? node.name.slice(0, 12) + '…' : node.name));
             });
 
         // Update link styles

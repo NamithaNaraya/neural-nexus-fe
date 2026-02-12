@@ -223,6 +223,7 @@ export const endpoints = {
         ask: '/query',
         history: (sessionId: string) => `/query/chat/history/${sessionId}`,
         sessions: '/query/chat/sessions',
+        delete: (sessionId: string) => `/query/chat/session/${sessionId}`,
     },
 
     // Analytics
@@ -318,7 +319,10 @@ export const docAiApi = {
             api.get(endpoints.query.history(sessionId), { limit: limit || 20 }),
 
         // List sessions
-        getSessions: () => api.get(endpoints.query.sessions),
+        listSessions: () => api.get(endpoints.query.sessions),
+
+        // Delete session
+        deleteSession: (sessionId: string) => api.delete(endpoints.query.delete(sessionId)),
     },
 
     // Analytics operations

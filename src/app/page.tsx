@@ -29,7 +29,7 @@ export default function HomePage() {
     if (!mounted) return null;
 
     return (
-        <div className="min-h-screen bg-neural-bg flex items-center justify-center">
+        <div className="min-h-screen bg-architect-bg flex items-center justify-center">
             {/* Animated Loading Screen */}
             <motion.div
                 initial={{ opacity: 0 }}
@@ -48,10 +48,10 @@ export default function HomePage() {
                     transition={{ duration: 0.5 }}
                     className="relative z-10"
                 >
-                    <h1 className="text-5xl font-bold text-white mb-4">
+                    <h1 className="text-5xl font-bold text-architect-text mb-4">
                         <span className="text-emerald">Neural</span> Nexus
                     </h1>
-                    <p className="text-neural-muted text-lg mb-8">
+                    <p className="text-architect-muted text-lg mb-8">
                         Knowledge Graph Platform
                     </p>
 
@@ -90,7 +90,7 @@ function NeuralBackground() {
 
     return (
         <svg
-            className="w-full h-full opacity-10"
+            className="w-full h-full opacity-30"
             viewBox="0 0 100 100"
             preserveAspectRatio="none"
         >

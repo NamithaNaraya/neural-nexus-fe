@@ -215,7 +215,7 @@ function Scene(props: SceneProps) {
                             ${isSelected ? 'bg-primary text-white scale-110 shadow-lg shadow-primary/20' : 'bg-black/60 text-white/90'}
                             transition-all duration-300
                         `}>
-                            {node.name}
+                            {isSelected || isHovered ? node.name : (node.name.length > 18 ? node.name.slice(0, 15) + '…' : node.name)}
                         </div>
                     </Html>
                 );
