@@ -118,20 +118,19 @@ function Scene(props: SceneProps) {
         const safeLinks = Array.isArray(links) ? links : [];
         if (safeNodes.length === 0) return [];
 
-        // Hub-based Organic Layout (Optimized for Responsiveness)
+        // Hub-based Organic Layout (Restored for distinctive 3D structure)
         const typeHubs = new Map<string, THREE.Vector3>();
-        const spreadFactor = 350; // More compact for better visibility
+        const spreadFactor = 200; // Keep it compact
 
         const seededRandom = (seed: number) => {
             const x = Math.sin(seed || 0) * 10000;
             return x - Math.floor(x);
         };
 
-        // Efficient single-pass type extraction
         const typesSet = new Set<string>();
         const degreeMap = new Map<string, number>();
 
-        // Pre-calculate degrees and unique types in constant passes
+        // Pre-calculate degrees and unique types
         for (let i = 0; i < safeLinks.length; i++) {
             const l = safeLinks[i];
             if (!l) continue;
@@ -150,23 +149,31 @@ function Scene(props: SceneProps) {
         const typesCount = Math.max(1, types.length);
         types.forEach((type, i) => {
             const angle = (i / typesCount) * Math.PI * 2;
-            const r = spreadFactor * (0.8 + seededRandom(i) * 2.0);
+            const r = spreadFactor * (0.8 + seededRandom(i) * 1.5);
             typeHubs.set(type, new THREE.Vector3(
                 Math.cos(angle) * r,
-                (seededRandom(i + 10) - 0.5) * spreadFactor * 1.5,
+                (seededRandom(i + 10) - 0.5) * spreadFactor,
                 Math.sin(angle) * r
             ));
         });
 
-        // Final mapping with pre-calculated values
+        // Final mapping into distinctive 3D clusters
         return safeNodes.map((node, i) => {
             if (!node || !node.id) return null;
+
+            // PERSISTENCE: preserve coordinates if they exist
+            if (typeof node.x === 'number' && isFinite(node.x) &&
+                typeof node.y === 'number' && isFinite(node.y) &&
+                typeof node.z === 'number' && isFinite(node.z) &&
+                (node.x !== 0 || node.y !== 0 || node.z !== 0)) {
+                return { ...node, degree: degreeMap.get(node.id) || 0 };
+            }
+
             const hub = typeHubs.get(node.type || 'default') || new THREE.Vector3(0, 0, 0);
             const degree = degreeMap.get(node.id) || 0;
-
             const phi = seededRandom(i * 3) * Math.PI * 2;
             const theta = Math.acos(2 * seededRandom(i * 7) - 1);
-            const r = 150 + seededRandom(i * 11) * 300;
+            const r = 60 + seededRandom(i * 11) * 120; // Tighter organic clustering
 
             return {
                 ...node,
@@ -176,7 +183,7 @@ function Scene(props: SceneProps) {
                 degree
             };
         }).filter((n): n is any => n !== null);
-    }, [nodes, links, props.analyticSelectionActive]);
+    }, [nodes, links]); // Reduced dependencies to prevent layout jumps
 
     const nodeMap = useMemo(() => new Map(nodesWithPositions.map(n => [n.id, n])), [nodesWithPositions]);
 
@@ -221,12 +228,14 @@ function Scene(props: SceneProps) {
 
             <OrbitControls
                 makeDefault
+                enabled={orbitEnabled}
                 enableDamping
                 dampingFactor={0.05}
-                minDistance={50}
-                maxDistance={5000}
+                minDistance={10}
+                maxDistance={10000}
                 rotateSpeed={0.8}
                 zoomSpeed={1.5}
+                screenSpacePanning={true}
             />
 
             <RelationshipLinks
@@ -245,6 +254,9 @@ function Scene(props: SceneProps) {
                 onNodeClick={props.onNodeClick}
                 onNodeDoubleClick={props.onNodeDoubleClick}
                 onNodeHover={props.onNodeHover}
+                onNodeContextMenu={props.onNodeContextMenu}
+                onDragStart={() => setOrbitEnabled(false)}
+                onDragEnd={() => setOrbitEnabled(true)}
                 analyticSelectionActive={props.analyticSelectionActive}
                 analyticIncludeNeighbors={props.analyticIncludeNeighbors}
                 nodeGeometry={nodeGeometry}
@@ -280,8 +292,12 @@ function Scene(props: SceneProps) {
                         style={{ pointerEvents: 'none', userSelect: 'none' }}
                     >
                         <div className={`
-                            pointer-events-none px-4 py-1.5 rounded-full border border-white/10 backdrop-blur-xl font-black text-[10px] uppercase tracking-widest whitespace-nowrap
-                            ${isSelected ? 'bg-primary/20 text-white scale-110 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'bg-black/40 text-white/80'}
+                            pointer-events-none px-4 py-1.5 rounded-full border border-white/10 backdrop-blur-xl font-bold text-[11px] uppercase tracking-widest whitespace-nowrap
+                            ${isSelected
+                                ? 'bg-primary/30 text-white scale-110 shadow-[0_0_20px_rgba(168,85,247,0.4)]'
+                                : props.isDark
+                                    ? 'bg-black/60 text-white/90 shadow-lg'
+                                    : 'bg-white/90 text-slate-900 shadow-xl border-slate-200'}
                             transition-all duration-300
                         `}>
                             {isSelected || isHovered ? (node.name || 'Unknown') : ((node.name || '').length > 20 ? node.name.slice(0, 18) + '…' : (node.name || 'Unknown'))}
@@ -378,7 +394,11 @@ export function NeuralSpace3D(props: NeuralSpace3DProps) {
             </Canvas>
             <div className="absolute bottom-4 left-4 z-10 p-3 rounded-lg border border-white/5 bg-background/40 backdrop-blur-xl max-w-xs pointer-events-none">
                 <p className="text-[10px] text-emerald-500 uppercase tracking-widest font-bold mb-1">3D Neural Space</p>
-                <p className="text-[11px] text-foreground/70 leading-relaxed">Zoom to explore. Drag to rotate. <span className="text-white font-medium">Click & Drag nodes to rearrange.</span></p>
+                <p className="text-[11px] text-foreground/70 leading-relaxed uppercase tracking-tighter">
+                    <span className="text-white font-black">L-Click</span> Select •
+                    <span className="text-white font-black"> R-Click</span> Options •
+                    <span className="text-white font-black"> Drag</span> Nodes to Move
+                </p>
             </div>
         </div>
     );

@@ -15,6 +15,7 @@ interface NodesProps {
     onNodeClick: (nodeId: string, event?: any) => void;
     onNodeDoubleClick?: (nodeId: string) => void;
     onNodeHover: (nodeId: string | null) => void;
+    onNodeContextMenu?: (nodeId: string, x: number, y: number) => void;
     nodeGeometry: THREE.BufferGeometry;
     onDragStart?: () => void;
     onDragEnd?: () => void;
@@ -29,6 +30,7 @@ export function InstancedNodes({
     onNodeClick,
     onNodeDoubleClick,
     onNodeHover,
+    onNodeContextMenu,
     nodeGeometry,
     onDragStart,
     onDragEnd,
@@ -37,6 +39,7 @@ export function InstancedNodes({
     links = [],
 }: NodesProps) {
     const meshRef = useRef<THREE.InstancedMesh>(null);
+    const borderRef = useRef<THREE.InstancedMesh>(null);
     const glowRef = useRef<THREE.InstancedMesh>(null);
     const glowOuterRef = useRef<THREE.InstancedMesh>(null);
     const updateNode = useGraphStore(state => state.updateNode);
@@ -72,7 +75,7 @@ export function InstancedNodes({
 
     useFrame((state) => {
         const safeNodes = Array.isArray(nodes) ? nodes : [];
-        if (!meshRef.current || !glowRef.current || !glowOuterRef.current || safeNodes.length === 0) return;
+        if (!meshRef.current || !borderRef.current || !glowRef.current || !glowOuterRef.current || safeNodes.length === 0) return;
 
         const time = state.clock.getElapsedTime();
         const safeSelected = Array.isArray(selectedNodes) ? selectedNodes : [];
@@ -80,6 +83,7 @@ export function InstancedNodes({
 
         // Sync instance counts
         if (meshRef.current.count !== safeNodes.length) meshRef.current.count = safeNodes.length;
+        if (borderRef.current.count !== safeNodes.length) borderRef.current.count = safeNodes.length;
         if (glowRef.current.count !== safeNodes.length) glowRef.current.count = safeNodes.length;
         if (glowOuterRef.current.count !== safeNodes.length) glowOuterRef.current.count = safeNodes.length;
 
@@ -88,15 +92,17 @@ export function InstancedNodes({
             const isSelected = safeSelected.includes(node.id);
             const isHovered = hoveredNode === node.id;
             const isNeighbor = neighbors.has(node.id);
+            const isDragging = draggingNodeId === node.id;
 
             const opacity = hasFocus ? (isNeighbor ? 1.0 : 0.15) : 1.0;
 
-            const baseSize = (node.degree || 0) * 0.6 + 12; // Increased base size
+            const baseSize = (node.degree || 0) * 0.6 + 12;
             let size = baseSize;
             if (isSelected) size *= 1.3;
             else if (isHovered) size *= 1.2;
+            if (isDragging) size *= 1.4; // Grow while dragging
 
-            if (isSelected || isHovered) {
+            if (isSelected || isHovered || isDragging) {
                 size *= (1 + Math.sin(time * 3 + i) * 0.03);
             }
 
@@ -107,8 +113,12 @@ export function InstancedNodes({
             tempObject.position.set(nx, ny, nz);
             tempObject.scale.setScalar(Math.max(0.1, size));
             tempObject.updateMatrix();
-
             meshRef.current!.setMatrixAt(i, tempObject.matrix);
+
+            // Border (Slightly larger than main mesh)
+            tempObject.scale.setScalar(Math.max(0.1, size * 1.08));
+            tempObject.updateMatrix();
+            borderRef.current!.setMatrixAt(i, tempObject.matrix);
 
             // Inner Glow (Slightly larger than node)
             const innerGlowScale = size * (1.3 + Math.sin(time * 2 + i) * 0.05);
@@ -125,7 +135,7 @@ export function InstancedNodes({
             const customNodeTypeColors = useGraphStore.getState().filters.customNodeTypeColors || {};
             const nodeType = node.type || 'default';
             const baseColor = customNodeTypeColors[nodeType] || NODE_TYPE_COLORS[nodeType] || NODE_TYPE_COLORS.default;
-            tempColor.set(baseColor);
+            tempColor.set(isDragging ? '#ffffff' : baseColor);
 
             if (isSelected) tempColor.lerp(new THREE.Color('#ffffff'), 0.4);
             if (opacity < 1) {
@@ -135,6 +145,10 @@ export function InstancedNodes({
 
             meshRef.current!.setColorAt(i, tempColor);
 
+            // Fixed Border Color (Dark neat stroke)
+            const borderColor = new THREE.Color('#000000').lerp(tempColor, 0.2);
+            borderRef.current!.setColorAt(i, borderColor);
+
             // Bright Glow Color - Consistently soft
             const glowColor = tempColor.clone().multiplyScalar(1.5);
             glowRef.current!.setColorAt(i, glowColor);
@@ -142,9 +156,11 @@ export function InstancedNodes({
         });
 
         meshRef.current.instanceMatrix.needsUpdate = true;
+        borderRef.current.instanceMatrix.needsUpdate = true;
         glowRef.current.instanceMatrix.needsUpdate = true;
         glowOuterRef.current.instanceMatrix.needsUpdate = true;
         if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
+        if (borderRef.current.instanceColor) borderRef.current.instanceColor.needsUpdate = true;
         if (glowRef.current.instanceColor) glowRef.current.instanceColor.needsUpdate = true;
         if (glowOuterRef.current.instanceColor) glowOuterRef.current.instanceColor.needsUpdate = true;
     });
@@ -178,11 +194,11 @@ export function InstancedNodes({
             const intersectPoint = new THREE.Vector3();
             e.ray.intersectPlane(plane, intersectPoint);
 
-            if (intersectPoint && isFinite(intersectPoint.x) && isFinite(intersectPoint.y)) {
+            if (intersectPoint && isFinite(intersectPoint.x) && isFinite(intersectPoint.y) && isFinite(intersectPoint.z)) {
                 updateNode(draggingNodeId, {
                     x: intersectPoint.x,
                     y: intersectPoint.y,
-                    z: node.z || 0
+                    z: intersectPoint.z
                 });
             }
         } else if (e.instanceId !== undefined && e.instanceId >= 0 && e.instanceId < safeNodes.length) {
@@ -223,7 +239,16 @@ export function InstancedNodes({
                 />
             </instancedMesh>
 
-            {/* 3. Main Premium Nodes */}
+            {/* 3. Node Border (Crisp neat stroke) */}
+            <instancedMesh
+                ref={borderRef}
+                args={[nodeGeometry, undefined, Array.isArray(nodes) ? nodes.length : 0]}
+                frustumCulled={false}
+            >
+                <meshBasicMaterial color="#000000" />
+            </instancedMesh>
+
+            {/* 4. Main Premium Nodes */}
             <instancedMesh
                 ref={meshRef}
                 args={[nodeGeometry, undefined, Array.isArray(nodes) ? nodes.length : 0]}
@@ -246,6 +271,17 @@ export function InstancedNodes({
                     if (e.instanceId !== undefined && e.instanceId >= 0 && e.instanceId < safeNodes.length) {
                         const node = safeNodes[e.instanceId];
                         if (node && onNodeDoubleClick) onNodeDoubleClick(node.id);
+                    }
+                }}
+                onContextMenu={(e) => {
+                    const safeNodes = Array.isArray(nodes) ? nodes : [];
+                    if (e.instanceId !== undefined && e.instanceId >= 0 && e.instanceId < safeNodes.length) {
+                        e.stopPropagation();
+                        const node = safeNodes[e.instanceId];
+                        if (node && onNodeContextMenu) {
+                            // Extract screen coordinates from the Three.js event
+                            onNodeContextMenu(node.id, e.clientX, e.clientY);
+                        }
                     }
                 }}
                 frustumCulled={false}

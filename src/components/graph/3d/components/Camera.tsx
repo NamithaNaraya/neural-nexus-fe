@@ -43,6 +43,9 @@ export function CameraManager({ targetNodeId, nodeMap, defaultCenter, graphRadiu
 
         if (controls) {
             // @ts-ignore
+            const isUserInteracting = controls.enabled === false || (controls.domElement && (controls.domElement.ownerDocument.activeElement === controls.domElement));
+
+            // @ts-ignore
             if (controls.target) {
                 // @ts-ignore
                 controls.target.lerp(targetVec.current, 0.08);
@@ -52,13 +55,23 @@ export function CameraManager({ targetNodeId, nodeMap, defaultCenter, graphRadiu
             // or on initial load. This prevents fighting with manual rotation.
             if (isFirstLoad.current || targetNodeId !== lastTargetId.current) {
                 // Calculate ideal distance based on graph radius if no node is focused
-                const distance = targetNodeId ? 600 : Math.max(800, (graphRadius || 500) * 2.5);
+                const distance = targetNodeId ? 600 : Math.max(800, (graphRadius || 500) * 1.8);
                 const idealPos = focusPos.clone().add(new THREE.Vector3(0, distance * 0.1, distance));
 
-                camera.position.lerp(idealPos, 0.08);
+                // If user is actively interacting, we stop the auto-focus jump to avoid "fighting"
+                // @ts-ignore
+                const isInteracting = controls.isDragging || controls.enabled === false;
 
-                // Once we are close enough to the target, stop forcing the position
-                if (camera.position.distanceTo(idealPos) < 1) {
+                if (!isInteracting) {
+                    camera.position.lerp(idealPos, 0.08);
+
+                    // Once we are close enough to the target, stop forcing the position
+                    if (camera.position.distanceTo(idealPos) < 5) {
+                        isFirstLoad.current = false;
+                        lastTargetId.current = targetNodeId;
+                    }
+                } else {
+                    // If user interacts during the transition, we concede control
                     isFirstLoad.current = false;
                     lastTargetId.current = targetNodeId;
                 }
