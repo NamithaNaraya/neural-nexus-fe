@@ -64,6 +64,8 @@ export interface FilterConfig {
     searchQuery: string;
     fileIds: string[];
     showOrphans: boolean;
+    customNodeTypeColors: Record<string, string>;
+    customRelationshipColors: Record<string, string>;
 }
 
 // === Store State ===
@@ -160,6 +162,12 @@ interface GraphState {
     analyticIncludeNeighbors: boolean;
     setAnalyticIncludeNeighbors: (include: boolean) => void;
 
+    // Custom Coloring
+    setNodeTypeColor: (type: string, color: string) => void;
+    setRelationshipTypeColor: (type: string, color: string) => void;
+    getNodeColor: (type: string) => string;
+    getRelationshipColor: (type: string) => string;
+
     fetchGraph: (folderId?: string | null, fileId?: string | null) => Promise<void>;
 }
 
@@ -171,6 +179,8 @@ const defaultFilters: FilterConfig = {
     searchQuery: '',
     fileIds: [],
     showOrphans: true,
+    customNodeTypeColors: {},
+    customRelationshipColors: {},
 };
 
 // Default camera position
@@ -547,6 +557,39 @@ export const useGraphStore = create<GraphState>()(
         setAnalyticSelectionActive: (active) => set({ analyticSelectionActive: active }),
         analyticIncludeNeighbors: false,
         setAnalyticIncludeNeighbors: (include) => set({ analyticIncludeNeighbors: include }),
+
+        // Custom Coloring Actions
+        setNodeTypeColor: (type, color) => set((state) => ({
+            filters: {
+                ...state.filters,
+                customNodeTypeColors: {
+                    ...state.filters.customNodeTypeColors,
+                    [type]: color
+                }
+            }
+        })),
+        setRelationshipTypeColor: (type, color) => set((state) => ({
+            filters: {
+                ...state.filters,
+                customRelationshipColors: {
+                    ...state.filters.customRelationshipColors,
+                    [type]: color
+                }
+            }
+        })),
+        getNodeColor: (type) => {
+            const { filters } = get();
+            if (filters.customNodeTypeColors[type]) {
+                return filters.customNodeTypeColors[type];
+            }
+            // Fallback to the dynamic proxy logic (not imported here to avoid cycles, 
+            // but we can import the generator or move it here)
+            return ''; // We'll handle the fallback in the visualizer for now or move the logic here.
+        },
+        getRelationshipColor: (type) => {
+            const { filters } = get();
+            return filters.customRelationshipColors[type] || '';
+        },
 
         // Async Actions
         fetchGraph: async (folderId, fileId) => {

@@ -27,6 +27,8 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
         filters,
         setFilters,
         resetFilters,
+        setNodeTypeColor,
+        setRelationshipTypeColor,
     } = useGraphStore();
     const [nodeSearch, setNodeSearch] = React.useState('');
     const [linkSearch, setLinkSearch] = React.useState('');
@@ -208,7 +210,8 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
                                     label={type}
                                     checked={filters.nodeTypes.length === 0 || filters.nodeTypes.includes(type)}
                                     onChange={() => toggleNodeType(type)}
-                                    color={NODE_TYPE_COLORS[type] || NODE_TYPE_COLORS.default}
+                                    color={filters.customNodeTypeColors[type] || NODE_TYPE_COLORS[type] || NODE_TYPE_COLORS.default}
+                                    onColorChange={(newColor) => setNodeTypeColor(type, newColor)}
                                 />
                             ))
                         ) : (
@@ -259,7 +262,8 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
                                     label={type.replace(/_/g, ' ')}
                                     checked={filters.relationshipTypes.length === 0 || filters.relationshipTypes.includes(type)}
                                     onChange={() => toggleRelationshipType(type)}
-                                    color={RELATIONSHIP_COLORS[type] || RELATIONSHIP_COLORS.default}
+                                    color={filters.customRelationshipColors[type] || RELATIONSHIP_COLORS[type] || RELATIONSHIP_COLORS.default}
+                                    onColorChange={(newColor) => setRelationshipTypeColor(type, newColor)}
                                     icon={<ArrowRight className="w-3 h-3" />}
                                 />
                             ))
@@ -315,56 +319,99 @@ interface FilterCheckboxProps {
     checked: boolean;
     onChange: () => void;
     color: string;
+    onColorChange?: (color: string) => void;
     icon?: React.ReactNode;
 }
 
-function FilterCheckbox({ label, checked, onChange, color, icon }: FilterCheckboxProps) {
+function FilterCheckbox({ label, checked, onChange, color, onColorChange, icon }: FilterCheckboxProps) {
     return (
-        <label className="flex items-center gap-3 cursor-pointer group">
-            <div
-                className={`
-                    w-5 h-5 rounded border-2 flex items-center justify-center transition-all
-                    ${checked
-                        ? 'border-transparent'
-                        : 'border-muted-foreground/30'
-                    }
-                `}
-                style={{
-                    backgroundColor: checked ? color : 'transparent',
-                }}
-            >
-                {checked && (
-                    <svg
-                        className="w-3 h-3 text-white"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={3}
-                            d="M5 13l4 4L19 7"
-                        />
-                    </svg>
-                )}
-            </div>
-            <div className="flex items-center gap-2 flex-1">
-                {icon && (
-                    <span style={{ color }} className="opacity-60">
-                        {icon}
+        <div className="flex items-center gap-3 group py-0.5">
+            {/* The Checkbox/Visibility Toggle Area */}
+            <label className="flex items-center gap-3 cursor-pointer flex-1">
+                <div
+                    className={`
+                        w-5 h-5 rounded border-2 flex items-center justify-center transition-all
+                        ${checked
+                            ? 'shadow-lg'
+                            : 'border-muted-foreground/30 hover:border-muted-foreground/50'
+                        }
+                    `}
+                    style={{
+                        backgroundColor: checked ? color : 'transparent',
+                        borderColor: checked ? color : undefined,
+                        boxShadow: checked ? `0 4px 12px ${color}40` : 'none'
+                    }}
+                    onClick={(e) => {
+                        // Let the label's default behavior handle the checkbox toggle
+                        // We don't need explicit onChange here if it's wrapped in a label with the hidden input
+                    }}
+                >
+                    {checked && (
+                        <svg
+                            className="w-3 h-3 text-white"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={3}
+                                d="M5 13l4 4L19 7"
+                            />
+                        </svg>
+                    )}
+                </div>
+
+                <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={onChange}
+                    className="sr-only"
+                />
+
+                <div className="flex items-center gap-2 flex-1">
+                    {icon && (
+                        <span style={{ color: checked ? color : undefined }} className={`transition-colors ${checked ? 'opacity-100' : 'opacity-40 group-hover:opacity-60'}`}>
+                            {icon}
+                        </span>
+                    )}
+                    <span className={`text-sm transition-colors ${checked ? 'text-foreground font-medium' : 'text-muted-foreground group-hover:text-foreground/80'}`}>
+                        {label}
                     </span>
-                )}
-                <span className="text-sm text-foreground group-hover:text-foreground/80 transition-colors">
-                    {label}
-                </span>
-            </div>
-            <input
-                type="checkbox"
-                checked={checked}
-                onChange={onChange}
-                className="sr-only"
-            />
-        </label>
+                </div>
+            </label>
+
+            {/* Side Options Area */}
+            {checked && (
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    {onColorChange && (
+                        <div className="relative">
+                            <button
+                                title="Customize Color"
+                                className="w-6 h-6 rounded-md hover:bg-muted flex items-center justify-center transition-colors group/btn"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const input = e.currentTarget.nextElementSibling as HTMLInputElement;
+                                    input?.click();
+                                }}
+                            >
+                                <div
+                                    className="w-3 h-3 rounded-full shadow-sm border border-white/20"
+                                    style={{ backgroundColor: color }}
+                                />
+                            </button>
+                            <input
+                                type="color"
+                                value={color ?? '#000000'}
+                                onChange={(e) => onColorChange(e.target.value)}
+                                className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
+                            />
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
     );
 }

@@ -57,44 +57,26 @@ export interface LinkVisualConfig {
     curvature: number;
 }
 
-// Extended Color Palette (30+ distinct colors)
+// Extended Color Palette (Strictly "Super" Neons)
 const COLOR_PALETTE = [
-    '#EF4444', // Red 500
-    '#F97316', // Orange 500
-    '#F59E0B', // Amber 500
-    '#84CC16', // Lime 500
-    '#10B981', // Emerald 500
-    '#06B6D4', // Cyan 500
-    '#3B82F6', // Blue 500
-    '#6366F1', // Indigo 500
-    '#8B5CF6', // Violet 500
-    '#D946EF', // Fuchsia 500
-    '#F43F5E', // Rose 500
-    '#E11D48', // Rose 600
-    '#BE123C', // Rose 700
-    '#C026D3', // Fuchsia 600
-    '#9333EA', // Purple 600
-    '#7E22CE', // Purple 700
-    '#4F46E5', // Indigo 600
-    '#4338CA', // Indigo 700
-    '#2563EB', // Blue 600
-    '#1D4ED8', // Blue 700
-    '#0284C7', // Sky 600
-    '#0369A1', // Sky 700
-    '#0891B2', // Cyan 600
-    '#0E7490', // Cyan 700
-    '#059669', // Emerald 600
-    '#047857', // Emerald 700
-    '#16A34A', // Green 600
-    '#15803D', // Green 700
-    '#65A30D', // Lime 600
-    '#4D7C0F', // Lime 700
-    '#CA8A04', // Yellow 600
-    '#A16207', // Yellow 700
-    '#EA580C', // Orange 600
-    '#C2410C', // Orange 700
-    '#DC2626', // Red 600
-    '#B91C1C', // Red 700
+    '#FF00FF', // Neon Pink (Hot)
+    '#00FFFF', // Cyan Neon (Cold)
+    '#00FF00', // Lime Neon (Electric)
+    '#FFFF00', // Yellow Neon (Cyber)
+    '#AA00FF', // Purple Neon (Deep)
+    '#FF3D00', // Orange Neon (Sunset)
+    '#00E5FF', // Aqua Neon
+    '#76FF03', // Volt Green
+    '#D500F9', // Magenta Pulse
+    '#F50057', // Rose Neon
+    '#651FFF', // Indigo Neon
+    '#C6FF00', // Chartreuse Neon
+    '#FF9100', // Amber Pulse
+    '#00B0FF', // Sky Neon
+    '#00E676', // Spring Green
+    '#FFEA00', // Lemon Neon
+    '#FF4081', // Pink Punch
+    '#304FFE', // Lucid Blue
 ];
 
 // Helper to deterministically map a string to a color index

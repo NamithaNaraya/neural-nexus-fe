@@ -103,6 +103,8 @@ export function ForceGraph2D({
     const simulationRef = useRef<d3.Simulation<D3Node, D3Link> | null>(null);
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
     const [isDark, setIsDark] = useState(false);
+    const customNodeTypeColors = useGraphStore(state => state.filters.customNodeTypeColors);
+    const customRelationshipColors = useGraphStore(state => state.filters.customRelationshipColors);
 
     // Zoom behavior ref to allow programmatic reset
     const zoomRef = useRef<any>(null);
@@ -232,12 +234,14 @@ export function ForceGraph2D({
 
     // Get node color
     const getNodeColor = useCallback((node: D3Node) => {
-        return node.color || NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
+        const customColors = useGraphStore.getState().filters.customNodeTypeColors;
+        return node.color || customColors[node.type] || NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
     }, []);
 
     // Get link color
     const getLinkColor = useCallback((link: D3Link) => {
-        return RELATIONSHIP_COLORS[link.type] || RELATIONSHIP_COLORS.default;
+        const customRelColors = useGraphStore.getState().filters.customRelationshipColors;
+        return customRelColors[link.type] || RELATIONSHIP_COLORS[link.type] || RELATIONSHIP_COLORS.default;
     }, []);
 
     // Handle resize
@@ -599,9 +603,8 @@ export function ForceGraph2D({
             simulation.stop();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        // CRITICAL: Only rebuild graph when DATA changes, NOT when callbacks change
-        // Callbacks are accessed via closure and don't need to trigger rebuilds
-    }, [d3Nodes, d3Links, dimensions, getNodeSize, getNodeColor, getLinkColor, strokeColor, textColor, isDark]);
+        // CRITICAL: Only rebuild graph structure when topology changes
+    }, [d3Nodes, d3Links, dimensions, isDark]);
 
     // Update visual states when selection/hover changes
     useEffect(() => {
@@ -653,16 +656,21 @@ export function ForceGraph2D({
                 const strokeOpacity = isSelected ? 0.8 : (isAnalyticNeighbor ? 0.4 : 1);
 
                 group.select('.node-circle')
+                    .attr('fill', (node: any) => getNodeColor(node as D3Node)) // Update color with explicit cast
                     .attr('stroke', isSelected ? selectionColor : (isAnalyticNeighbor ? selectionColor : strokeColor))
                     .attr('stroke-width', isSelected ? strokeWidth : (isAnalyticNeighbor ? 5 : 2))
                     .attr('opacity', shouldDim ? 0.15 : 1)
                     .attr('stroke-opacity', strokeOpacity)
                     .attr('stroke-dasharray', isAnalyticNeighbor && !isSelected ? '6,3' : 'none');
 
+                group.select('.node-inner-glow')
+                    .attr('opacity', shouldDim ? 0.1 : 1);
+
                 group.select('.glow-ring')
                     .attr('stroke-opacity', isSelected ? (analyticSelectionActive ? 0.2 : 0.6) : (isAnalyticNeighbor ? 0.4 : 0))
                     .attr('stroke', isSelected || isAnalyticNeighbor ? selectionColor : 'none')
-                    .attr('r', isSelected ? getNodeSize(d) + 12 : getNodeSize(d) + 8);
+                    .attr('r', isSelected ? getNodeSize(d) + 12 : getNodeSize(d) + 8)
+                    .attr('opacity', shouldDim ? 0.1 : 1);
 
                 group.select('.node-label')
                     .attr('opacity', shouldDim ? 0.1 : 1)
@@ -679,7 +687,8 @@ export function ForceGraph2D({
                 if (analyticSelectionActive && selectedNodes.includes(sourceId) && selectedNodes.includes(targetId)) {
                     return '#000000';
                 }
-                return '#94a3b8';
+                // Use custom color if available
+                return getLinkColor(d);
             })
             .attr('stroke-opacity', d => {
                 const sourceId = typeof d.source === 'string' ? d.source : (d.source as D3Node).id;
@@ -715,7 +724,7 @@ export function ForceGraph2D({
                 return isLinkFocused ? 1 : 0;
             });
 
-    }, [selectedNodes, hoveredNode, strokeColor, d3Links, analyticSelectionActive]);
+    }, [selectedNodes, hoveredNode, strokeColor, d3Links, analyticSelectionActive, customNodeTypeColors, customRelationshipColors, isDark]);
 
     return (
         <div

@@ -103,7 +103,7 @@ const TYPE_CONFIG: Record<string, { icon: React.ReactNode; gradient: string }> =
 export function GraphLegend() {
     const [isExpanded, setIsExpanded] = useState(true);
     const [isDark, setIsDark] = useState(true);
-    const { nodeTypes, linkTypes } = useGraphStore();
+    const { nodeTypes, linkTypes, filters } = useGraphStore();
 
     // Detect dark mode
     useEffect(() => {
@@ -185,7 +185,7 @@ export function GraphLegend() {
                                     <div className="flex flex-wrap gap-2">
                                         {nodeTypes.slice(0, 6).map((type, index) => {
                                             const config = TYPE_CONFIG[type] || TYPE_CONFIG.default;
-                                            const color = NODE_TYPE_COLORS[type] || NODE_TYPE_COLORS.default;
+                                            const color = filters.customNodeTypeColors[type] || NODE_TYPE_COLORS[type] || NODE_TYPE_COLORS.default;
                                             return (
                                                 <LegendItem
                                                     key={type}
@@ -229,7 +229,7 @@ export function GraphLegend() {
                                             <LinkLegendItem
                                                 key={type}
                                                 label={type.replace(/_/g, ' ')}
-                                                color={RELATIONSHIP_COLORS[type] || RELATIONSHIP_COLORS.default}
+                                                color={filters.customRelationshipColors[type] || RELATIONSHIP_COLORS[type] || RELATIONSHIP_COLORS.default}
                                                 delay={index * 0.04}
                                                 isDark={isDark}
                                             />

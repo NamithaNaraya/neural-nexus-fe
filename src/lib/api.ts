@@ -248,6 +248,12 @@ export const endpoints = {
         check: '/health',
         detailed: '/health/detailed',
     },
+
+    // Reasoning Pipeline
+    reasoning: {
+        consult: '/reasoning/consult',
+        feedback: '/reasoning/feedback',
+    },
 };
 
 // Higher-level API methods
@@ -415,6 +421,22 @@ export const docAiApi = {
         // Remove folder permissions
         removePermissions: (folderId: string, userId: string) =>
             api.delete(`/folders/${folderId}/permissions/${userId}`),
+    },
+
+    // Reasoning operations
+    reasoning: {
+        consult: (data: {
+            message: string;
+            folder_id: string;
+            session_id?: string;
+            user_id?: string;
+        }) => api.post(endpoints.reasoning.consult, data),
+
+        submitFeedback: (data: {
+            encounter_id: string;
+            feedback: string;
+            rating: number;
+        }) => api.post(endpoints.reasoning.feedback, data),
     },
 
     // Dashboard operations

@@ -29,11 +29,11 @@ export function CameraManager({ targetNodeId, nodeMap, defaultCenter, resetKey }
     useFrame((state) => {
         let focusPos: THREE.Vector3;
 
-        if (targetNodeId && nodeMap.has(targetNodeId)) {
+        if (targetNodeId && nodeMap && nodeMap.has(targetNodeId)) {
             const node = nodeMap.get(targetNodeId);
-            focusPos = new THREE.Vector3(node.x, node.y, node.z);
+            focusPos = new THREE.Vector3(node.x || 0, node.y || 0, node.z || 0);
         } else {
-            focusPos = defaultCenter;
+            focusPos = defaultCenter || new THREE.Vector3(0, 0, 0);
         }
 
         // 1. Target Following: Always smoothly move the pivot point to the focused node/center

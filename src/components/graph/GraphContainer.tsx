@@ -22,7 +22,8 @@ import { GraphStats } from './shared/GraphStats';
 import { NodeDetailPanel } from './panels/NodeDetailPanel';
 import { DataCanvas } from '../../visualizations/DataCanvas';
 import { FileScopePanel } from './panels/FileScopePanel';
-import { ChatAssistant } from './panels/ChatAssistant';
+// ReasoningAssistant handles both discovery and reasoning
+import { ReasoningAssistant } from './panels/ReasoningAssistant';
 import { GraphViewMode } from './types';
 import { useNodeExpansion, useShortestPath } from '@/hooks/useApi';
 import { useDevice, useViewModeLock } from '@/hooks/useDevice';
@@ -204,9 +205,28 @@ export function GraphContainer({
     } = useGraphStore();
 
     // Get filtered data
-    // Use useMemo with proper dependencies to ensure updates when data/filters change
-    const visibleNodes = useMemo(() => filteredNodes(), [filteredNodes, nodes, filters]);
-    const visibleLinks = useMemo(() => filteredLinks(), [filteredLinks, links, filters, nodes]); // Links depend on nodes filtering too
+    // 1. Create a stable filtered key for topology-affecting filters
+    const filterTopologyKey = useMemo(() => {
+        return JSON.stringify({
+            nodeTypes: filters.nodeTypes,
+            relationshipTypes: filters.relationshipTypes,
+            fileIds: filters.fileIds,
+            searchQuery: filters.searchQuery,
+            minDegree: filters.minDegree,
+            showOrphans: filters.showOrphans
+        });
+    }, [
+        filters.nodeTypes,
+        filters.relationshipTypes,
+        filters.fileIds,
+        filters.searchQuery,
+        filters.minDegree,
+        filters.showOrphans
+    ]);
+
+    // 2. Memoize visible nodes/links based on topology key
+    const visibleNodes = useMemo(() => filteredNodes(), [filteredNodes, nodes, filterTopologyKey]);
+    const visibleLinks = useMemo(() => filteredLinks(), [filteredLinks, links, filterTopologyKey]);
 
     // Debug Data
     useEffect(() => {
@@ -614,7 +634,7 @@ export function GraphContainer({
             </div>
 
             {/* Floating Tools UI Layer - Unified Left Alignment */}
-            <div className="absolute inset-0 pointer-events-none z-40">
+            <div className="absolute inset-0 pointer-events-none z-[100]">
                 {/* Search Bar */}
                 <div className="absolute top-24 left-6 w-[360px] pointer-events-auto">
                     <GraphSearch />
@@ -724,8 +744,10 @@ export function GraphContainer({
                 itemName={deleteTargetNode?.name}
             />
 
-            {/* AI Assistant Overlay */}
-            <ChatAssistant />
+            {/* Unified AI Assistant Overlay */}
+            <div className="z-[150] pointer-events-none fixed inset-0">
+                <ReasoningAssistant />
+            </div>
         </div>
 
     );
