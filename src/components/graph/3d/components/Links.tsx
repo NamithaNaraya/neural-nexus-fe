@@ -6,8 +6,10 @@ import * as THREE from 'three';
 import { GraphLink } from '@/store/graphStore';
 import { RELATIONSHIP_COLORS } from '../../types';
 
-const PARTICLES_PER_LINK = 4; // Increased for "Super" flow
-const CURVE_SUBDIVISIONS = 64; // Ultra-high smoothness
+const PARTICLES_PER_LINK = 3; // Optimized for performance
+const CURVE_SUBDIVISIONS = 32; // Optimized for responsiveness, still smooth
+const STABLE_CYLINDER_GEOMETRY = new THREE.CylinderGeometry(1, 1, 1, 16); // 16 radial segments is enough for ultra-thin links
+const STABLE_ARROW_GEOMETRY = new THREE.ConeGeometry(2, 6, 12);
 
 interface LinksProps {
     links: GraphLink[];
@@ -31,26 +33,30 @@ export function RelationshipLinks({
     const arrowMeshRef = useRef<THREE.InstancedMesh>(null);
     const pulseMeshRef = useRef<THREE.InstancedMesh>(null);
 
-    const cylinderGeometry = useMemo(() => new THREE.CylinderGeometry(1, 1, 1, 8), []);
-    const arrowGeometry = useMemo(() => new THREE.ConeGeometry(3, 10, 8), []);
+    // Use stable shared geometries
 
     const activeLinksData = useMemo(() => {
-        if (!Array.isArray(links) || !nodeMap) return [];
+        const safeLinks = Array.isArray(links) ? links : [];
+        const safeNodeMap = nodeMap instanceof Map ? nodeMap : new Map();
+        if (safeLinks.length === 0 || safeNodeMap.size === 0) return [];
 
         const safeSelected = Array.isArray(selectedNodes) ? selectedNodes : [];
         const hasFocus = focusNodeId || safeSelected.length > 0;
         const focusIds = focusNodeId ? [focusNodeId] : safeSelected;
 
         const result: any[] = [];
-        links.forEach((link, i) => {
+        safeLinks.forEach((link, i) => {
             if (!link || !link.source || !link.target) return;
 
             const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
             const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
-            const source = nodeMap.get(sourceId);
-            const target = nodeMap.get(targetId);
 
-            if (sourceId && targetId && source && target) {
+            if (!sourceId || !targetId) return;
+
+            const source = safeNodeMap.get(sourceId);
+            const target = safeNodeMap.get(targetId);
+
+            if (source && target) {
                 if (typeof source.x !== 'number' || typeof target.x !== 'number') return;
 
                 const isPartOfFocus = focusIds.includes(sourceId) || focusIds.includes(targetId);
@@ -59,7 +65,7 @@ export function RelationshipLinks({
 
                 const start = new THREE.Vector3(source.x || 0, source.y || 0, source.z || 0);
                 const end = new THREE.Vector3(target.x || 0, target.y || 0, target.z || 0);
-                const dist = start.distanceTo(end);
+                const dist = Math.max(0.1, start.distanceTo(end));
 
                 // Stable organic bend
                 const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
@@ -72,9 +78,11 @@ export function RelationshipLinks({
 
                 // Pre-calculate segments for instanced cylinder placement
                 const segmentData: any[] = [];
-                for (let j = 0; j < points.length - 1; j++) {
+                const safeSubdivisions = Math.max(1, points.length - 1);
+                for (let j = 0; j < safeSubdivisions; j++) {
                     const p1 = points[j];
                     const p2 = points[j + 1];
+                    if (!p1 || !p2) continue;
                     const sMid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
                     const sDist = p1.distanceTo(p2);
                     segmentData.push({ mid: sMid, start: p1, end: p2, dist: sDist });
@@ -91,7 +99,7 @@ export function RelationshipLinks({
                     segmentData,
                     color: baseColor,
                     opacity,
-                    width: isPartOfFocus ? 2.5 : 1.5,
+                    width: isPartOfFocus ? 0.4 : 0.15, // Ultra-thin "neural" aesthetic
                     arrowPos,
                     arrowTangent
                 });
@@ -105,27 +113,31 @@ export function RelationshipLinks({
     const up = useMemo(() => new THREE.Vector3(0, 1, 0), []);
 
     useFrame((state) => {
-        if (!linkMeshRef.current || !activeLinksData.length) return;
+        const safeData = Array.isArray(activeLinksData) ? activeLinksData : [];
+        if (!linkMeshRef.current || safeData.length === 0) return;
+
         const time = state.clock.getElapsedTime();
 
         // Sync instance counts
-        const totalSegments = activeLinksData.length * CURVE_SUBDIVISIONS;
+        const totalSegments = safeData.length * CURVE_SUBDIVISIONS;
         if (linkMeshRef.current.count !== totalSegments) linkMeshRef.current.count = totalSegments;
         if (linkGlowRef.current) linkGlowRef.current.count = totalSegments;
-        if (arrowMeshRef.current) arrowMeshRef.current.count = activeLinksData.length;
+        if (arrowMeshRef.current) arrowMeshRef.current.count = safeData.length;
 
-        activeLinksData.forEach((link, i) => {
+        safeData.forEach((link, i) => {
+            if (!link || !link.color) return;
             const linkColor = new THREE.Color(link.color);
 
             // Render physical segments
-            link.segmentData.forEach((seg: any, j: number) => {
+            const safeSegments = Array.isArray(link.segmentData) ? link.segmentData : [];
+            safeSegments.forEach((seg: any, j: number) => {
                 const idx = i * CURVE_SUBDIVISIONS + j;
-                if (j >= CURVE_SUBDIVISIONS) return;
+                if (j >= CURVE_SUBDIVISIONS || !seg) return;
 
                 tempMatrix.identity();
                 tempMatrix.lookAt(seg.start, seg.end, up);
                 tempMatrix.multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
-                tempMatrix.scale(new THREE.Vector3(link.width, seg.dist, link.width));
+                tempMatrix.scale(new THREE.Vector3(link.width || 0.1, seg.dist || 1, link.width || 0.1));
                 tempMatrix.setPosition(seg.mid);
 
                 linkMeshRef.current!.setMatrixAt(idx, tempMatrix);
@@ -150,14 +162,16 @@ export function RelationshipLinks({
             }
 
             // Pulses
-            for (let j = 0; j < PARTICLES_PER_LINK; j++) {
-                const idx = i * PARTICLES_PER_LINK + j;
-                const progress = (time * 0.4 + j / PARTICLES_PER_LINK) % 1.0;
-                link.curve.getPoint(progress, tempPos);
-                const scale = 1.0 * link.opacity;
-                tempMatrix.makeScale(scale, scale, scale);
-                tempMatrix.setPosition(tempPos);
-                pulseMeshRef.current!.setMatrixAt(idx, tempMatrix);
+            if (pulseMeshRef.current && link.curve) {
+                for (let j = 0; j < PARTICLES_PER_LINK; j++) {
+                    const idx = i * PARTICLES_PER_LINK + j;
+                    const progress = (time * 0.4 + j / PARTICLES_PER_LINK) % 1.0;
+                    link.curve.getPoint(progress, tempPos);
+                    const scale = 1.0 * (link.opacity || 0.8);
+                    tempMatrix.makeScale(scale, scale, scale);
+                    tempMatrix.setPosition(tempPos);
+                    pulseMeshRef.current.setMatrixAt(idx, tempMatrix);
+                }
             }
         });
 
@@ -165,26 +179,28 @@ export function RelationshipLinks({
         if (linkMeshRef.current.instanceColor) linkMeshRef.current.instanceColor.needsUpdate = true;
         if (linkGlowRef.current) {
             linkGlowRef.current.instanceMatrix.needsUpdate = true;
-            linkGlowRef.current.instanceColor!.needsUpdate = true;
+            if (linkGlowRef.current.instanceColor) linkGlowRef.current.instanceColor.needsUpdate = true;
         }
         if (arrowMeshRef.current) {
             arrowMeshRef.current.instanceMatrix.needsUpdate = true;
-            arrowMeshRef.current.instanceColor!.needsUpdate = true;
+            if (arrowMeshRef.current.instanceColor) arrowMeshRef.current.instanceColor.needsUpdate = true;
         }
-        pulseMeshRef.current!.instanceMatrix.needsUpdate = true;
+        if (pulseMeshRef.current) pulseMeshRef.current.instanceMatrix.needsUpdate = true;
     });
+
+    if (!pulseGeometry) return null;
 
     return (
         <group>
             {/* 1. Main Physical Ribbon Links */}
             <instancedMesh
                 ref={linkMeshRef}
-                args={[cylinderGeometry, undefined, activeLinksData.length * CURVE_SUBDIVISIONS]}
+                args={[STABLE_CYLINDER_GEOMETRY, undefined, (Array.isArray(activeLinksData) ? activeLinksData.length : 0) * CURVE_SUBDIVISIONS]}
             >
                 <meshPhongMaterial
                     transparent
-                    opacity={0.9}
-                    shininess={100}
+                    opacity={0.6} // Softer opacity for links
+                    shininess={40}
                     specular="#ffffff"
                 />
             </instancedMesh>
@@ -192,7 +208,7 @@ export function RelationshipLinks({
             {/* 2. Link Glow */}
             <instancedMesh
                 ref={linkGlowRef}
-                args={[cylinderGeometry, undefined, activeLinksData.length * CURVE_SUBDIVISIONS]}
+                args={[STABLE_CYLINDER_GEOMETRY, undefined, (Array.isArray(activeLinksData) ? activeLinksData.length : 0) * CURVE_SUBDIVISIONS]}
             >
                 <meshBasicMaterial
                     transparent
@@ -205,7 +221,7 @@ export function RelationshipLinks({
             {/* 3. Directional Arrows */}
             <instancedMesh
                 ref={arrowMeshRef}
-                args={[arrowGeometry, undefined, activeLinksData.length]}
+                args={[STABLE_ARROW_GEOMETRY, undefined, Array.isArray(activeLinksData) ? activeLinksData.length : 0]}
             >
                 <meshStandardMaterial metalness={0.8} roughness={0.2} transparent opacity={1} />
             </instancedMesh>
@@ -213,7 +229,7 @@ export function RelationshipLinks({
             {/* 4. Neon Particles */}
             <instancedMesh
                 ref={pulseMeshRef}
-                args={[pulseGeometry, undefined, activeLinksData.length * PARTICLES_PER_LINK]}
+                args={[pulseGeometry, undefined, (Array.isArray(activeLinksData) ? activeLinksData.length : 0) * PARTICLES_PER_LINK]}
             >
                 <meshBasicMaterial
                     color="#ffffff"

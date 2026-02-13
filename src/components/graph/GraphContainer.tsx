@@ -147,8 +147,6 @@ export function GraphContainer({
     immersiveMode: initialImmersive = false,
     initialShowInbox = false,
 }: GraphContainerProps) {
-    console.log("GraphContainer MOUNTING", { folderId });
-
     // State
     const [viewMode, setViewMode] = useState<GraphViewMode>(initialMode);
     const { isFullscreen, setFullscreen } = useUIStore();
@@ -202,6 +200,7 @@ export function GraphContainer({
         setIsolatedNode,
         isolatedNodeId,
         analyticSelectionActive,
+        analyticIncludeNeighbors,
     } = useGraphStore();
 
     // Get filtered data

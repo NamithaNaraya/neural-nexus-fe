@@ -24,31 +24,32 @@ export function RelationshipLabels({
     }, []);
 
     const activeLabels = useMemo(() => {
-        if (!Array.isArray(links) || !nodeMap || !mounted) return [];
+        const safeLinks = Array.isArray(links) ? links : [];
+        const safeNodeMap = nodeMap instanceof Map ? nodeMap : new Map();
+        if (safeLinks.length === 0 || safeNodeMap.size === 0 || !mounted) return [];
 
         const safeSelected = Array.isArray(selectedNodes) ? selectedNodes : [];
-        const hasFocus = focusNodeId || safeSelected.length > 0;
         const focusIds = focusNodeId ? [focusNodeId] : safeSelected;
 
-        return links.filter(link => {
-            if (!link) return false;
+        return safeLinks.filter(link => {
+            if (!link || !link.source || !link.target) return false;
             const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
             const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
-            // Only show labels for focused connections to reduce clutter
+            if (!sourceId || !targetId) return false;
+            // Only show labels for focused connections
             return focusIds.includes(sourceId) || focusIds.includes(targetId);
         }).map((link, i) => {
             const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
             const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
-            const source = nodeMap.get(sourceId);
-            const target = nodeMap.get(targetId);
+            const source = safeNodeMap.get(sourceId);
+            const target = safeNodeMap.get(targetId);
 
-            if (!source || !target) return null;
-            if (typeof source.x !== 'number' || typeof target.x !== 'number') return null;
+            if (!source || !target || typeof source.x !== 'number' || typeof target.x !== 'number') return null;
 
             const mid = new THREE.Vector3(
-                (source.x + target.x) / 2,
-                (source.y + target.y) / 2 + 8,
-                (source.z + target.z) / 2
+                ((source.x || 0) + (target.x || 0)) / 2,
+                ((source.y || 0) + (target.y || 0)) / 2 + 8,
+                ((source.z || 0) + (target.z || 0)) / 2
             );
 
             return {

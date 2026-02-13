@@ -53,31 +53,37 @@ export function InstancedNodes({
     // Neighborhood Map for Dimming / Analytics
     const neighbors = useMemo(() => {
         const set = new Set<string>();
-        if (hoveredNode || (selectedNodes.length > 0)) {
-            const focusIds = hoveredNode ? [hoveredNode] : selectedNodes;
-            links.forEach(l => {
+        const safeLinks = Array.isArray(links) ? links : [];
+        const safeSelected = Array.isArray(selectedNodes) ? selectedNodes : [];
+
+        if (hoveredNode || (safeSelected.length > 0)) {
+            const focusIds = hoveredNode ? [hoveredNode] : safeSelected;
+            safeLinks.forEach(l => {
+                if (!l) return;
                 const s = typeof l.source === 'object' ? (l.source as any).id : l.source;
                 const t = typeof l.target === 'object' ? (l.target as any).id : l.target;
-                if (focusIds.includes(s)) set.add(t);
-                if (focusIds.includes(t)) set.add(s);
+                if (s && focusIds.includes(s)) set.add(t);
+                if (t && focusIds.includes(t)) set.add(s);
             });
-            focusIds.forEach(id => set.add(id)); // Include self
+            focusIds.forEach(id => { if (id) set.add(id); }); // Include self
         }
         return set;
     }, [hoveredNode, selectedNodes, links]);
 
     useFrame((state) => {
-        if (!meshRef.current || !glowRef.current || !glowOuterRef.current || !Array.isArray(nodes) || nodes.length === 0) return;
+        const safeNodes = Array.isArray(nodes) ? nodes : [];
+        if (!meshRef.current || !glowRef.current || !glowOuterRef.current || safeNodes.length === 0) return;
+
         const time = state.clock.getElapsedTime();
         const safeSelected = Array.isArray(selectedNodes) ? selectedNodes : [];
         const hasFocus = hoveredNode || safeSelected.length > 0;
 
         // Sync instance counts
-        if (meshRef.current.count !== nodes.length) meshRef.current.count = nodes.length;
-        if (glowRef.current.count !== nodes.length) glowRef.current.count = nodes.length;
-        if (glowOuterRef.current.count !== nodes.length) glowOuterRef.current.count = nodes.length;
+        if (meshRef.current.count !== safeNodes.length) meshRef.current.count = safeNodes.length;
+        if (glowRef.current.count !== safeNodes.length) glowRef.current.count = safeNodes.length;
+        if (glowOuterRef.current.count !== safeNodes.length) glowOuterRef.current.count = safeNodes.length;
 
-        nodes.forEach((node, i) => {
+        safeNodes.forEach((node, i) => {
             if (!node || !node.id) return;
             const isSelected = safeSelected.includes(node.id);
             const isHovered = hoveredNode === node.id;
@@ -85,10 +91,10 @@ export function InstancedNodes({
 
             const opacity = hasFocus ? (isNeighbor ? 1.0 : 0.15) : 1.0;
 
-            const baseSize = (node.degree || 0) * 0.5 + 8;
+            const baseSize = (node.degree || 0) * 0.6 + 12; // Increased base size
             let size = baseSize;
-            if (isSelected) size *= 1.2;
-            else if (isHovered) size *= 1.1;
+            if (isSelected) size *= 1.3;
+            else if (isHovered) size *= 1.2;
 
             if (isSelected || isHovered) {
                 size *= (1 + Math.sin(time * 3 + i) * 0.03);
@@ -105,17 +111,20 @@ export function InstancedNodes({
             meshRef.current!.setMatrixAt(i, tempObject.matrix);
 
             // Inner Glow (Slightly larger than node)
-            tempObject.scale.setScalar(Math.max(0.1, size * 1.3));
+            const innerGlowScale = size * (1.3 + Math.sin(time * 2 + i) * 0.05);
+            tempObject.scale.setScalar(Math.max(0.1, innerGlowScale));
             tempObject.updateMatrix();
             glowRef.current!.setMatrixAt(i, tempObject.matrix);
 
             // Outer Glow (Much larger, soft aura)
-            tempObject.scale.setScalar(Math.max(0.1, size * 2.2));
+            const outerGlowScale = size * (2.2 + Math.cos(time * 1.5 + i) * 0.1);
+            tempObject.scale.setScalar(Math.max(0.1, outerGlowScale));
             tempObject.updateMatrix();
             glowOuterRef.current!.setMatrixAt(i, tempObject.matrix);
 
-            const customNodeTypeColors = useGraphStore.getState().filters.customNodeTypeColors;
-            const baseColor = customNodeTypeColors[node.type] || NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
+            const customNodeTypeColors = useGraphStore.getState().filters.customNodeTypeColors || {};
+            const nodeType = node.type || 'default';
+            const baseColor = customNodeTypeColors[nodeType] || NODE_TYPE_COLORS[nodeType] || NODE_TYPE_COLORS.default;
             tempColor.set(baseColor);
 
             if (isSelected) tempColor.lerp(new THREE.Color('#ffffff'), 0.4);
@@ -126,8 +135,8 @@ export function InstancedNodes({
 
             meshRef.current!.setColorAt(i, tempColor);
 
-            // Bright Glow Color
-            const glowColor = tempColor.clone().multiplyScalar(2.0); // Boost for manual radiance
+            // Bright Glow Color - Consistently soft
+            const glowColor = tempColor.clone().multiplyScalar(1.5);
             glowRef.current!.setColorAt(i, glowColor);
             glowOuterRef.current!.setColorAt(i, glowColor);
         });
@@ -141,10 +150,10 @@ export function InstancedNodes({
     });
 
     const handlePointerDown = useCallback((e: any) => {
-        if (!Array.isArray(nodes)) return;
-        if (e.instanceId !== undefined && e.instanceId >= 0 && e.instanceId < nodes.length) {
+        const safeNodes = Array.isArray(nodes) ? nodes : [];
+        if (e.instanceId !== undefined && e.instanceId >= 0 && e.instanceId < safeNodes.length) {
             e.stopPropagation();
-            const node = nodes[e.instanceId];
+            const node = safeNodes[e.instanceId];
             if (node) {
                 if (e.button === 0) {
                     setDraggingNodeId(node.id);
@@ -154,16 +163,16 @@ export function InstancedNodes({
                         new THREE.Vector3(node.x || 0, node.y || 0, node.z || 0)
                     );
                 }
-                onNodeClick(node.id, e);
+                // onNodeClick(node.id, e); // REMOVED from here to fix double firing
             }
         }
     }, [nodes, onNodeClick, camera, plane, planeNormal, onDragStart]);
 
     const handlePointerMove = useCallback((e: any) => {
-        if (!Array.isArray(nodes)) return;
+        const safeNodes = Array.isArray(nodes) ? nodes : [];
         if (draggingNodeId) {
             e.stopPropagation();
-            const node = nodes.find(n => n.id === draggingNodeId);
+            const node = safeNodes.find(n => n && n.id === draggingNodeId);
             if (!node) return;
 
             const intersectPoint = new THREE.Vector3();
@@ -176,8 +185,8 @@ export function InstancedNodes({
                     z: node.z || 0
                 });
             }
-        } else if (e.instanceId !== undefined && e.instanceId >= 0 && e.instanceId < nodes.length) {
-            const node = nodes[e.instanceId];
+        } else if (e.instanceId !== undefined && e.instanceId >= 0 && e.instanceId < safeNodes.length) {
+            const node = safeNodes[e.instanceId];
             if (node) onNodeHover(node.id);
         }
     }, [nodes, draggingNodeId, plane, updateNode, onNodeHover]);
@@ -194,7 +203,7 @@ export function InstancedNodes({
             >
                 <meshBasicMaterial
                     transparent
-                    opacity={0.05}
+                    opacity={0.15} // Increased from 0.05 for "soft" star feel
                     blending={THREE.AdditiveBlending}
                     depthWrite={false}
                 />
@@ -221,19 +230,21 @@ export function InstancedNodes({
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerOut={() => onNodeHover(null)}
-                onClick={(e) => {
-                    if (Array.isArray(nodes) && e.instanceId !== undefined && e.instanceId >= 0 && e.instanceId < nodes.length) {
-                        const node = nodes[e.instanceId];
-                        if (node) onNodeClick(node.id, e);
+                onPointerUp={(e) => {
+                    if (draggingNodeId === null) {
+                        const safeNodes = Array.isArray(nodes) ? nodes : [];
+                        if (e.instanceId !== undefined && e.instanceId >= 0 && e.instanceId < safeNodes.length) {
+                            const node = safeNodes[e.instanceId];
+                            if (node) onNodeClick(node.id, e);
+                        }
                     }
-                }}
-                onPointerUp={() => {
                     setDraggingNodeId(null);
                     onDragEnd?.();
                 }}
                 onDoubleClick={(e) => {
-                    if (Array.isArray(nodes) && e.instanceId !== undefined && e.instanceId >= 0 && e.instanceId < nodes.length) {
-                        const node = nodes[e.instanceId];
+                    const safeNodes = Array.isArray(nodes) ? nodes : [];
+                    if (e.instanceId !== undefined && e.instanceId >= 0 && e.instanceId < safeNodes.length) {
+                        const node = safeNodes[e.instanceId];
                         if (node && onNodeDoubleClick) onNodeDoubleClick(node.id);
                     }
                 }}
@@ -246,19 +257,21 @@ export function InstancedNodes({
                 */}
                 <meshPhysicalMaterial
                     transparent
-                    metalness={0.7} // Even more solid/premium
-                    roughness={0.02} // Mirror-like sharpness
-                    clearcoat={1.0}
-                    clearcoatRoughness={0.01}
-                    reflectivity={1.0}
-                    transmission={0.2} // Catch more internal light
-                    thickness={2}
-                    ior={1.5}
+                    metalness={0.4}
+                    roughness={0.1}
+                    clearcoat={0.5}
+                    clearcoatRoughness={0.1}
+                    reflectivity={0.8}
+                    transmission={0.4}
+                    thickness={1.5}
+                    ior={1.4}
+                    depthWrite={true} // Critical for reducing flickering in transparent instances
+                    depthTest={true}
                 />
             </instancedMesh>
 
             {/* Selection Ring (High Fidelity) */}
-            {Array.isArray(nodes) && Array.isArray(selectedNodes) && nodes.filter(n => n && selectedNodes.includes(n.id)).map(node => (
+            {Array.isArray(nodes) && Array.isArray(selectedNodes) && nodes.filter(n => n && n.id && selectedNodes.includes(n.id)).map(node => (
                 <Billboard
                     key={`ring-${node.id}`}
                     position={[node.x || 0, node.y || 0, node.z || 0]}

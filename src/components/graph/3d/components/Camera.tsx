@@ -8,10 +8,11 @@ interface CameraProps {
     targetNodeId: string | null;
     nodeMap: Map<string, any>;
     defaultCenter: THREE.Vector3;
+    graphRadius?: number;
     resetKey?: number;
 }
 
-export function CameraManager({ targetNodeId, nodeMap, defaultCenter, resetKey }: CameraProps) {
+export function CameraManager({ targetNodeId, nodeMap, defaultCenter, graphRadius, resetKey }: CameraProps) {
     const { camera, controls } = useThree();
     const targetVec = useRef(new THREE.Vector3(0, 0, 0));
     const isFirstLoad = useRef(true);
@@ -50,8 +51,11 @@ export function CameraManager({ targetNodeId, nodeMap, defaultCenter, resetKey }
             // 2. Position Auto-Focus: Only "jump" the camera position when selection changes
             // or on initial load. This prevents fighting with manual rotation.
             if (isFirstLoad.current || targetNodeId !== lastTargetId.current) {
-                const idealPos = focusPos.clone().add(new THREE.Vector3(0, 50, 600));
-                camera.position.lerp(idealPos, 0.05);
+                // Calculate ideal distance based on graph radius if no node is focused
+                const distance = targetNodeId ? 600 : Math.max(800, (graphRadius || 500) * 2.5);
+                const idealPos = focusPos.clone().add(new THREE.Vector3(0, distance * 0.1, distance));
+
+                camera.position.lerp(idealPos, 0.08);
 
                 // Once we are close enough to the target, stop forcing the position
                 if (camera.position.distanceTo(idealPos) < 1) {
