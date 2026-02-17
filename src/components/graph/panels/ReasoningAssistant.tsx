@@ -1,6 +1,6 @@
-'use client';
-
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
     Activity,
     Brain,
@@ -236,11 +236,30 @@ export function ReasoningAssistant() {
                                     <div className={`flex flex-col max-w-[88%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                         <div className={`px-5 py-4 rounded-[1.5rem] text-sm leading-relaxed shadow-sm ${msg.role === 'user' ? 'bg-emerald-500 text-white rounded-tr-none font-medium' : 'bg-slate-50 border border-slate-100 rounded-tl-none text-slate-800'
                                             }`}>
-                                            {msg.content}
+                                            {msg.role === 'user' ? (
+                                                msg.content
+                                            ) : (
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkGfm]}
+                                                    components={{
+                                                        p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                                                        ul: ({ node, ...props }) => <ul className="list-disc ml-4 mb-2" {...props} />,
+                                                        ol: ({ node, ...props }) => <ol className="list-decimal ml-4 mb-2" {...props} />,
+                                                        li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+                                                        h1: ({ node, ...props }) => <h1 className="text-base font-bold mb-2" {...props} />,
+                                                        h2: ({ node, ...props }) => <h2 className="text-sm font-bold mb-2" {...props} />,
+                                                        h3: ({ node, ...props }) => <h3 className="text-xs font-bold mb-1" {...props} />,
+                                                        strong: ({ node, ...props }) => <strong className="font-bold text-emerald-700" {...props} />,
+                                                        code: ({ node, ...props }) => <code className="bg-slate-200 px-1 rounded text-xs" {...props} />
+                                                    }}
+                                                >
+                                                    {msg.content}
+                                                </ReactMarkdown>
+                                            )}
                                         </div>
 
                                         {/* Citations */}
-                                        {msg.citations && msg.citations.length > 0 && (
+                                        {/* {msg.citations && msg.citations.length > 0 && (
                                             <div className="mt-3 flex flex-wrap gap-2">
                                                 {msg.citations.map((cite, ci) => (
                                                     <button key={ci} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-500/5 border border-blue-500/10 text-[10px] font-bold text-blue-600 hover:bg-blue-500/10 transition-all uppercase tracking-tighter">
@@ -249,7 +268,7 @@ export function ReasoningAssistant() {
                                                     </button>
                                                 ))}
                                             </div>
-                                        )}
+                                        )} */}
 
                                         {/* Reasoning Artifacts */}
                                         {msg.isReasoning && msg.reasoningOutcome && (
