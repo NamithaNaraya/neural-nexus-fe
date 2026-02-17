@@ -4,7 +4,14 @@ import { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
-import { useFolders, useCreateFolder, useDeleteFolder, useUpdateFolder, useShareFolder, useUploadFile } from "@/hooks/useApi";
+import {
+    useFolders,
+    useCreateFolder,
+    useDeleteFolder,
+    useUpdateFolder,
+    useShareFolder,
+    useUploadFile,
+} from "@/hooks/useApi";
 import { Header } from "@/components/layout/Header";
 import {
     Plus,
@@ -19,18 +26,23 @@ import {
     Trash2,
     Edit,
     Share2,
-    AlertTriangle,
     Check,
     ChevronRight,
     FileUp,
     Brain,
     Database,
+    AlertTriangle,
     Network,
     Sparkles,
     CheckCircle2,
     Clock,
     XCircle,
     Inbox,
+    Filter,
+    ArrowUpRight,
+    FileType,
+    ListFilter,
+    ChevronLeft,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import api from "@/lib/api";
@@ -405,8 +417,6 @@ function LibraryContent() {
                                     </div>
 
                                     <p className="text-xs text-muted-foreground mt-3 select-none">Updated {formatRelativeTime(folder.updated_at)}</p>
-
-
                                 </div>
                             </motion.div>
                         ))}

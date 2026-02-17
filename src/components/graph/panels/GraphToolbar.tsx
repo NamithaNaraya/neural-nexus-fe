@@ -103,9 +103,9 @@ export function GraphToolbar({
                 {/* Left Section: Back, View Modes & Filters */}
                 <div className="flex items-center gap-1.5">
                     <button
-                        onClick={() => router.push('/library')}
+                        onClick={() => folderId ? router.push(`/folders/${folderId}?tab=browse`) : router.push('/library')}
                         className="p-2.5 rounded-full bg-muted/20 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-all border border-white/5 group/back"
-                        title="Back to Library"
+                        title={folderId ? "Back to Topic" : "Back to Library"}
                     >
                         <ArrowLeft className="w-5 h-5 transition-transform group-hover/back:-translate-x-1" />
                     </button>

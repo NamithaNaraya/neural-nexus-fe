@@ -99,8 +99,17 @@ function GraphContent() {
             }));
 
             setGraphData(nodes, links);
+
+            // Zoom to target node if specified in URL
+            const nodeId = searchParams.get('node');
+            if (nodeId) {
+                // Wait for data to be processed and state updated
+                setTimeout(() => {
+                    useGraphStore.getState().zoomToNode(nodeId);
+                }, 100);
+            }
         }
-    }, [graphData, isLoading, setGraphData, setGraphLoading]);
+    }, [graphData, isLoading, setGraphData, setGraphLoading, searchParams]);
 
     // Loading state
     if (isLoading) {
@@ -126,7 +135,7 @@ function GraphContent() {
                     </p>
                     <div className="flex gap-3 justify-center">
                         <button
-                            onClick={() => router.back()}
+                            onClick={() => folderId ? router.push(`/folders/${folderId}?tab=browse`) : router.back()}
                             className="flex items-center gap-2 px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
                         >
                             <ArrowLeft className="w-4 h-4" />

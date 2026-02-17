@@ -43,8 +43,14 @@ class APIClient {
         if (params) {
             const searchParams = new URLSearchParams();
             Object.entries(params).forEach(([key, value]) => {
+                if (value === undefined || value === null) return;
+
                 if (Array.isArray(value)) {
-                    value.forEach(v => searchParams.append(key, String(v)));
+                    value.forEach(v => {
+                        if (v !== undefined && v !== null) {
+                            searchParams.append(key, String(v));
+                        }
+                    });
                 } else {
                     searchParams.append(key, String(value));
                 }
@@ -255,6 +261,12 @@ export const endpoints = {
         consult: '/reasoning/consult',
         feedback: '/reasoning/feedback',
     },
+
+    // Browse operations
+    browse: {
+        types: '/browse/types',
+        nodes: (type: string) => `/browse/nodes/${type}`,
+    },
 };
 
 // Higher-level API methods
@@ -448,6 +460,19 @@ export const docAiApi = {
     dashboard: {
         getStats: () => api.get(endpoints.dashboard.stats),
         getActivity: (limit?: number) => api.get(endpoints.dashboard.activity, { limit: limit || 5 }),
+    },
+
+    // Browse operations
+    browse: {
+        getTypes: (options?: { folder_id?: string }) => api.get<{ types: { type: string; count: number }[]; total_types: number }>(endpoints.browse.types, options),
+        getNodes: (type: string, options?: { folder_id?: string; q?: string; page?: number; page_size?: number }) =>
+            api.get<{
+                nodes: any[];
+                total: number;
+                page: number;
+                page_size: number;
+                total_pages: number;
+            }>(endpoints.browse.nodes(type), options),
     },
 };
 

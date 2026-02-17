@@ -285,3 +285,28 @@ export function useHealthCheck() {
         refetchInterval: 30000, // Every 30 seconds
     });
 }
+
+// === Browse Hooks ===
+
+export function useBrowseTypes(folderId?: string) {
+    return useQuery({
+        queryKey: ['browse-types', folderId],
+        queryFn: () => api.get<{ types: { type: string; count: number }[]; total_types: number }>(endpoints.browse.types, { folder_id: folderId } as Record<string, any>),
+        staleTime: 1000 * 60 * 5, // 5 minutes
+    });
+}
+
+export function useBrowseNodes(type: string, options: { folder_id?: string; q?: string; page?: number; page_size?: number } = {}) {
+    return useQuery({
+        queryKey: ['browse-nodes', type, options.folder_id, options.q, options.page, options.page_size],
+        queryFn: () => api.get<{
+            nodes: any[];
+            total: number;
+            page: number;
+            page_size: number;
+            total_pages: number;
+        }>(endpoints.browse.nodes(type), options),
+        enabled: !!type,
+        staleTime: 1000 * 60, // 1 minute
+    });
+}
