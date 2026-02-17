@@ -20,10 +20,11 @@ interface FolderSettingsModalProps {
         description?: string;
     };
     onClose: () => void;
+    onUpdate?: () => void;
     onDeleteSuccess: () => void;
 }
 
-export function FolderSettingsModal({ folder, onClose, onDeleteSuccess }: FolderSettingsModalProps) {
+export function FolderSettingsModal({ folder, onClose, onUpdate, onDeleteSuccess }: FolderSettingsModalProps) {
     const [name, setName] = useState(folder.name);
     const [description, setDescription] = useState(folder.description || "");
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -39,6 +40,7 @@ export function FolderSettingsModal({ folder, onClose, onDeleteSuccess }: Folder
                 folderId: folder.id,
                 data: { name, description }
             });
+            onUpdate?.();
             onClose();
         } catch (error) {
             console.error("Failed to update folder:", error);

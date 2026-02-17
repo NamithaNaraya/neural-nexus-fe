@@ -70,7 +70,7 @@ function GraphLoadingState({ message }: { message: string }) {
                     <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full group-hover:bg-primary/40 transition-all duration-1000" />
                     <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto relative z-10" />
                 </div>
-                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-primary/80 animate-pulse">{message}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-primary/80 animate-pulse">{message}</p>
             </div>
         </div>
     );
@@ -115,13 +115,13 @@ class GraphErrorBoundary extends React.Component<
                         <div className="w-16 h-16 bg-destructive/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
                             <AlertTriangle className="w-8 h-8 text-destructive" />
                         </div>
-                        <h3 className="text-lg font-black text-foreground uppercase tracking-tight mb-2">Protocol Failure</h3>
+                        <h3 className="text-lg font-bold text-foreground uppercase tracking-tight mb-2">Protocol Failure</h3>
                         <p className="text-sm text-muted-foreground mb-6 font-medium italic">
                             {this.state.error?.message || "Dimensional rendering collapsed unexpectedly."}
                         </p>
                         <button
                             onClick={() => this.setState({ hasError: false })}
-                            className="px-8 py-3 bg-destructive/10 text-destructive border border-destructive/20 rounded-xl hover:bg-destructive/20 transition-all font-black text-[10px] uppercase tracking-widest"
+                            className="px-8 py-3 bg-destructive/10 text-destructive border border-destructive/20 rounded-xl hover:bg-destructive/20 transition-all font-bold text-[10px] uppercase tracking-widest"
                         >
                             REBOOT RENDERER
                         </button>

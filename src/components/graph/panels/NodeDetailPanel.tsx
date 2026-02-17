@@ -256,7 +256,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                 />
                             ) : (
                                 <>
-                                    <p className="text-[10px] text-primary/80 uppercase tracking-[0.2em] font-black leading-none mb-1.5 opacity-60">System Intelligence</p>
+                                    <p className="text-[10px] text-primary/80 uppercase tracking-[0.2em] font-bold leading-none mb-1.5 opacity-60">System Intelligence</p>
                                     <h3 className="text-lg font-bold text-foreground truncate max-w-[180px] tracking-tight">
                                         {node.name}
                                     </h3>
@@ -276,7 +276,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                             ) : (
                                 <div className="flex items-center gap-2 mt-1">
                                     <span
-                                        className="text-[10px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-widest border"
+                                        className="text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-widest border"
                                         style={{
                                             backgroundColor: `${nodeColor}10`,
                                             color: nodeColor,
@@ -298,7 +298,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                         {onCreateNode && (
                             <button
                                 onClick={onCreateNode}
-                                className="px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 transition-all text-primary text-[10px] font-black uppercase tracking-widest border border-primary/20"
+                                className="px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 transition-all text-primary text-[10px] font-bold uppercase tracking-widest border border-primary/20"
                                 title="Create New Node"
                             >
                                 NEW
@@ -375,13 +375,13 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                 {/* Relate Mode UI */}
                 {isRelating && (
                     <div className="p-6 border-b border-white/10 space-y-6 bg-indigo-500/5">
-                        <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] flex items-center gap-2">
                             <Link className="w-4 h-4" /> NEURAL CONNECTION BRIDGE
                         </h4>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mb-2 block">Target Destination</label>
+                                <label className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-2 block">Target Destination</label>
                                 <div className="relative group">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                                     <input
@@ -414,7 +414,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                             </div>
 
                             <div>
-                                <label className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mb-2 block">Link Protocol</label>
+                                <label className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-2 block">Link Protocol</label>
                                 <div className="relative">
                                     <select
                                         value={relType}
@@ -438,15 +438,15 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                     className="p-4 bg-primary/10 border border-primary/20 rounded-2xl flex items-center justify-center gap-4 shadow-[0_0_15px_rgba(168,85,247,0.1)]"
                                 >
                                     <div className="text-center">
-                                        <div className="text-[8px] text-primary/60 font-black uppercase mb-1">SOURCE</div>
+                                        <div className="text-[8px] text-primary/60 font-bold uppercase mb-1">SOURCE</div>
                                         <div className="text-[10px] font-bold text-foreground truncate max-w-[80px]">{node.name}</div>
                                     </div>
                                     <div className="flex flex-col items-center gap-1">
-                                        <div className="text-[8px] text-primary font-black">{relType}</div>
+                                        <div className="text-[8px] text-primary font-bold">{relType}</div>
                                         <ArrowRight className="w-4 h-4 text-primary animate-pulse" />
                                     </div>
                                     <div className="text-center">
-                                        <div className="text-[8px] text-primary/60 font-black uppercase mb-1">TARGET</div>
+                                        <div className="text-[8px] text-primary/60 font-bold uppercase mb-1">TARGET</div>
                                         <div className="text-[10px] font-bold text-foreground truncate max-w-[80px]">
                                             {nodes.find(n => n.id === targetId)?.name}
                                         </div>
@@ -460,7 +460,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                 {/* Description */}
                 {(isEditing || node.description) && (
                     <div className="p-6 border-b border-white/10">
-                        <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-3 opacity-60">
+                        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-3 opacity-60">
                             Knowledge Content
                         </h4>
                         {isEditing ? (
@@ -487,7 +487,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                     <div className="p-6 border-b border-white/10 bg-amber-500/5">
                         <div className="flex items-center gap-2 mb-4 text-amber-400">
                             <AlertCircle className="w-4 h-4" />
-                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em]">
+                            <h4 className="text-[10px] font-bold uppercase tracking-[0.2em]">
                                 DISCREPANCY DETECTED
                             </h4>
                         </div>
@@ -555,7 +555,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                         )}
                         {(details?.source_files || []).length > 0 && (
                             <div className="space-y-2 mt-4">
-                                <h5 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-3">
+                                <h5 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-3">
                                     Source Artifacts
                                 </h5>
                                 {details?.source_files.map((filename, i) => (
@@ -627,7 +627,7 @@ function ActionButton({ icon, label, onClick, variant = 'default', disabled, pri
             onClick={onClick}
             disabled={disabled}
             className={`
-                flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest
+                flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest
                 transition-all duration-300 shadow-sm hover:shadow-lg active:scale-95
                 ${disabled ? 'opacity-30 cursor-not-allowed' : 'opacity-100'}
                 ${primary
@@ -654,7 +654,7 @@ interface PropertyRowProps {
 function PropertyRow({ label, value, icon }: PropertyRowProps) {
     return (
         <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-all duration-300 group">
-            <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest flex items-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+            <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest flex items-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
                 {icon}
                 {label}
             </span>
@@ -687,7 +687,7 @@ function ConnectionItem({ node, relationship, direction, onClick }: ConnectionIt
             </div>
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-foreground truncate tracking-tight">{node.name}</p>
-                <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest flex items-center gap-1.5 opacity-60">
+                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest flex items-center gap-1.5 opacity-60">
                     {direction === 'outgoing' ? <ArrowRight className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5 rotate-180" />}
                     <span className="truncate">{relationship.replace(/_/g, ' ')}</span>
                 </p>

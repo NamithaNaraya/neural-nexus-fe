@@ -73,7 +73,7 @@ export function NodeListView({
             {/* Header / Search Area (Global Search is already in Container, but we can add local context if needed) */}
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h2 className="text-2xl font-black text-foreground uppercase tracking-tighter flex items-center gap-3">
+                    <h2 className="text-2xl font-bold text-foreground uppercase tracking-tighter flex items-center gap-3">
                         <Box className="w-6 h-6 text-primary" />
                         Entity Registry
                     </h2>
@@ -88,7 +88,7 @@ export function NodeListView({
                 <table className="w-full text-left border-collapse">
                     <thead className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-white/10">
                         <tr>
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                 <button
                                     onClick={() => toggleSort('name')}
                                     className="flex items-center gap-2 hover:text-foreground transition-colors"
@@ -97,7 +97,7 @@ export function NodeListView({
                                     <ArrowUpDown className="w-3 h-3" />
                                 </button>
                             </th>
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                 <button
                                     onClick={() => toggleSort('type')}
                                     className="flex items-center gap-2 hover:text-foreground transition-colors"
@@ -106,10 +106,10 @@ export function NodeListView({
                                     <ArrowUpDown className="w-3 h-3" />
                                 </button>
                             </th>
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                 Description
                             </th>
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                 <button
                                     onClick={() => toggleSort('degree')}
                                     className="flex items-center gap-2 hover:text-foreground transition-colors"
@@ -118,7 +118,7 @@ export function NodeListView({
                                     <ArrowUpDown className="w-3 h-3" />
                                 </button>
                             </th>
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">
+                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground text-right">
                                 Actions
                             </th>
                         </tr>
@@ -155,7 +155,7 @@ export function NodeListView({
                                     </td>
                                     <td className="px-6 py-4">
                                         <span
-                                            className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border"
+                                            className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border"
                                             style={{
                                                 color: typeColor,
                                                 borderColor: `${typeColor}44`,

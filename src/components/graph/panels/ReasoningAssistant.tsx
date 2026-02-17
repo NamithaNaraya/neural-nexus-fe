@@ -183,7 +183,7 @@ export function ReasoningAssistant() {
                                     <h3 className="font-bold text-slate-900 tracking-tight">Unified Neural Assistant</h3>
                                     <div className="flex items-center gap-1.5 leading-none mt-1">
                                         <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10B981] animate-pulse" />
-                                        <span className="text-[10px] text-emerald-600/70 uppercase font-black tracking-widest leading-none">Reasoning + Discovery v3.0</span>
+                                        <span className="text-[10px] text-emerald-600/70 uppercase font-bold tracking-widest leading-none">Reasoning + Discovery v3.0</span>
                                     </div>
                                 </div>
                             </div>
@@ -275,14 +275,14 @@ export function ReasoningAssistant() {
                                             <div className="mt-4 w-full space-y-4">
                                                 <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/5 border border-emerald-500/10 rounded-lg w-fit">
                                                     <ShieldCheck size={12} className="text-emerald-600" />
-                                                    <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Protocol Verified</span>
+                                                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Protocol Verified</span>
                                                 </div>
 
                                                 {/* Outcome Tracking Toggle */}
                                                 {showOutcomeForm !== msg.id ? (
                                                     <button
                                                         onClick={() => setShowOutcomeForm(msg.id)}
-                                                        className="flex items-center gap-2 text-[10px] font-black text-emerald-500/60 hover:text-emerald-500 uppercase tracking-widest transition-colors pl-1"
+                                                        className="flex items-center gap-2 text-[10px] font-bold text-emerald-500/60 hover:text-emerald-500 uppercase tracking-widest transition-colors pl-1"
                                                     >
                                                         <Star size={12} />
                                                         Track Result
@@ -301,8 +301,8 @@ export function ReasoningAssistant() {
                                                             onChange={e => setFeedback({ ...feedback, comment: e.target.value })}
                                                         />
                                                         <div className="flex gap-2">
-                                                            <button onClick={() => submitOutcome(msg.reasoningOutcome!.encounter_id)} className="flex-1 py-1.5 bg-emerald-500 text-white font-black text-[9px] uppercase rounded-lg shadow-sm">Update Audit</button>
-                                                            <button onClick={() => setShowOutcomeForm(null)} className="px-3 py-1.5 bg-slate-200 text-slate-600 font-black text-[9px] uppercase rounded-lg">Close</button>
+                                                            <button onClick={() => submitOutcome(msg.reasoningOutcome!.encounter_id)} className="flex-1 py-1.5 bg-emerald-500 text-white font-bold text-[9px] uppercase rounded-lg shadow-sm">Update Audit</button>
+                                                            <button onClick={() => setShowOutcomeForm(null)} className="px-3 py-1.5 bg-slate-200 text-slate-600 font-bold text-[9px] uppercase rounded-lg">Close</button>
                                                         </div>
                                                     </motion.div>
                                                 )}
@@ -325,7 +325,7 @@ export function ReasoningAssistant() {
                                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: '0.2s' }} />
                                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: '0.4s' }} />
                                             </div>
-                                            <span className="text-[10px] text-emerald-600 font-black uppercase tracking-widest">Neural Dispatch...</span>
+                                            <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest">Neural Dispatch...</span>
                                         </div>
                                     </div>
 
@@ -365,13 +365,13 @@ export function ReasoningAssistant() {
                                 </button>
                             </form>
                             <div className="flex justify-center gap-6 mt-3">
-                                <p className="text-[9px] text-emerald-600/40 font-black uppercase tracking-[0.2em]">
+                                <p className="text-[9px] text-emerald-600/40 font-bold uppercase tracking-[0.2em]">
                                     Neural RAG
                                 </p>
-                                <p className="text-[9px] text-emerald-600/40 font-black uppercase tracking-[0.2em]">
+                                <p className="text-[9px] text-emerald-600/40 font-bold uppercase tracking-[0.2em]">
                                     Graph Reasoning
                                 </p>
-                                <p className="text-[9px] text-emerald-600/40 font-black uppercase tracking-[0.2em]">
+                                <p className="text-[9px] text-emerald-600/40 font-bold uppercase tracking-[0.2em]">
                                     GDS Analytics
                                 </p>
                             </div>
@@ -396,7 +396,7 @@ export function ReasoningAssistant() {
                 )}
 
                 {!isOpen && (
-                    <div className="absolute right-full mr-6 px-4 py-2 rounded-xl bg-white backdrop-blur-xl border border-emerald-500/20 text-emerald-600 text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all translate-x-[10px] group-hover:translate-x-0 pointer-events-none shadow-xl">
+                    <div className="absolute right-full mr-6 px-4 py-2 rounded-xl bg-white backdrop-blur-xl border border-emerald-500/20 text-emerald-600 text-[10px] font-bold uppercase tracking-[0.2em] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all translate-x-[10px] group-hover:translate-x-0 pointer-events-none shadow-xl">
                         Unified Neural Assistant
                     </div>
                 )}

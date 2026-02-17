@@ -243,7 +243,7 @@ export function SystemHealthIndicator({
 
                         {/* Last Updated */}
                         <div className="p-3 border-t border-border bg-muted/30">
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground select-none">
                                 <Clock className="w-3 h-3" />
                                 <span>
                                     Updated{' '}

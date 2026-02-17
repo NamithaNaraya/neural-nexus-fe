@@ -37,8 +37,8 @@ export function AnalyticsSelectionLocker({
                         <div className="flex items-center gap-3 lg:gap-4 px-3 lg:px-4 py-3 bg-cyan-500/10 rounded-2xl border border-cyan-500/20 shrink-0">
                             <BoxSelect className="w-5 h-5 text-cyan-500 animate-pulse" />
                             <div className="flex flex-col">
-                                <span className="text-[10px] font-black uppercase text-cyan-600 dark:text-cyan-400 tracking-widest leading-none mb-1">Targeting Logic</span>
-                                <span className={`${isSidebarOpen ? 'text-xs' : 'text-sm'} font-black text-foreground leading-none truncate`}>
+                                <span className="text-[10px] font-semibold uppercase text-cyan-600 dark:text-cyan-400 tracking-widest leading-none mb-1">Targeting Logic</span>
+                                <span className={`${isSidebarOpen ? 'text-xs' : 'text-sm'} font-bold text-foreground leading-none truncate`}>
                                     {isSidebarOpen ? `Dataset: ${selectedNodes.length}` : `Dataset: ${selectedNodes.length} Selected Entities`}
                                 </span>
                             </div>
@@ -54,12 +54,12 @@ export function AnalyticsSelectionLocker({
                                 title="Clear Selection"
                             >
                                 <X className="w-4 h-4 group-hover:rotate-90 transition-transform" />
-                                <span className={`${isSidebarOpen ? 'hidden' : 'block'} text-[9px] font-black uppercase tracking-widest`}>Clear All</span>
+                                <span className={`${isSidebarOpen ? 'hidden' : 'block'} text-[9px] font-bold uppercase tracking-widest`}>Clear All</span>
                             </button>
                             <button
                                 onClick={onConfirm}
                                 disabled={selectedNodes.length === 0}
-                                className={`group flex items-center gap-3 px-8 py-3 rounded-2xl bg-cyan-500 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed ${isSidebarOpen ? 'lg:px-4 lg:gap-2' : ''}`}
+                                className={`group flex items-center gap-3 px-8 py-3 rounded-2xl bg-cyan-500 text-white text-[10px] font-bold uppercase tracking-[0.2em] shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed ${isSidebarOpen ? 'lg:px-4 lg:gap-2' : ''}`}
                             >
                                 <Zap className="w-4 h-4 fill-current animate-pulse group-hover:rotate-12 transition-transform" />
                                 {isSidebarOpen ? 'Source' : 'Source Dataset'}

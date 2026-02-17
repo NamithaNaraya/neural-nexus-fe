@@ -339,7 +339,7 @@ function FilterCheckbox({ label, checked, onChange, color, onColorChange, icon }
                     style={{
                         backgroundColor: checked ? color : 'transparent',
                         borderColor: checked ? color : undefined,
-                        boxShadow: checked ? `0 4px 12px ${color}40` : 'none'
+                        boxShadow: checked ? `0 2px 8px ${color}30` : 'none'
                     }}
                     onClick={(e) => {
                         // Let the label's default behavior handle the checkbox toggle

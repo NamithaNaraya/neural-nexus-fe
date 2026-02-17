@@ -57,26 +57,26 @@ export interface LinkVisualConfig {
     curvature: number;
 }
 
-// Extended Color Palette (Strictly "Super" Neons)
+// Extended Color Palette (Professional Classic Palette)
 const COLOR_PALETTE = [
-    '#FF00FF', // Neon Pink (Hot)
-    '#00FFFF', // Cyan Neon (Cold)
-    '#00FF00', // Lime Neon (Electric)
-    '#FFFF00', // Yellow Neon (Cyber)
-    '#AA00FF', // Purple Neon (Deep)
-    '#FF3D00', // Orange Neon (Sunset)
-    '#00E5FF', // Aqua Neon
-    '#76FF03', // Volt Green
-    '#D500F9', // Magenta Pulse
-    '#F50057', // Rose Neon
-    '#651FFF', // Indigo Neon
-    '#C6FF00', // Chartreuse Neon
-    '#FF9100', // Amber Pulse
-    '#00B0FF', // Sky Neon
-    '#00E676', // Spring Green
-    '#FFEA00', // Lemon Neon
-    '#FF4081', // Pink Punch
-    '#304FFE', // Lucid Blue
+    '#10B981', // Emerald
+    '#6366F1', // Indigo
+    '#F43F5E', // Rose
+    '#F59E0B', // Amber
+    '#0EA5E9', // Sky
+    '#8B5CF6', // Violet
+    '#14B8A6', // Teal
+    '#F97316', // Orange
+    '#64748B', // Slate
+    '#06B6D4', // Cyan
+    '#EC4899', // Pink
+    '#84CC16', // Lime
+    '#3B82F6', // Blue
+    '#7C3AED', // Deep Purple
+    '#EF4444', // Red
+    '#2DD4BF', // Mint
+    '#F87171', // Soft Red
+    '#60A5FA', // Soft Blue
 ];
 
 // Helper to deterministically map a string to a color index

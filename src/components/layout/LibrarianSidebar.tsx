@@ -15,7 +15,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useUIStore } from '@/store/uiStore';
 import { useGraphStore } from '@/store/graphStore';
-import { docAiApi } from '@/lib/api';
+import { docAiApi, api, endpoints } from '@/lib/api';
 
 // Icons (using simple SVG)
 const Icons = {
@@ -96,6 +96,26 @@ const Icons = {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
         </svg>
     ),
+    Upload: () => (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+    ),
+    Edit: () => (
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        </svg>
+    ),
+    Check: () => (
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+    ),
+    X: () => (
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+    ),
 };
 
 interface LibrarianSidebarProps {
@@ -137,11 +157,17 @@ export default function LibrarianSidebar({
     const [fileVisibility, setFileVisibility] = useState<Record<string, boolean>>({});
     const [isLoading, setIsLoading] = useState(false);
 
+    // File upload/rename state
+    const [targetFolderId, setTargetFolderId] = useState<string | null>(null);
+    const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
+    const [newName, setNewName] = useState('');
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
     // Initial load of folders
     useEffect(() => {
         const fetchFolders = async () => {
             try {
-                const data = await docAiApi.folders.list();
+                const data = await docAiApi.folders.list() as any[];
                 setFolders(data);
 
                 // If there's an active folder, expand it
@@ -161,12 +187,12 @@ export default function LibrarianSidebar({
         if (folderFiles[folderId]) return; // Already loaded
 
         try {
-            const data = await docAiApi.files.list(folderId);
+            const data = await docAiApi.folders.getFiles(folderId) as any[];
             setFolderFiles(prev => ({ ...prev, [folderId]: data }));
 
             // Set initial visibility
             const visibility: Record<string, boolean> = {};
-            data.forEach((f: any) => {
+            (data as any[]).forEach((f: any) => {
                 visibility[f.id] = true;
             });
             setFileVisibility(prev => ({ ...prev, ...visibility }));
@@ -177,7 +203,7 @@ export default function LibrarianSidebar({
 
     // Handle folder expansion
     const toggleFolder = async (folderId: string) => {
-        const newExpanded = new Set(expandedFolders);
+        const newExpanded = new Set(Array.from(expandedFolders));
         if (newExpanded.has(folderId)) {
             newExpanded.delete(folderId);
         } else {
@@ -194,6 +220,73 @@ export default function LibrarianSidebar({
         const newVisibility = !fileVisibility[fileId];
         setFileVisibility(prev => ({ ...prev, [fileId]: newVisibility }));
         onFileToggle?.(fileId, newVisibility);
+    };
+
+    // Handle file upload
+    const handleFileUpload = async (folderId: string, file: File) => {
+        setIsLoading(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('folder_id', folderId);
+
+            await api.upload(endpoints.files.upload, formData);
+
+            // Re-fetch files for this folder
+            const data = await docAiApi.folders.getFiles(folderId) as any[];
+            setFolderFiles(prev => ({ ...prev, [folderId]: data }));
+
+            // Ensure expanded
+            setExpandedFolders(prev => {
+                if (prev.has(folderId)) return prev;
+                const next = new Set(Array.from(prev));
+                next.add(folderId);
+                return next;
+            });
+        } catch (error) {
+            console.error('Upload failed:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const triggerUpload = (folderId: string) => {
+        setTargetFolderId(folderId);
+        fileInputRef.current?.click();
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && targetFolderId) {
+            handleFileUpload(targetFolderId, file);
+        }
+        setTargetFolderId(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    // Handle file renaming
+    const handleRename = async (fileId: string, folderId: string) => {
+        if (!newName.trim()) {
+            setRenamingFileId(null);
+            return;
+        }
+
+        try {
+            await docAiApi.files.updateFile(fileId, { filename: newName });
+
+            // Update local state
+            setFolderFiles(prev => {
+                const next = { ...prev };
+                next[folderId] = (prev[folderId] || []).map(f =>
+                    f.id === fileId ? { ...f, filename: newName } : f
+                );
+                return next;
+            });
+        } catch (error) {
+            console.error('Rename failed:', error);
+        } finally {
+            setRenamingFileId(null);
+        }
     };
 
     // View mode buttons
@@ -285,7 +378,7 @@ export default function LibrarianSidebar({
                                     >
                                         <Icons.Folder />
                                         <span className="text-sm flex-1 text-left">{folder.name}</span>
-                                        <span className="text-xs text-muted-foreground">{folder.file_count || 0}</span>
+                                        <span className="text-xs text-muted-foreground mr-1">{folder.file_count || 0}</span>
                                     </button>
 
                                     {/* Files under folder */}
@@ -297,7 +390,55 @@ export default function LibrarianSidebar({
                                                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5 group"
                                                 >
                                                     <Icons.File />
-                                                    <span className="text-xs flex-1 truncate">{file.filename}</span>
+                                                    {renamingFileId === file.id ? (
+                                                        <div className="flex-1 flex items-center gap-1">
+                                                            <input
+                                                                autoFocus
+                                                                type="text"
+                                                                value={newName}
+                                                                onChange={(e) => setNewName(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') handleRename(file.id, folder.id);
+                                                                    if (e.key === 'Escape') setRenamingFileId(null);
+                                                                }}
+                                                                className="flex-1 bg-black/40 border border-emerald-500/50 rounded px-1.5 py-0.5 text-xs outline-none"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            />
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleRename(file.id, folder.id);
+                                                                }}
+                                                                className="text-emerald-400 hover:scale-110 transition-transform"
+                                                            >
+                                                                <Icons.Check />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setRenamingFileId(null);
+                                                                }}
+                                                                className="text-red-400 hover:scale-110 transition-transform"
+                                                            >
+                                                                <Icons.X />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <span className="text-xs flex-1 truncate">{file.filename}</span>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setNewName(file.filename);
+                                                                    setRenamingFileId(file.id);
+                                                                }}
+                                                                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-white/10 transition-all"
+                                                                title="Rename file"
+                                                            >
+                                                                <Icons.Edit />
+                                                            </button>
+                                                        </>
+                                                    )}
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -310,6 +451,11 @@ export default function LibrarianSidebar({
                                                     </button>
                                                 </div>
                                             ))}
+                                            {folderFiles[folder.id].length === 0 && (
+                                                <div className="px-3 py-2 border border-dashed border-white/5 rounded-lg text-center">
+                                                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Empty Topic</span>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>

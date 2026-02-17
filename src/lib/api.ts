@@ -195,6 +195,7 @@ export const endpoints = {
         uploadCypher: '/upload/cypher',
         list: (folderId: string) => `/folders/${folderId}/files`,
         get: (id: string) => `/files/${id}`,
+        update: (id: string) => `/files/${id}`,
         delete: (id: string) => `/files/${id}`,
         status: (id: string) => `/files/${id}/status`,
         pending: '/files/pending',
@@ -381,6 +382,10 @@ export const docAiApi = {
         // Ingest data via Cypher
         ingestCypher: (data: { query: string; folder_id: string; filename?: string; file_id?: string }) =>
             api.post(endpoints.files.uploadCypher, data),
+
+        // Update file
+        updateFile: (fileId: string, data: { filename?: string }) =>
+            api.patch(endpoints.files.update(fileId), data),
 
         // Delete file
         deleteFile: (fileId: string) => api.delete(endpoints.files.delete(fileId)),

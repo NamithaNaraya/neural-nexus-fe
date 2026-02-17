@@ -33,7 +33,6 @@ import {
     Plus,
 } from 'lucide-react';
 import { AlgorithmDrawer } from './AlgorithmDrawer';
-import { AnalyticsScopeModal } from '../modals/AnalyticsScopeModal';
 import { AnalyticsSelectionLocker } from './AnalyticsSelectionLocker';
 import { useGraphStore } from '@/store/graphStore';
 
@@ -84,7 +83,6 @@ export function GraphToolbar({
 }: GraphToolbarProps) {
     const router = useRouter();
     const [showAlgorithmDrawer, setShowAlgorithmDrawer] = useState(false);
-    const [showScopeModal, setShowScopeModal] = useState(false);
     const [includeNeighbors, setIncludeNeighbors] = useState(false);
     const [runOnSelection, setRunOnSelection] = useState(false);
 
@@ -114,13 +112,13 @@ export function GraphToolbar({
 
                     {/* View Mode Toggle - Horizontal */}
                     <div className="flex items-center gap-1 bg-muted/20 p-1 rounded-full border border-white/5">
-                        <ViewModeButton
+                        {/* <ViewModeButton
                             mode="3d"
                             currentMode={viewMode}
                             onClick={() => onViewModeChange('3d')}
                             icon={<Box className="w-5 h-5" />}
                             label="3D"
-                        />
+                        /> */}
                         <ViewModeButton
                             mode="2d"
                             currentMode={viewMode}
@@ -173,9 +171,9 @@ export function GraphToolbar({
                         )}
 
                         <ToolbarButton
-                            onClick={() => setShowScopeModal(true)}
+                            onClick={() => setShowAlgorithmDrawer(true)}
                             icon={<Zap className="w-4 h-4" />}
-                            title="Graph Algorithms"
+                            title="Graph Analytics"
                             className="text-amber-500 hover:bg-amber-500/10"
                         />
                         {onResetCamera && (
@@ -209,13 +207,13 @@ export function GraphToolbar({
                         <div className="flex items-center gap-2.5 group/stats">
                             <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.6)] animate-pulse" />
                             <div className="flex flex-col">
-                                <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest leading-none">Nodes</span>
+                                <span className="text-[9px] text-muted-foreground font-semibold uppercase tracking-widest leading-none">Nodes</span>
                                 <div className="flex items-baseline gap-1.5 mt-0.5">
-                                    <span className="text-sm font-black text-foreground leading-none">
+                                    <span className="text-sm font-bold text-foreground leading-none">
                                         {nodeCount} <span className="text-[10px] text-muted-foreground/60 font-medium">/</span> {totalNodeCount}
                                     </span>
                                     {selectedCount > 0 && (
-                                        <span className="text-[10px] font-black text-cyan-400/90 leading-none">
+                                        <span className="text-[10px] font-bold text-cyan-400/90 leading-none">
                                             ({selectedCount} SELECTED)
                                         </span>
                                     )}
@@ -227,9 +225,9 @@ export function GraphToolbar({
                         <div className="flex items-center gap-2.5 group/stats ml-2">
                             <div className="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.6)] animate-pulse" />
                             <div className="flex flex-col">
-                                <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest leading-none">Links</span>
+                                <span className="text-[9px] text-muted-foreground font-semibold uppercase tracking-widest leading-none">Links</span>
                                 <div className="flex items-baseline gap-1.5 mt-0.5">
-                                    <span className="text-sm font-black text-foreground leading-none">
+                                    <span className="text-sm font-bold text-foreground leading-none">
                                         {linkCount} <span className="text-[10px] text-muted-foreground/60 font-medium">/</span> {totalLinkCount}
                                     </span>
                                 </div>
@@ -245,26 +243,7 @@ export function GraphToolbar({
                 onClose={() => setShowAlgorithmDrawer(false)}
                 folderId={folderId}
                 runOnSelection={runOnSelection}
-                initialSetupPhase={false}
                 includeNeighbors={includeNeighbors}
-                onChangeScope={() => {
-                    setShowAlgorithmDrawer(false);
-                    setShowScopeModal(true);
-                }}
-            />
-
-            {/* Selection Scope Modal */}
-            <AnalyticsScopeModal
-                isOpen={showScopeModal}
-                onClose={() => setShowScopeModal(false)}
-                onSelectGlobal={() => {
-                    setRunOnSelection(false);
-                    setShowAlgorithmDrawer(true);
-                }}
-                onSelectTargeted={() => {
-                    setRunOnSelection(true);
-                    setAnalyticSelectionActive(true);
-                }}
             />
 
             {/* Selection Locker */}
