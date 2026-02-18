@@ -107,6 +107,16 @@ export const graphApi = {
     deleteRelationship: (relationshipId: string) =>
         api.delete<{ success: boolean; relationship_id: string; message: string }>(`/graph/relationships/${relationshipId}`),
 
+    // === Herb Feature ===
+    getHerbProperties: (herbName: string) =>
+        api.get<{ properties: string[] }>(`/graph/herb/${encodeURIComponent(herbName)}/properties`),
+
+    getHerbQualities: (herbName: string, propertyName: string) =>
+        api.get<{ qualities: string[] }>(`/graph/herb/${encodeURIComponent(herbName)}/property/${encodeURIComponent(propertyName)}/qualities`),
+
+    getHerbFullProfile: (herbName: string) =>
+        api.get<{ profile: Record<string, string[]> }>(`/graph/herb/${encodeURIComponent(herbName)}/full`),
+
     // Get available node types
     getNodeTypes: () =>
         api.get<{ types: string[] }>('/graph/node-types'),

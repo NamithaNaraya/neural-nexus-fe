@@ -13,6 +13,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { GraphNode, useGraphStore } from '@/store/graphStore';
+import { formatDisplayName } from '@/utils/graphUtils';
 import { graphApi, NodeDetails } from '@/lib/api/graph';
 import { NODE_TYPE_COLORS } from '../types';
 import {
@@ -24,20 +25,15 @@ import {
     Circle,
     Link,
     FileText,
-    Calendar,
     AlertCircle,
     Plus,
-    Box,
     Search,
     ArrowRight,
     Save,
     Check,
-    Palette,
+    BookOpen,
+    Layers
 } from 'lucide-react';
-
-
-// Static presets removed - now fetched dynamically from API
-const RELATIONSHIP_TYPES = []; // Placeholder, will be populated via state
 
 const HIDDEN_PROPERTIES = [
     'conflicts',
@@ -87,6 +83,10 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
     const [details, setDetails] = useState<NodeDetails | null>(null);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
+    // Herb specific state
+    const [herbProfile, setHerbProfile] = useState<Record<string, string[]> | null>(null);
+    const [herbQualities, setHerbQualities] = useState<string[] | null>(null);
+
     // Filter nodes for relationship search
     const filteredNodes = useMemo(() => {
         return nodes
@@ -105,6 +105,8 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
         setEditDescription(node.description || '');
         setIsEditing(false);
         setIsRelating(false);
+        setHerbProfile(null);
+        setHerbQualities(null);
 
         // Fetch detailed metadata
         const fetchNodeDetails = async () => {
@@ -118,7 +120,31 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                 setIsLoadingDetails(false);
             }
         };
+
+        // Fetch Herb Data
+        const fetchHerbData = async () => {
+            if (node.type === 'Herb') {
+                try {
+                    const res = await (graphApi as any).getHerbFullProfile(node.name);
+                    setHerbProfile(res.profile);
+                } catch (e) {
+                    console.error("Failed to fetch herb profile", e);
+                }
+            } else if (node.type === 'Property') {
+                const herbName = node.properties?.herb as string;
+                if (herbName) {
+                    try {
+                        const res = await (graphApi as any).getHerbQualities(herbName, node.name);
+                        setHerbQualities(res.qualities);
+                    } catch (e) {
+                        console.error("Failed to fetch herb qualities", e);
+                    }
+                }
+            }
+        };
+
         fetchNodeDetails();
+        fetchHerbData();
     }, [node]);
 
     // Fetch dynamic types
@@ -258,7 +284,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                 <>
                                     <p className="text-[10px] text-primary/80 uppercase tracking-[0.2em] font-bold leading-none mb-1.5 opacity-60">System Intelligence</p>
                                     <h3 className="text-lg font-bold text-foreground truncate max-w-[180px] tracking-tight">
-                                        {node.name}
+                                        {formatDisplayName(node)}
                                     </h3>
                                 </>
                             )}
@@ -402,7 +428,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                             >
                                                 <div className="flex items-center gap-2">
                                                     <Circle className="w-2 h-2 opacity-50" fill={n.color || '#fff'} />
-                                                    <span className="font-bold">{n.name}</span>
+                                                    <span className="font-bold">{formatDisplayName(n)}</span>
                                                 </div>
                                                 {targetId === n.id && <Check className="w-3.5 h-3.5" />}
                                             </button>
@@ -439,7 +465,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                 >
                                     <div className="text-center">
                                         <div className="text-[8px] text-primary/60 font-bold uppercase mb-1">SOURCE</div>
-                                        <div className="text-[10px] font-bold text-foreground truncate max-w-[80px]">{node.name}</div>
+                                        <div className="text-[10px] font-bold text-foreground truncate max-w-[80px]">{formatDisplayName(node)}</div>
                                     </div>
                                     <div className="flex flex-col items-center gap-1">
                                         <div className="text-[8px] text-primary font-bold">{relType}</div>
@@ -448,12 +474,65 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                     <div className="text-center">
                                         <div className="text-[8px] text-primary/60 font-bold uppercase mb-1">TARGET</div>
                                         <div className="text-[10px] font-bold text-foreground truncate max-w-[80px]">
-                                            {nodes.find(n => n.id === targetId)?.name}
+                                            {formatDisplayName(nodes.find(n => n.id === targetId) || { id: targetId })}
                                         </div>
                                     </div>
                                 </motion.div>
                             )}
                         </div>
+                    </div>
+                )}
+
+                {/* Herb Profile Section - Specialized UI Layer */}
+                {herbProfile && (
+                    <div className="p-6 border-b border-white/10 bg-emerald-500/5">
+                        <div className="flex items-center gap-2 mb-4 text-emerald-400">
+                            <Layers className="w-4 h-4" />
+                            <h4 className="text-[10px] font-bold uppercase tracking-[0.2em]">
+                                AYURVEDIC PROFILE
+                            </h4>
+                        </div>
+                        <div className="space-y-4">
+                            {Object.entries(herbProfile).map(([property, qualities]) => (
+                                <div key={property} className="bg-white/5 rounded-xl p-3 border border-white/5">
+                                    <h5 className="text-xs font-bold text-emerald-200 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                        {property}
+                                    </h5>
+                                    <div className="flex flex-wrap gap-2">
+                                        {qualities.map((q, i) => (
+                                            <span key={i} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                                {q}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Herb Property Qualities Section */}
+                {herbQualities && (
+                    <div className="p-6 border-b border-white/10 bg-emerald-500/5">
+                        <div className="flex items-center gap-2 mb-4 text-emerald-400">
+                            <BookOpen className="w-4 h-4" />
+                            <h4 className="text-[10px] font-bold uppercase tracking-[0.2em]">
+                                ASSOCIATED QUALITIES
+                            </h4>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {herbQualities.map((q, i) => (
+                                <span key={i} className="text-xs font-bold px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm">
+                                    {q}
+                                </span>
+                            ))}
+                        </div>
+                        {node.properties?.herb && (
+                            <div className="mt-4 pt-4 border-t border-white/5 text-[10px] text-muted-foreground font-medium">
+                                Context: <span className="text-emerald-400 font-bold">{String(node.properties.herb)}</span>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -480,7 +559,6 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                         )}
                     </div>
                 )}
-
 
                 {/* Property Conflicts */}
                 {!!node.properties?.conflicts && (
@@ -516,8 +594,6 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                     </div>
                 )}
 
-
-
                 {/* Properties */}
                 {node.properties && Object.keys(node.properties).filter(k => !HIDDEN_PROPERTIES.includes(k)).length > 0 && (
                     <div className="p-4 border-b border-border">
@@ -533,7 +609,6 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                         </div>
                     </div>
                 )}
-
 
                 {/* Metadata */}
                 <div className="p-4 border-b border-border">
@@ -575,7 +650,6 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                 icon={<FileText className="w-3 h-3" />}
                             />
                         )}
-
                     </div>
                 </div>
 
@@ -691,7 +765,7 @@ function ConnectionItem({ node, relationship, properties, direction, onClick }: 
                 <Circle className="w-4 h-4" fill={color} stroke={color} />
             </div>
             <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-foreground truncate tracking-tight">{node.name}</p>
+                <p className="text-sm font-bold text-foreground truncate tracking-tight">{formatDisplayName(node)}</p>
                 <div className="flex items-center gap-1.5 opacity-60">
                     <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest flex items-center gap-1.5">
                         {direction === 'outgoing' ? <ArrowRight className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5 rotate-180" />}

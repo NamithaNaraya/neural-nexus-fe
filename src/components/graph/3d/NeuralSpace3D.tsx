@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { SphereGeometry } from 'three';
 import { GraphNode, GraphLink } from '@/store/graphStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { formatDisplayName } from '@/utils/graphUtils';
 
 // Modular Components
 import { InstancedNodes } from './components/Nodes';
@@ -394,7 +395,10 @@ function Scene(props: SceneProps) {
                                     : 'bg-white/90 text-slate-900 shadow-xl border-slate-200'}
                             transition-all duration-300
                         `}>
-                            {isSelected || isHovered ? (node.name || 'Unknown') : ((node.name || '').length > 20 ? node.name.slice(0, 18) + '…' : (node.name || 'Unknown'))}
+                            {(() => {
+                                const displayName = formatDisplayName(node);
+                                return (isSelected || isHovered) ? displayName : (displayName.length > 20 ? displayName.slice(0, 18) + '…' : displayName);
+                            })()}
                         </div>
                     </Html>
                 );

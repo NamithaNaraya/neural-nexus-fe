@@ -17,6 +17,9 @@ import { useGraphStore, GraphNode, GraphLink } from '@/store/graphStore';
 import { NODE_TYPE_COLORS, RELATIONSHIP_COLORS } from '../types';
 import { useSSE, PHASE_LABELS } from '@/hooks/useSSE';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { formatDisplayName } from '@/utils/graphUtils';
+
+// Helper functions moved to shared utils
 
 // Props
 interface ForceGraph2DProps {
@@ -336,15 +339,15 @@ export function ForceGraph2D({
         defs.append('marker')
             .attr('id', 'arrow-marker')
             .attr('viewBox', '0 -5 10 10')
-            .attr('refX', 30) // Adjusted for cleaner termination at node edge
+            .attr('refX', 10) // Tip of the 10-length arrow sits at the end of the line
             .attr('refY', 0)
-            .attr('markerWidth', 6) // Slightly smaller for better proportion
+            .attr('markerWidth', 6)
             .attr('markerHeight', 6)
             .attr('orient', 'auto')
             .append('path')
             .attr('fill', isDark ? '#94A3B8' : '#64748B')
-            .attr('fill-opacity', 0.5)
-            .attr('d', 'M0,-3 L8,0 L0,3'); // Sharper arrowhead path
+            .attr('fill-opacity', 0.6)
+            .attr('d', 'M0,-2 L10,0 L0,2'); // Sleek, sharper arrowhead
 
         // Glow filter for nodes (Outer)
         const outerFilter = defs.append('filter')
@@ -569,8 +572,21 @@ export function ForceGraph2D({
 
                 const dx = target.x - source.x;
                 const dy = target.y - source.y;
-                const dr = Math.sqrt(dx * dx + dy * dy) * 1.2; // Slightly more curved
-                return `M${source.x},${source.y}A${dr},${dr} 0 0,1 ${target.x},${target.y}`;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist === 0) return '';
+
+                // Calculate truncation based on node size to sit arrow exactly at edge
+                const targetRadius = getNodeSize(target);
+                const sourceRadius = getNodeSize(source);
+
+                // Truncate path so it doesn't go inside the node
+                const tx = target.x - (dx * targetRadius / dist);
+                const ty = target.y - (dy * targetRadius / dist);
+                const sx = source.x + (dx * sourceRadius / dist);
+                const sy = source.y + (dy * sourceRadius / dist);
+
+                const dr = dist * 1.2; // Curve Factor
+                return `M${sx},${sy}A${dr},${dr} 0 0,1 ${tx},${ty}`;
             });
 
             // Update link labels - positioned at midpoint or above self-loops
@@ -755,7 +771,10 @@ export function ForceGraph2D({
                 group.select('.node-label')
                     .attr('opacity', shouldDim ? 0.1 : 1)
                     .attr('font-weight', isSelected || isAnalyticNeighbor ? '700' : '500')
-                    .text((node: any) => (isSelected || isFocused) ? node.name : (node.name.length > 12 ? node.name.slice(0, 12) + '…' : node.name));
+                    .text((node: any) => {
+                        const displayName = formatDisplayName(node);
+                        return (isSelected || isFocused) ? displayName : (displayName.length > 12 ? displayName.slice(0, 12) + '…' : displayName);
+                    });
             });
 
         // Update link styles

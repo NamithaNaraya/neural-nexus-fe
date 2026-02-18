@@ -40,6 +40,7 @@ import {
 import { ReviewInboxPanel } from '@/components/graph/panels/ReviewInboxPanel';
 import { FileExtractionDetails } from '@/components/shared/FileExtractionDetails';
 import { MergeNodesModal } from "@/components/shared/MergeNodesModal";
+import { formatDisplayName } from '@/utils/graphUtils';
 
 interface FolderData {
     id: string;
@@ -576,8 +577,8 @@ function BrowseData({ folderId }: { folderId: string }) {
                                 setSelectedNodeIds([]);
                             }}
                             className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${isMergeMode
-                                    ? "bg-amber-500/10 text-amber-600 border border-amber-500/30 hover:bg-amber-500/20"
-                                    : "bg-muted/30 text-muted-foreground border border-border hover:bg-muted hover:text-foreground"
+                                ? "bg-amber-500/10 text-amber-600 border border-amber-500/30 hover:bg-amber-500/20"
+                                : "bg-muted/30 text-muted-foreground border border-border hover:bg-muted hover:text-foreground"
                                 }`}
                             title={isMergeMode ? "Cancel merge operation" : "Enter merge mode to consolidate entities"}
                         >
@@ -664,7 +665,7 @@ function BrowseData({ folderId }: { folderId: string }) {
                                                     onClick={() => router.push(`/graph?folder=${folderId}&node=${node.id}`)}
                                                 >
                                                     <div className="flex items-center gap-2">
-                                                        {node.name}
+                                                        {formatDisplayName(node)}
                                                         <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all text-emerald-500" />
                                                     </div>
                                                 </td>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, AlertTriangle, Edit3, Save, Eye, X } from 'lucide-react';
 import { docAiApi } from '@/lib/api';
+import { formatDisplayName } from '@/utils/graphUtils';
 
 export interface ExtractedEntity {
     id: string;
@@ -260,7 +261,7 @@ export function FileExtractionDetails({
                                 <div key={entity.id} className="p-3 bg-muted/30 rounded border border-border/50 hover:bg-muted/50 transition-colors">
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2">
-                                            <span className="font-medium text-sm text-foreground">{entity.name}</span>
+                                            <span className="font-medium text-sm text-foreground">{formatDisplayName(entity)}</span>
                                             <span className="px-1.5 py-0.5 text-[10px] bg-muted rounded border border-border">
                                                 {entity.type}
                                             </span>
@@ -363,7 +364,7 @@ function EntityPreviewRow({ entity, isEditing, onEdit, onSave, onCancel, readOnl
                 <span className={`px-2 py-0.5 rounded text-xs font-medium border ${colorClass}`}>
                     {type}
                 </span>
-                <span className="text-sm text-foreground truncate" title={name}>{name}</span>
+                <span className="text-sm text-foreground truncate" title={name}>{formatDisplayName(entity)}</span>
             </div>
             <div className="flex items-center gap-1">
                 {/* Confidence score removed */}

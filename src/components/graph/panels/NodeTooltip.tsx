@@ -11,6 +11,7 @@ import { motion } from 'framer-motion';
 import { GraphNode } from '@/store/graphStore';
 import { NODE_TYPE_COLORS } from '../types';
 import { Circle, Link, ExternalLink } from 'lucide-react';
+import { formatDisplayName } from '@/utils/graphUtils';
 
 interface NodeTooltipProps {
     node: GraphNode;
@@ -59,7 +60,7 @@ export function NodeTooltip({ node }: NodeTooltipProps) {
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">
-                            {node.name}
+                            {formatDisplayName(node)}
                         </p>
                         <span
                             className="text-xs px-1.5 py-0.5 rounded"
