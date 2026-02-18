@@ -332,18 +332,19 @@ export function ForceGraph2D({
         // Add defs for filters and markers
         const defs = svg.append('defs');
 
-        // Arrow marker for directional links
+        // Arrow marker for directional links - Refined for a sharper look
         defs.append('marker')
             .attr('id', 'arrow-marker')
             .attr('viewBox', '0 -5 10 10')
-            .attr('refX', 28) // Further offset for cleaner line termination
+            .attr('refX', 30) // Adjusted for cleaner termination at node edge
             .attr('refY', 0)
-            .attr('markerWidth', 8)
-            .attr('markerHeight', 8)
+            .attr('markerWidth', 6) // Slightly smaller for better proportion
+            .attr('markerHeight', 6)
             .attr('orient', 'auto')
             .append('path')
-            .attr('fill', isDark ? '#ffffff30' : '#00000020')
-            .attr('d', 'M0,-5L10,0L0,5');
+            .attr('fill', isDark ? '#94A3B8' : '#64748B')
+            .attr('fill-opacity', 0.5)
+            .attr('d', 'M0,-3 L8,0 L0,3'); // Sharper arrowhead path
 
         // Glow filter for nodes (Outer)
         const outerFilter = defs.append('filter')
