@@ -8,6 +8,7 @@ interface RelationshipLabelsProps {
     links: any[];
     nodeMap: Map<string, any>;
     focusNodeId: string | null;
+    focusNodeIds?: Set<string>;
     selectedNodes: string[];
 }
 
@@ -15,6 +16,7 @@ export function RelationshipLabels({
     links = [],
     nodeMap = new Map(),
     focusNodeId = null,
+    focusNodeIds = new Set(),
     selectedNodes = []
 }: RelationshipLabelsProps) {
     const [mounted, setMounted] = React.useState(false);
@@ -36,8 +38,10 @@ export function RelationshipLabels({
             const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
             const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
             if (!sourceId || !targetId) return false;
-            // Only show labels for focused connections
-            return focusIds.includes(sourceId) || focusIds.includes(targetId);
+            // Show label if directly connected to focus node OR if both nodes are in the focus path
+            const isDirectFocus = focusIds.includes(sourceId) || focusIds.includes(targetId);
+            const isPathFocus = focusNodeIds.has(sourceId) && focusNodeIds.has(targetId);
+            return isDirectFocus || isPathFocus;
         }).map((link, i) => {
             const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
             const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
@@ -58,7 +62,7 @@ export function RelationshipLabels({
                 text: link.type || 'RELATES_TO',
             };
         }).filter((n): n is any => n !== null);
-    }, [links, nodeMap, focusNodeId, selectedNodes, mounted]);
+    }, [links, nodeMap, focusNodeId, focusNodeIds, selectedNodes, mounted]);
 
     if (!mounted || !Array.isArray(activeLabels)) return null;
 

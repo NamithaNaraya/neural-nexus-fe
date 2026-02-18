@@ -14,6 +14,9 @@ interface LinksProps {
     links: GraphLink[];
     nodeMap: Map<string, any>;
     focusNodeId: string | null;
+    focusNodeName?: string | null;
+    focusNodeIds?: Set<string>;
+    focusLinkIds?: Set<string>;
     pulseGeometry: THREE.BufferGeometry;
     selectedNodes?: string[];
     analyticSelectionActive?: boolean;
@@ -23,6 +26,9 @@ export function RelationshipLinks({
     links = [],
     nodeMap = new Map(),
     focusNodeId = null,
+    focusNodeName = null,
+    focusNodeIds = new Set(),
+    focusLinkIds = new Set(),
     pulseGeometry,
     selectedNodes = [],
     analyticSelectionActive = false
@@ -37,7 +43,7 @@ export function RelationshipLinks({
         if (safeLinks.length === 0 || safeNodeMap.size === 0) return [];
 
         const safeSelected = Array.isArray(selectedNodes) ? selectedNodes : [];
-        const hasFocus = focusNodeId || safeSelected.length > 0;
+        const hasFocus = !!(focusNodeId || safeSelected.length > 0);
         const focusIds = focusNodeId ? [focusNodeId] : safeSelected;
 
         const result: any[] = [];
@@ -55,9 +61,24 @@ export function RelationshipLinks({
             if (source && target) {
                 if (typeof source.x !== 'number' || typeof target.x !== 'number') return;
 
+                // Contextual Matching Logic
+                let isContextMatch = false;
+                if (focusNodeName && link.properties) {
+                    // Check all property values for a match (case-insensitive)
+                    isContextMatch = Object.values(link.properties).some(val =>
+                        typeof val === 'string' && val.toLowerCase() === focusNodeName.toLowerCase()
+                    );
+                }
+
                 const isPartOfFocus = focusIds.includes(sourceId) || focusIds.includes(targetId);
-                const opacity = hasFocus ? (isPartOfFocus ? 1.0 : 0.05) : 0.8;
+                const isPathMatch = focusLinkIds.has(`${sourceId}-${targetId}`) || (focusNodeIds.has(sourceId) && focusNodeIds.has(targetId));
+                const isHighlighted = isPartOfFocus || isContextMatch || isPathMatch;
+
+                const opacity = hasFocus ? (isHighlighted ? 1.0 : 0.05) : 0.8;
                 const baseColor = RELATIONSHIP_COLORS[link.type] || RELATIONSHIP_COLORS.default;
+
+                // Enhance context matches or path matches with a slightly distinct appearance
+                const width = isHighlighted ? (isPathMatch && !isPartOfFocus ? 1.4 : 1.2) : 0.6;
 
                 const start = new THREE.Vector3(source.x || 0, source.y || 0, source.z || 0);
                 const end = new THREE.Vector3(target.x || 0, target.y || 0, target.z || 0);
@@ -93,14 +114,14 @@ export function RelationshipLinks({
                     segmentData,
                     color: baseColor,
                     opacity,
-                    width: isPartOfFocus ? 1.2 : 0.6, // Significant increase for "solid" look
+                    width, // Uses the computed width from path/context matching
                     arrowPos,
                     arrowTangent
                 });
             }
         });
         return result;
-    }, [links, nodeMap, focusNodeId, selectedNodes, analyticSelectionActive]);
+    }, [links, nodeMap, focusNodeId, focusNodeName, focusNodeIds, focusLinkIds, selectedNodes, analyticSelectionActive]);
 
     const tempMatrix = useMemo(() => new THREE.Matrix4(), []);
     const up = useMemo(() => new THREE.Vector3(0, 1, 0), []);

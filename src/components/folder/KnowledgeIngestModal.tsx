@@ -61,6 +61,7 @@ export function KnowledgeIngestModal({ folderId, folderName, onClose, onSuccess 
     const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
     const [existingFiles, setExistingFiles] = useState<FileData[]>([]);
     const [isLoadingExisting, setIsLoadingExisting] = useState(true);
+    const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
 
     const [pastedText, setPastedText] = useState('');
     const [pastedCypher, setPastedCypher] = useState('');
@@ -219,10 +220,12 @@ export function KnowledgeIngestModal({ folderId, folderName, onClose, onSuccess 
     const handleCypherIngest = async () => {
         if (!pastedCypher.trim()) return;
 
-        const tempId = Math.random().toString(36).substring(7);
+        const effectiveFileId = selectedFileId || Math.random().toString(36).substring(7);
+        const selectedFile = existingFiles.find(f => f.id === selectedFileId);
+
         const newFile: UploadingFile = {
-            id: tempId,
-            file: new File([], pastedFilename || 'Direct Cypher Ingestion'),
+            id: effectiveFileId,
+            file: new File([], pastedFilename || (selectedFile ? selectedFile.filename : 'Direct Cypher Ingestion')),
             status: 'processing',
             progress: 10,
             currentStage: 2,
@@ -235,17 +238,18 @@ export function KnowledgeIngestModal({ folderId, folderName, onClose, onSuccess 
             const data = await api.post('/upload/cypher', {
                 query: pastedCypher,
                 folder_id: folderId,
-                filename: pastedFilename || 'Direct Cypher Ingestion'
+                filename: pastedFilename || (selectedFile ? selectedFile.filename : 'Direct Cypher Ingestion'),
+                file_id: selectedFileId || undefined
             }) as any;
 
             setUploadingFiles(prev => prev.map(f =>
-                f.id === tempId ? { ...f, fileId: data.file_id, status: 'completed', progress: 100, currentStage: 4 } : f
+                f.id === effectiveFileId ? { ...f, fileId: data.file_id, status: 'completed', progress: 100, currentStage: 4 } : f
             ));
             setPastedCypher('');
             setPastedFilename('');
         } catch (err) {
             setUploadingFiles(prev => prev.map(f =>
-                f.id === tempId ? { ...f, status: 'failed', error: (err as any).detail || 'Ingestion failed' } : f
+                f.id === effectiveFileId ? { ...f, status: 'failed', error: (err as any).detail || 'Ingestion failed' } : f
             ));
         }
     };
@@ -337,14 +341,29 @@ export function KnowledgeIngestModal({ folderId, folderName, onClose, onSuccess 
                         ) : (
                             <div className="space-y-4 h-full flex flex-col">
                                 <div>
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Name</label>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Context</label>
+                                        {selectedFileId ? (
+                                            <button
+                                                onClick={() => setSelectedFileId(null)}
+                                                className="text-[10px] font-bold text-destructive hover:underline"
+                                            >
+                                                Clear File Selection
+                                            </button>
+                                        ) : (
+                                            <span className="text-[10px] text-muted-foreground italic">Target: Folder Level</span>
+                                        )}
+                                    </div>
                                     <input
                                         type="text"
-                                        placeholder="Cypher transaction name..."
-                                        className="w-full px-4 py-2 bg-muted/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all text-sm"
+                                        placeholder={selectedFileId ? existingFiles.find(f => f.id === selectedFileId)?.filename : "Cypher transaction name..."}
+                                        className={`w-full px-4 py-2 border rounded-lg text-foreground focus:outline-none focus:ring-2 transition-all text-sm ${selectedFileId ? 'bg-emerald-500/5 border-emerald-500/30 ring-emerald-500/20' : 'bg-muted/30 border-border focus:ring-amber-500/50'}`}
                                         value={pastedFilename}
                                         onChange={(e) => setPastedFilename(e.target.value)}
                                     />
+                                    {selectedFileId && (
+                                        <p className="text-[10px] text-emerald-600 mt-1 font-medium">Injecting into existing file context</p>
+                                    )}
                                 </div>
                                 <div className="flex-1 min-h-0">
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Query</label>
@@ -358,10 +377,10 @@ export function KnowledgeIngestModal({ folderId, folderName, onClose, onSuccess 
                                 <button
                                     onClick={handleCypherIngest}
                                     disabled={!pastedCypher.trim()}
-                                    className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-sm font-bold shadow-lg shadow-amber-600/20"
+                                    className={`w-full py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-sm font-bold shadow-lg ${selectedFileId ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' : 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'} text-white`}
                                 >
                                     <Database className="w-4 h-4" />
-                                    <span>Run Ingestion</span>
+                                    <span>Run {selectedFileId ? 'Merge' : 'Ingestion'}</span>
                                 </button>
                             </div>
                         )}
@@ -405,18 +424,29 @@ export function KnowledgeIngestModal({ folderId, folderName, onClose, onSuccess 
                                     <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                                     <span className="text-xs text-muted-foreground">Loading folder contents...</span>
                                 </div>
-                            ) : existingFiles.length === 0 ? (
-                                <p className="text-xs text-muted-foreground italic py-2">No files in this topic yet.</p>
                             ) : (
                                 <div className="space-y-2">
                                     {existingFiles.map(file => (
-                                        <div key={file.id} className="flex items-center justify-between p-2.5 rounded-lg border border-border/50 bg-muted/5">
+                                        <button
+                                            key={file.id}
+                                            onClick={() => setSelectedFileId(selectedFileId === file.id ? null : file.id)}
+                                            className={`w-full flex items-center justify-between p-2.5 rounded-lg border transition-all ${selectedFileId === file.id
+                                                ? 'border-emerald-500 bg-emerald-500/5 shadow-sm'
+                                                : 'border-border/50 bg-muted/5 hover:bg-muted/10'
+                                                }`}
+                                        >
                                             <div className="flex items-center gap-2 min-w-0">
-                                                <FileText className="w-3.5 h-3.5 text-blue-500" />
-                                                <span className="text-xs truncate">{file.filename}</span>
+                                                <FileText className={`w-3.5 h-3.5 ${selectedFileId === file.id ? 'text-emerald-500' : 'text-blue-500'}`} />
+                                                <span className={`text-xs truncate ${selectedFileId === file.id ? 'font-medium text-emerald-700' : ''}`}>
+                                                    {file.filename}
+                                                </span>
                                             </div>
-                                            <span className="text-[10px] uppercase font-bold text-emerald tracking-tighter">Existing</span>
-                                        </div>
+                                            {selectedFileId === file.id ? (
+                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                            ) : (
+                                                <span className="text-[10px] uppercase font-bold text-muted-foreground/40 tracking-tighter hover:text-emerald transition-colors">Select</span>
+                                            )}
+                                        </button>
                                     ))}
                                 </div>
                             )}

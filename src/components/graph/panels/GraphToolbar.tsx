@@ -31,6 +31,7 @@ import {
     List,
     ArrowLeft,
     Plus,
+    GitMerge,
 } from 'lucide-react';
 import { AlgorithmDrawer } from './AlgorithmDrawer';
 import { AnalyticsSelectionLocker } from './AnalyticsSelectionLocker';
@@ -57,6 +58,7 @@ interface GraphToolbarProps {
     totalLinkCount?: number;
     selectedCount?: number;
     isSidebarOpen?: boolean;
+    onMerge?: () => void;
 }
 
 export function GraphToolbar({
@@ -80,6 +82,7 @@ export function GraphToolbar({
     totalLinkCount = 0,
     selectedCount = 0,
     isSidebarOpen = false,
+    onMerge,
 }: GraphToolbarProps) {
     const router = useRouter();
     const [showAlgorithmDrawer, setShowAlgorithmDrawer] = useState(false);
@@ -167,6 +170,15 @@ export function GraphToolbar({
                                 icon={<Plus className="w-4 h-4" />}
                                 title="Create New Node"
                                 className="text-primary hover:bg-primary/10 border-primary/20"
+                            />
+                        )}
+
+                        {selectedCount >= 2 && onMerge && (
+                            <ToolbarButton
+                                onClick={onMerge}
+                                icon={<GitMerge className="w-4 h-4" />}
+                                title="Merge Selected Nodes"
+                                className="text-emerald-500 hover:bg-emerald-500/10 border-emerald-500/20"
                             />
                         )}
 

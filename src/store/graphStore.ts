@@ -44,6 +44,7 @@ export interface GraphLink {
     type: string;
     strength?: number;
     description?: string;
+    properties?: Record<string, unknown>;
 
     // Visual properties
     color?: string;

@@ -590,6 +590,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                 key={index}
                                 node={connection.node!}
                                 relationship={connection.relationship}
+                                properties={links.find(l => (l.source === node.id && l.target === connection.node!.id && l.type === connection.relationship) || (l.target === node.id && l.source === connection.node!.id && l.type === connection.relationship))?.properties}
                                 direction={connection.direction as 'incoming' | 'outgoing'}
                                 onClick={() => selectNode(connection.node!.id)}
                             />
@@ -667,12 +668,16 @@ function PropertyRow({ label, value, icon }: PropertyRowProps) {
 interface ConnectionItemProps {
     node: GraphNode;
     relationship: string;
+    properties?: Record<string, any>;
     direction: 'incoming' | 'outgoing';
     onClick: () => void;
 }
 
-function ConnectionItem({ node, relationship, direction, onClick }: ConnectionItemProps) {
+function ConnectionItem({ node, relationship, properties, direction, onClick }: ConnectionItemProps) {
     const color = NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
+
+    // Extract identify properties (like herb)
+    const herbName = properties?.herb || properties?.entity || properties?.name;
 
     return (
         <button
@@ -687,10 +692,17 @@ function ConnectionItem({ node, relationship, direction, onClick }: ConnectionIt
             </div>
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-foreground truncate tracking-tight">{node.name}</p>
-                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest flex items-center gap-1.5 opacity-60">
-                    {direction === 'outgoing' ? <ArrowRight className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5 rotate-180" />}
-                    <span className="truncate">{relationship.replace(/_/g, ' ')}</span>
-                </p>
+                <div className="flex items-center gap-1.5 opacity-60">
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest flex items-center gap-1.5">
+                        {direction === 'outgoing' ? <ArrowRight className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5 rotate-180" />}
+                        <span className="truncate">{relationship.replace(/_/g, ' ')}</span>
+                    </p>
+                    {herbName && (
+                        <span className="text-[10px] text-primary font-bold px-1.5 py-0.5 rounded-md bg-primary/10 border border-primary/20">
+                            {herbName}
+                        </span>
+                    )}
+                </div>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
         </button>

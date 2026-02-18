@@ -51,6 +51,7 @@ interface D3Link {
     target: D3Node | string;
     type: string;
     strength?: number;
+    properties?: Record<string, unknown>;
 }
 
 // Ingestion Progress UI for 2D
@@ -217,6 +218,7 @@ export function ForceGraph2D({
                 target: l.target, // Keep as STRING  
                 type: l.type,
                 strength: l.strength,
+                properties: l.properties,
             });
             return acc;
         }, []);
@@ -612,10 +614,10 @@ export function ForceGraph2D({
 
         const svg = d3.select(svgRef.current);
 
-        // Calculate neighborhood for dimming effect
-        // Dim on BOTH hover AND selection for focus during expansion
+        // Calculate neighborhood using property-aware multi-hop BFS
         const focusNodeId = hoveredNode || (selectedNodes.length === 1 ? selectedNodes[0] : null);
         const neighbors = new Set<string>();
+        const focusLinkKeys = new Set<string>();
 
         // Analytics scope neighbors
         const analyticsNeighbors = new Set<string>();
@@ -629,16 +631,93 @@ export function ForceGraph2D({
         }
 
         if (focusNodeId) {
-            neighbors.add(focusNodeId);
-            // Include all selected nodes as neighbors too
-            selectedNodes.forEach(id => neighbors.add(id));
-            d3Links.forEach(link => {
-                const sourceId = typeof link.source === 'string' ? link.source : (link.source as D3Node).id;
-                const targetId = typeof link.target === 'string' ? link.target : (link.target as D3Node).id;
+            // Property-aware multi-hop BFS
+            const seeds = [focusNodeId, ...selectedNodes];
+            seeds.forEach(id => neighbors.add(id));
 
-                if (sourceId === focusNodeId || selectedNodes.includes(sourceId)) neighbors.add(targetId);
-                if (targetId === focusNodeId || selectedNodes.includes(targetId)) neighbors.add(sourceId);
-            });
+            // 1. Identify "Origin Herb" context
+            const focusD3Node = d3Nodes.find(n => n.id === focusNodeId);
+            let originHerbName = '';
+
+            // Helper to get type even if property is missing
+            const getNodeType = (node: D3Node) => {
+                return node.type || 'Entity';
+            };
+
+            const focusType = focusD3Node ? getNodeType(focusD3Node) : '';
+
+            if (focusType === 'Herb') {
+                originHerbName = focusD3Node?.name || '';
+            } else {
+                // Look for an origin herb in the selection
+                const selectedHerbs = selectedNodes
+                    .map(id => d3Nodes.find(n => n.id === id))
+                    .filter(n => n && getNodeType(n) === 'Herb');
+
+                if (selectedHerbs.length === 1) {
+                    originHerbName = selectedHerbs[0]!.name;
+                }
+            }
+
+            if (originHerbName) {
+                console.log(`[BFS] Focus: ${focusD3Node?.name} (${focusType}) Origin Herb: ${originHerbName}`);
+            }
+
+            let currentLevel = [...seeds];
+            const MAX_HOPS = 3;
+
+            for (let hop = 0; hop < MAX_HOPS; hop++) {
+                const nextLevel: string[] = [];
+
+                d3Links.forEach(link => {
+                    const s = typeof link.source === 'string' ? link.source : (link.source as D3Node).id;
+                    const t = typeof link.target === 'string' ? link.target : (link.target as D3Node).id;
+                    if (!s || !t) return;
+
+                    // 2. Apply persistent context filtering
+                    if (originHerbName && link.type === 'HAS_QUALITY') {
+                        if (!link.properties || !link.properties.herb) {
+                            // Diagnostic: Log why it's dimmed if it's a direct connection of the focused node
+                            if (hop === 0 && s === focusNodeId) {
+                                console.log(`[BFS Skip] Link ${s}->${t} is dimmed. Reason: Missing {herb: "${originHerbName}"} property.`, {
+                                    link_type: link.type,
+                                    link_props: link.properties,
+                                    all_link_data: link
+                                });
+                            }
+                            return;
+                        }
+                        const herbProp = link.properties.herb as string;
+                        const v = herbProp.toLowerCase();
+                        const o = originHerbName.toLowerCase();
+                        const matchesOrigin = v === o || o.includes(v) || v.includes(o);
+
+                        if (!matchesOrigin) return;
+
+                        if (hop === 1 || (hop === 0 && s === focusNodeId)) {
+                            console.log(`[BFS] MATCH! ${s}->${t} belongs to ${herbProp}`);
+                        }
+                    }
+
+                    // Hop 0: follow both directions
+                    // Hop 1+: follow forward only
+                    if (currentLevel.includes(s)) {
+                        focusLinkKeys.add(`${s}-${t}`);
+                        if (!neighbors.has(t)) {
+                            neighbors.add(t);
+                            nextLevel.push(t);
+                        }
+                    }
+                    if (hop === 0 && currentLevel.includes(t)) {
+                        focusLinkKeys.add(`${s}-${t}`);
+                        if (!neighbors.has(s)) {
+                            neighbors.add(s);
+                            nextLevel.push(s);
+                        }
+                    }
+                });
+                currentLevel = nextLevel;
+            }
         }
 
         // Update node styles
@@ -695,10 +774,11 @@ export function ForceGraph2D({
                 const targetId = typeof d.target === 'string' ? d.target : (d.target as D3Node).id;
 
                 const isLinkFocused = focusNodeId && (neighbors.has(sourceId) && neighbors.has(targetId));
+                const isPathLink = focusLinkKeys.has(`${sourceId}-${targetId}`);
                 const isCorrelation = analyticSelectionActive && selectedNodes.includes(sourceId) && selectedNodes.includes(targetId);
 
                 if (isCorrelation) return 1;
-                if (isLinkFocused) return 0.6;
+                if (isLinkFocused || isPathLink) return 0.8;
                 if (focusNodeId) return 0.04;
 
                 if (selectedNodes.includes(sourceId) || selectedNodes.includes(targetId)) return 0.6;
@@ -709,22 +789,24 @@ export function ForceGraph2D({
                 const targetId = typeof d.target === 'string' ? d.target : (d.target as D3Node).id;
 
                 const isCorrelation = analyticSelectionActive && selectedNodes.includes(sourceId) && selectedNodes.includes(targetId);
+                const isPathLink = focusLinkKeys.has(`${sourceId}-${targetId}`);
                 if (isCorrelation) return 2.5;
-                if (focusNodeId && (neighbors.has(sourceId) && neighbors.has(targetId))) return 2.5;
+                if (isPathLink || (focusNodeId && (neighbors.has(sourceId) && neighbors.has(targetId)))) return 2.5;
                 if (selectedNodes.includes(sourceId) || selectedNodes.includes(targetId)) return 2.5;
                 return 1.5;
             });
 
-        // Update link labels - only show for focused connections
+        // Update link labels - show for focused connections and path links
         svg.selectAll<SVGTextElement, D3Link>('.link-label')
             .attr('opacity', d => {
                 const sourceId = typeof d.source === 'string' ? d.source : (d.source as D3Node).id;
                 const targetId = typeof d.target === 'string' ? d.target : (d.target as D3Node).id;
                 const isLinkFocused = focusNodeId && (neighbors.has(sourceId) && neighbors.has(targetId));
-                return isLinkFocused ? 1 : 0;
+                const isPathLink = focusLinkKeys.has(`${sourceId}-${targetId}`);
+                return (isLinkFocused || isPathLink) ? 1 : 0;
             });
 
-    }, [selectedNodes, hoveredNode, strokeColor, d3Links, analyticSelectionActive, customNodeTypeColors, customRelationshipColors, isDark]);
+    }, [selectedNodes, hoveredNode, strokeColor, d3Links, d3Nodes, analyticSelectionActive, customNodeTypeColors, customRelationshipColors, isDark]);
 
     return (
         <div

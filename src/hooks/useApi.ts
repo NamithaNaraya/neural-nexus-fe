@@ -245,6 +245,25 @@ export function useGraphSearch(query: string, folderId?: string) {
     });
 }
 
+export function useMergeNodes() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: {
+            primary_id: string;
+            secondary_ids: string[];
+            new_name?: string;
+            new_type?: string;
+            new_description?: string;
+        }) => api.post(endpoints.graph.merge, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['graph'] });
+            queryClient.invalidateQueries({ queryKey: ['browse-nodes'] });
+            queryClient.invalidateQueries({ queryKey: ['browse-types'] });
+        },
+    });
+}
+
 // === Query Hooks ===
 
 export function useAskQuestion() {

@@ -31,6 +31,7 @@ import { useUIStore } from '@/store/uiStore';
 import { Loader2, Maximize2, Minimize2, Zap, FolderTree, AlertTriangle } from 'lucide-react';
 import { OnboardingOverlay, useOnboarding } from '@/components/onboarding';
 import { NodeEditorModal, RelationshipEditorModal, DeleteConfirmModal } from './modals';
+import { MergeNodesModal } from '@/components/shared/MergeNodesModal';
 import { api } from '@/lib/api';
 
 // Dynamic imports for heavy visualization components
@@ -166,6 +167,7 @@ export function GraphContainer({
     const [relationshipSourceNode, setRelationshipSourceNode] = useState<GraphNode | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteTargetNode, setDeleteTargetNode] = useState<GraphNode | null>(null);
+    const [showMergeModal, setShowMergeModal] = useState(false);
 
     // Device detection for mobile 2D lock
     const device = useDevice();
@@ -297,7 +299,8 @@ export function GraphContainer({
                     source: link.source,
                     target: link.target,
                     type: link.type,
-                    strength: link.strength
+                    strength: link.strength,
+                    properties: link.properties
                 }));
 
                 console.log(`Adding ${newNodes.length} nodes and ${newLinks.length} relations to graph`);
@@ -525,6 +528,7 @@ export function GraphContainer({
                     selectedCount={selectedNodes.length}
                     isSidebarOpen={showNodeDetail}
                     onCreateNode={handleCreateNode}
+                    onMerge={() => setShowMergeModal(true)}
                 />
             )}
 
@@ -634,25 +638,26 @@ export function GraphContainer({
 
             {/* Floating Tools UI Layer - Unified Left Alignment */}
             <div className="absolute inset-0 pointer-events-none z-[100]">
-                {/* Search Bar */}
-                <div className="absolute top-24 left-6 w-[360px] pointer-events-auto">
-                    <GraphSearch />
-                </div>
-
-                {/* Filters Panel - Stacked/Floating on the left */}
                 <AnimatePresence>
                     {showFilters && (
                         <motion.div
                             initial={{ x: -400, opacity: 0 }}
                             animate={{ x: 0, opacity: 1 }}
                             exit={{ x: -400, opacity: 0 }}
-                            className="absolute left-6 top-40 bottom-6 w-[360px] pointer-events-auto"
+                            className="absolute left-6 top-24 bottom-6 w-[360px] pointer-events-auto flex flex-col gap-4"
                         >
-                            <GraphFilters onClose={() => setShowFilters(false)} />
+                            {/* Search Bar - Now inside the filter visibility container */}
+                            <GraphSearch />
+
+                            {/* Filters Panel */}
+                            <div className="flex-1 min-h-0">
+                                <GraphFilters onClose={() => setShowFilters(false)} />
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
             </div>
+
 
             {/* Node Detail Sidebar - Primary left panel when active */}
             <AnimatePresence>
@@ -742,6 +747,17 @@ export function GraphContainer({
                 message={`Are you sure you want to delete "${deleteTargetNode?.name}"? This will also remove all relationships connected to this entity.`}
                 itemName={deleteTargetNode?.name}
             />
+
+            {showMergeModal && (
+                <MergeNodesModal
+                    nodes={nodes.filter(n => selectedNodes.includes(n.id))}
+                    onClose={() => setShowMergeModal(false)}
+                    onSuccess={() => {
+                        clearSelection();
+                        // Query invalidation handled inside modal
+                    }}
+                />
+            )}
 
             {/* Unified AI Assistant Overlay */}
             <div className="z-[150] pointer-events-none fixed inset-0">

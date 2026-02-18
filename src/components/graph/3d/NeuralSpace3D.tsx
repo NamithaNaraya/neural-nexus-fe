@@ -213,6 +213,95 @@ function Scene(props: SceneProps) {
 
     const focusNodeId = hoveredNode || (Array.isArray(selectedNodes) && selectedNodes.length === 1 ? selectedNodes[0] : null);
 
+    // Multi-Hop Focus Discovery (Property-Aware BFS)
+    // For shared-node data models (Herb→Property→Quality), hop 1+ only follows
+    // links whose properties match the seed node's name (e.g., herb: "Tulsi").
+    const focusSets = useMemo(() => {
+        const nodeIds = new Set<string>();
+        const linkIds = new Set<string>();
+
+        const safeSelected = Array.isArray(selectedNodes) ? selectedNodes : [];
+        const seeds = hoveredNode ? [hoveredNode] : safeSelected;
+
+        if (seeds.length === 0) return { nodeIds, linkIds };
+
+        // Get the hovered node's name for property-aware filtering
+        const seedNode = nodeMap.get(seeds[0]);
+        if (seeds.length > 0) {
+            // 1. Identify "Origin Herb" context
+            const focusNode = hoveredNode || (selectedNodes.length === 1 ? selectedNodes[0] : null);
+            const focusData = focusNode ? nodeMap.get(focusNode) : null;
+            let originHerbName = '';
+
+            // Helper for fallback types
+            const getNodeType = (n: any) => n?.type || n?.labels?.[0] || 'Entity';
+            const focusType = focusData ? getNodeType(focusData) : '';
+
+            if (focusType === 'Herb') {
+                originHerbName = focusData?.name || '';
+            } else {
+                const selectedHerbs = selectedNodes
+                    .map(id => nodeMap.get(id))
+                    .filter(n => n && getNodeType(n) === 'Herb');
+                if (selectedHerbs.length === 1) {
+                    originHerbName = selectedHerbs[0]!.name;
+                }
+            }
+
+            let currentLevel = [...seeds];
+            seeds.forEach(id => nodeIds.add(id)); // Add seeds to nodeIds
+            const MAX_HOPS = 3;
+
+            for (let hop = 0; hop < MAX_HOPS; hop++) {
+                const nextLevel: string[] = [];
+
+                links.forEach(link => {
+                    const s = typeof link.source === 'string' ? link.source : (link.source as any).id;
+                    const t = typeof link.target === 'string' ? link.target : (link.target as any).id;
+                    if (!s || !t) return;
+
+                    // 2. Persistent context filtering
+                    if (originHerbName && link.type === 'HAS_QUALITY') {
+                        if (!link.properties || !link.properties.herb) {
+                            if (hop === 0 && s === focusNode) {
+                                console.log(`[3D BFS Skip] Link ${s}->${t} is dimmed. Reason: Missing {herb: "${originHerbName}"} property.`, {
+                                    link_type: link.type,
+                                    link_props: link.properties,
+                                    all_link_data: link
+                                });
+                            }
+                            return;
+                        }
+                        const herbProp = link.properties.herb as string;
+                        const v = herbProp.toLowerCase();
+                        const o = originHerbName.toLowerCase();
+                        const matchesOrigin = v === o || o.includes(v) || v.includes(o);
+                        if (!matchesOrigin) return;
+                    }
+
+                    // Hop 0: both directions. Hop 1+: forward only.
+                    if (currentLevel.includes(s)) {
+                        linkIds.add(`${s}-${t}`);
+                        if (!nodeIds.has(t)) {
+                            nodeIds.add(t);
+                            nextLevel.push(t);
+                        }
+                    }
+                    if (hop === 0 && currentLevel.includes(t)) {
+                        linkIds.add(`${s}-${t}`);
+                        if (!nodeIds.has(s)) {
+                            nodeIds.add(s);
+                            nextLevel.push(s);
+                        }
+                    }
+                });
+                currentLevel = nextLevel;
+            }
+        }
+
+        return { nodeIds, linkIds };
+    }, [hoveredNode, selectedNodes, links, nodeMap]);
+
     if (nodesWithPositions.length === 0) return null;
 
     return (
@@ -242,6 +331,9 @@ function Scene(props: SceneProps) {
                 links={Array.isArray(links) ? links : []}
                 nodeMap={nodeMap}
                 focusNodeId={focusNodeId}
+                focusNodeName={nodeMap.get(focusNodeId || '')?.name || null}
+                focusNodeIds={focusSets.nodeIds}
+                focusLinkIds={focusSets.linkIds}
                 pulseGeometry={pulseGeometry}
                 selectedNodes={Array.isArray(selectedNodes) ? selectedNodes : []}
                 analyticSelectionActive={props.analyticSelectionActive}
@@ -251,6 +343,7 @@ function Scene(props: SceneProps) {
                 links={Array.isArray(links) ? links : []}
                 selectedNodes={Array.isArray(selectedNodes) ? selectedNodes : []}
                 hoveredNode={hoveredNode}
+                focusNodeIds={focusSets.nodeIds}
                 onNodeClick={props.onNodeClick}
                 onNodeDoubleClick={props.onNodeDoubleClick}
                 onNodeHover={props.onNodeHover}
@@ -266,6 +359,7 @@ function Scene(props: SceneProps) {
                     links={Array.isArray(links) ? links : []}
                     nodeMap={nodeMap}
                     focusNodeId={focusNodeId}
+                    focusNodeIds={focusSets.nodeIds}
                     selectedNodes={Array.isArray(selectedNodes) ? selectedNodes : []}
                 />
             )}

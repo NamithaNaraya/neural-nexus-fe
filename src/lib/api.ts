@@ -223,6 +223,7 @@ export const endpoints = {
         crossTopic: '/graph/blind-spots/cross-topic',
         export: (folderId: string) => `/graph/export/${folderId}`,
         layout: (folderId: string) => `/graph/layout/${folderId}`,
+        merge: '/graph/nodes/merge',
     },
 
     // Query
@@ -321,6 +322,15 @@ export const docAiApi = {
             folderId: string,
             options?: { algorithm?: string; iterations?: number; scale?: number }
         ) => api.get(endpoints.graph.layout(folderId), options),
+
+        // Merge nodes
+        merge: (data: {
+            primary_id: string;
+            secondary_ids: string[];
+            new_name?: string;
+            new_type?: string;
+            new_description?: string;
+        }) => api.post(endpoints.graph.merge, data),
     },
 
     // Query operations (Hybrid RAG)

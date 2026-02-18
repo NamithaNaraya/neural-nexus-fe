@@ -34,10 +34,12 @@ import {
     Info,
     Plus,
     Search,
-    ArrowUpRight
+    ArrowUpRight,
+    GitMerge
 } from 'lucide-react';
 import { ReviewInboxPanel } from '@/components/graph/panels/ReviewInboxPanel';
 import { FileExtractionDetails } from '@/components/shared/FileExtractionDetails';
+import { MergeNodesModal } from "@/components/shared/MergeNodesModal";
 
 interface FolderData {
     id: string;
@@ -488,6 +490,9 @@ function BrowseData({ folderId }: { folderId: string }) {
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
+    const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+    const [isMergeMode, setIsMergeMode] = useState(false);
+    const [showMergeModal, setShowMergeModal] = useState(false);
 
     // Debounce search
     useEffect(() => {
@@ -495,9 +500,11 @@ function BrowseData({ folderId }: { folderId: string }) {
         return () => clearTimeout(timer);
     }, [search]);
 
-    // Reset page when type or search changes
+    // Reset page and selection when type or search changes
     useEffect(() => {
         setPage(1);
+        setSelectedNodeIds([]);
+        setIsMergeMode(false);
     }, [selectedType, debouncedSearch]);
 
     // Set initial type
@@ -562,6 +569,31 @@ function BrowseData({ folderId }: { folderId: string }) {
                                 className="w-full pl-10 pr-4 py-2 bg-muted/30 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                             />
                         </div>
+
+                        <button
+                            onClick={() => {
+                                setIsMergeMode(!isMergeMode);
+                                setSelectedNodeIds([]);
+                            }}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${isMergeMode
+                                    ? "bg-amber-500/10 text-amber-600 border border-amber-500/30 hover:bg-amber-500/20"
+                                    : "bg-muted/30 text-muted-foreground border border-border hover:bg-muted hover:text-foreground"
+                                }`}
+                            title={isMergeMode ? "Cancel merge operation" : "Enter merge mode to consolidate entities"}
+                        >
+                            <GitMerge className="w-4 h-4" />
+                            {isMergeMode ? "Cancel Merge" : "Merge Entities"}
+                        </button>
+
+                        {isMergeMode && selectedNodeIds.length >= 2 && (
+                            <button
+                                onClick={() => setShowMergeModal(true)}
+                                className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 animate-in zoom-in-95 duration-200"
+                            >
+                                <Check className="w-4 h-4" />
+                                Confirm Merge ({selectedNodeIds.length})
+                            </button>
+                        )}
                     </div>
 
                     {/* Table */}
@@ -569,8 +601,21 @@ function BrowseData({ folderId }: { folderId: string }) {
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="bg-muted/50 border-b border-border">
-                                        <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Name</th>
+                                    <tr className="bg-muted/50 border-b border-border text-[10px] uppercase tracking-widest text-muted-foreground/60">
+                                        {isMergeMode && (
+                                            <th className="px-4 py-4 w-10">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={nodes.length > 0 && selectedNodeIds.length === nodes.length}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) setSelectedNodeIds(nodes.map(n => n.id));
+                                                        else setSelectedNodeIds([]);
+                                                    }}
+                                                    className="rounded border-border text-emerald-600 focus:ring-emerald-500"
+                                                />
+                                            </th>
+                                        )}
+                                        <th className="px-6 py-4 font-bold">Name</th>
                                         {connectionTypes.map(ct => (
                                             <th key={ct} className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">
                                                 → {ct}
@@ -598,10 +643,26 @@ function BrowseData({ folderId }: { folderId: string }) {
                                         nodes.map((node) => (
                                             <tr
                                                 key={node.id}
-                                                className="hover:bg-muted/30 transition-colors group cursor-pointer"
-                                                onClick={() => router.push(`/graph?folder=${folderId}&node=${node.id}`)}
+                                                className={`hover:bg-muted/30 transition-colors group cursor-pointer ${selectedNodeIds.includes(node.id) ? "bg-emerald-500/5 border-l-2 border-l-emerald-500" : ""
+                                                    }`}
                                             >
-                                                <td className="px-6 py-4 font-semibold text-foreground group-hover:text-emerald-500 transition-colors">
+                                                {isMergeMode && (
+                                                    <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedNodeIds.includes(node.id)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) setSelectedNodeIds(prev => [...prev, node.id]);
+                                                                else setSelectedNodeIds(prev => prev.filter(id => id !== node.id));
+                                                            }}
+                                                            className="rounded border-border text-emerald-600 focus:ring-emerald-500"
+                                                        />
+                                                    </td>
+                                                )}
+                                                <td
+                                                    className="px-6 py-4 font-semibold text-foreground group-hover:text-emerald-500 transition-colors"
+                                                    onClick={() => router.push(`/graph?folder=${folderId}&node=${node.id}`)}
+                                                >
                                                     <div className="flex items-center gap-2">
                                                         {node.name}
                                                         <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all text-emerald-500" />
@@ -651,6 +712,16 @@ function BrowseData({ folderId }: { folderId: string }) {
                         )}
                     </div>
                 </>
+            )}
+
+            {showMergeModal && (
+                <MergeNodesModal
+                    nodes={nodes.filter(n => selectedNodeIds.includes(n.id))}
+                    onClose={() => setShowMergeModal(false)}
+                    onSuccess={() => {
+                        setSelectedNodeIds([]);
+                    }}
+                />
             )}
         </div>
     );

@@ -12,6 +12,7 @@ interface NodesProps {
     links: any[];
     selectedNodes: string[];
     hoveredNode: string | null;
+    focusNodeIds?: Set<string>;
     onNodeClick: (nodeId: string, event?: any) => void;
     onNodeDoubleClick?: (nodeId: string) => void;
     onNodeHover: (nodeId: string | null) => void;
@@ -27,6 +28,7 @@ export function InstancedNodes({
     nodes = [],
     selectedNodes = [],
     hoveredNode = null,
+    focusNodeIds = new Set(),
     onNodeClick,
     onNodeDoubleClick,
     onNodeHover,
@@ -53,25 +55,8 @@ export function InstancedNodes({
     const plane = useMemo(() => new THREE.Plane(), []);
     const planeNormal = useMemo(() => new THREE.Vector3(), []);
 
-    // Neighborhood Map for Dimming / Analytics
-    const neighbors = useMemo(() => {
-        const set = new Set<string>();
-        const safeLinks = Array.isArray(links) ? links : [];
-        const safeSelected = Array.isArray(selectedNodes) ? selectedNodes : [];
-
-        if (hoveredNode || (safeSelected.length > 0)) {
-            const focusIds = hoveredNode ? [hoveredNode] : safeSelected;
-            safeLinks.forEach(l => {
-                if (!l) return;
-                const s = typeof l.source === 'object' ? (l.source as any).id : l.source;
-                const t = typeof l.target === 'object' ? (l.target as any).id : l.target;
-                if (s && focusIds.includes(s)) set.add(t);
-                if (t && focusIds.includes(t)) set.add(s);
-            });
-            focusIds.forEach(id => { if (id) set.add(id); }); // Include self
-        }
-        return set;
-    }, [hoveredNode, selectedNodes, links]);
+    // Neighborhood Map for Dimming
+    const neighbors = useMemo(() => focusNodeIds, [focusNodeIds]);
 
     useFrame((state) => {
         const safeNodes = Array.isArray(nodes) ? nodes : [];
@@ -94,7 +79,7 @@ export function InstancedNodes({
             const isNeighbor = neighbors.has(node.id);
             const isDragging = draggingNodeId === node.id;
 
-            const opacity = hasFocus ? (isNeighbor ? 1.0 : 0.15) : 1.0;
+            const opacity = hasFocus ? (isNeighbor ? 1.0 : 0.05) : 1.0;
 
             const baseSize = (node.degree || 0) * 0.6 + 12;
             let size = baseSize;

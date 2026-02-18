@@ -389,11 +389,8 @@ export function ReasoningAssistant() {
                     }`}
             >
                 <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                {isOpen ? <X size={28} /> : <Stethoscope size={28} />}
+                {isOpen ? <X size={28} /> : <MessageSquare size={28} />}
 
-                {!isOpen && (
-                    <div className="absolute top-3 right-3 w-3 h-3 bg-red-500 border-2 border-white rounded-full animate-ping" />
-                )}
 
                 {!isOpen && (
                     <div className="absolute right-full mr-6 px-4 py-2 rounded-xl bg-white backdrop-blur-xl border border-emerald-500/20 text-emerald-600 text-[10px] font-bold uppercase tracking-[0.2em] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all translate-x-[10px] group-hover:translate-x-0 pointer-events-none shadow-xl">
