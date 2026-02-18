@@ -311,12 +311,26 @@ export const useGraphStore = create<GraphState>()(
         // Visual Anchoring (Camera zoom to node)
         targetNode: null,
         zoomToNode: (nodeId) => {
-            const node = get().nodes.find(n => n.id === nodeId);
+            const { nodes, links } = get();
+            const node = nodes.find(n => n.id === nodeId);
+
             if (node && node.x !== undefined && node.y !== undefined) {
-                // Set target node for camera animation
+                // Find immediate neighbors (1st layer)
+                const neighborIds = new Set<string>();
+                neighborIds.add(nodeId);
+
+                links.forEach(link => {
+                    const s = typeof link.source === 'object' ? (link.source as any).id : link.source;
+                    const t = typeof link.target === 'object' ? (link.target as any).id : link.target;
+
+                    if (s === nodeId) neighborIds.add(t);
+                    if (t === nodeId) neighborIds.add(s);
+                });
+
+                // Set target node for camera animation and select neighbors
                 set({
                     targetNode: nodeId,
-                    selectedNodes: [nodeId],
+                    selectedNodes: Array.from(neighborIds),
                     cameraPosition: {
                         x: node.x,
                         y: node.y,
