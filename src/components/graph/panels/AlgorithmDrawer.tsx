@@ -36,12 +36,17 @@ import { useGraphStore } from '@/store/graphStore';
 // ─── Types ──────────────────────────────────────────────────
 
 interface AlgorithmResultItem {
-    id: string;
-    name: string;
+    id?: string;
+    name?: string;
     type?: string;
     score?: number;
     community?: number;
-    [key: string]: unknown;
+    community_id?: number | string;
+    source_name?: string;
+    target_name?: string;
+    similarity?: number;
+    source_type?: string;
+    [key: string]: any;
 }
 
 interface AlgorithmResult {
@@ -62,7 +67,7 @@ interface AlgorithmDrawerProps {
     onChangeScope?: () => void;
 }
 
-type AlgorithmCategory = 'centrality' | 'community' | 'prediction' | 'analysis';
+type AlgorithmCategory = 'centrality' | 'community' | 'prediction';
 
 interface AlgorithmConfig {
     key: string;
@@ -136,34 +141,12 @@ const algorithms: AlgorithmConfig[] = [
         simpleInfo: 'Predicts which nodes should likely be connected but aren\'t yet.',
         benefit: 'Discovers missing relationships in your knowledge.',
     },
-    {
-        key: 'health', name: 'Graph Health', description: 'Overall quality score',
-        icon: <Activity className="w-4 h-4" />, category: 'analysis',
-        endpoint: '/analytics/health',
-        simpleInfo: 'Checks how well-connected and structured your network is.',
-        benefit: 'Gives a high-level view of your data quality and integrity.',
-    },
-    {
-        key: 'completeness', name: 'Completeness', description: 'Knowledge coverage',
-        icon: <PieChart className="w-4 h-4" />, category: 'analysis',
-        endpoint: '/analytics/completeness',
-        simpleInfo: 'Analyzes how much information is missing from your data.',
-        benefit: 'Highlights gaps where you need more data.',
-    },
-    {
-        key: 'degree-distribution', name: 'Connectivity', description: 'Connection patterns',
-        icon: <BarChart3 className="w-4 h-4" />, category: 'analysis',
-        endpoint: '/analytics/degree-distribution',
-        simpleInfo: 'Shows patterns of how nodes connect to each other.',
-        benefit: 'Reveals the underlying structure of your network.',
-    },
 ];
 
 const CATEGORIES: { key: AlgorithmCategory; label: string; icon: React.ReactNode; color: string }[] = [
     { key: 'centrality', label: 'Centrality', icon: <TrendingUp className="w-4 h-4" />, color: '#4ade80' },
     { key: 'community', label: 'Community', icon: <Network className="w-4 h-4" />, color: '#34d399' },
     { key: 'prediction', label: 'Prediction', icon: <Lightbulb className="w-4 h-4" />, color: '#6ee7b7' },
-    { key: 'analysis', label: 'Analysis', icon: <Activity className="w-4 h-4" />, color: '#a7f3d0' },
 ];
 
 // ─── Human-friendly summary builder ────────────────────────
@@ -193,8 +176,7 @@ function buildSummary(algo: AlgorithmConfig, result: AlgorithmResult): string {
             }
             return result.insight || `${count} results found.`;
 
-        case 'analysis':
-            return result.insight || `Analysis complete with ${count} data points.`;
+
 
         default:
             return result.insight || `Processed ${count} results.`;
@@ -208,23 +190,41 @@ export function AlgorithmDrawer({
     onClose,
     folderId,
 }: AlgorithmDrawerProps) {
-    const { filteredNodes, filteredLinks, nodes, links } = useGraphStore();
+    const { filteredNodes, filteredLinks, nodes, links, filters, selectedNodes } = useGraphStore();
 
     // State
+    const [scopeMode, setScopeMode] = useState<'filtered' | 'selected'>('filtered');
     const [expandedCategory, setExpandedCategory] = useState<AlgorithmCategory | null>(null);
     const [selectedAlgorithm, setSelectedAlgorithm] = useState<AlgorithmConfig | null>(null);
     const [result, setResult] = useState<AlgorithmResult | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Derive filtered counts from existing graph filters
-    const visibleNodes = React.useMemo(() => filteredNodes(), [filteredNodes, nodes]);
-    const visibleLinks = React.useMemo(() => filteredLinks(), [filteredLinks, links]);
+    // Derive count based on scope mode
+    const visibleNodes = React.useMemo(() => {
+        if (scopeMode === 'selected' && selectedNodes.length > 0) {
+            return nodes.filter(n => selectedNodes.includes(n.id));
+        }
+        return filteredNodes();
+    }, [filteredNodes, nodes, filters, scopeMode, selectedNodes]);
+
+    const visibleLinks = React.useMemo(() => {
+        if (scopeMode === 'selected' && selectedNodes.length > 0) {
+            const selectedSet = new Set(selectedNodes);
+            return links.filter(l => {
+                const s = typeof l.source === 'object' ? (l.source as any).id : l.source;
+                const t = typeof l.target === 'object' ? (l.target as any).id : l.target;
+                return selectedSet.has(s) && selectedSet.has(t);
+            });
+        }
+        return filteredLinks();
+    }, [filteredLinks, links, filters, scopeMode, selectedNodes]);
+
     const nodeCount = visibleNodes.length;
     const linkCount = visibleLinks.length;
     const nodeIds = React.useMemo(() => visibleNodes.map(n => n.id), [visibleNodes]);
 
-    // Run algorithm on filtered nodes
+    // Run algorithm on target nodes
     const runAlgorithm = useCallback(async () => {
         if (!selectedAlgorithm) return;
         setIsLoading(true);
@@ -283,9 +283,34 @@ export function AlgorithmDrawer({
                         </div>
                     </div>
 
-                    {/* Stats Pill */}
+                    {/* Stats Pill & Scope Toggle */}
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-3 px-4 py-2 rounded-full text-xs font-bold"
+                        {/* Scope Toggle */}
+                        <div className="flex items-center gap-1 bg-green-100/40 p-1 rounded-xl border border-green-200/50">
+                            <button
+                                onClick={() => {
+                                    setScopeMode('filtered');
+                                    setResult(null);
+                                }}
+                                className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${scopeMode === 'filtered' ? 'bg-white text-green-700 shadow-sm' : 'text-green-600/60 hover:text-green-700'
+                                    }`}
+                            >
+                                Filtered
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setScopeMode('selected');
+                                    setResult(null);
+                                }}
+                                disabled={selectedNodes.length === 0}
+                                className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${scopeMode === 'selected' ? 'bg-white text-green-700 shadow-sm' : 'text-green-600/60 hover:text-green-700'
+                                    } disabled:opacity-30 disabled:cursor-not-allowed`}
+                            >
+                                Selected ({selectedNodes.length})
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-3 px-4 py-2.5 rounded-full text-xs font-bold"
                             style={{ background: '#dcfce7', color: '#166534' }}
                         >
                             <span className="flex items-center gap-1.5">
@@ -406,7 +431,7 @@ export function AlgorithmDrawer({
                                 <h3 className="text-xl font-bold text-gray-700 mb-2">Select an Algorithm</h3>
                                 <p className="text-sm text-gray-400 max-w-sm">
                                     Pick a category from the sidebar, then choose an algorithm to run on your
-                                    <strong className="mx-1" style={{ color: '#16a34a' }}>{nodeCount} filtered nodes</strong>
+                                    <strong className="mx-1" style={{ color: '#16a34a' }}>{nodeCount} {scopeMode} nodes</strong>
                                     and
                                     <strong className="mx-1" style={{ color: '#16a34a' }}>{linkCount} relationships</strong>.
                                 </p>
@@ -483,7 +508,7 @@ export function AlgorithmDrawer({
                                                 <Activity className="absolute inset-0 m-auto w-6 h-6 animate-pulse" style={{ color: '#22c55e' }} />
                                             </div>
                                             <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#22c55e' }}>
-                                                Analyzing {nodeCount} nodes...
+                                                Analyzing {nodeCount} {scopeMode} nodes...
                                             </p>
                                         </div>
                                     ) : result ? (
@@ -535,30 +560,48 @@ export function AlgorithmDrawer({
                                                         </div>
 
                                                         {/* Table Rows */}
-                                                        {result.results.slice(0, 30).map((item, i) => (
-                                                            <motion.div
-                                                                key={item.id || i}
-                                                                initial={{ opacity: 0 }}
-                                                                animate={{ opacity: 1 }}
-                                                                transition={{ delay: i * 0.03 }}
-                                                                className="grid grid-cols-12 gap-2 px-4 py-3 items-center border-t text-xs hover:bg-green-50/50 transition-colors"
-                                                                style={{ borderColor: '#f0fdf4' }}
-                                                            >
-                                                                <div className="col-span-1 text-gray-300 font-bold text-[10px]">{i + 1}</div>
-                                                                <div className="col-span-5 font-semibold text-gray-700 truncate">{item.name}</div>
-                                                                <div className="col-span-3">
-                                                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold"
-                                                                        style={{ background: '#dcfce7', color: '#166534' }}
-                                                                    >
-                                                                        {item.type || 'Entity'}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="col-span-3 text-right font-mono font-bold text-[11px]" style={{ color: '#16a34a' }}>
-                                                                    {item.score !== undefined ? item.score.toFixed(4) :
-                                                                        item.community !== undefined ? `Group ${item.community}` : '—'}
-                                                                </div>
-                                                            </motion.div>
-                                                        ))}
+                                                        {result.results.slice(0, 50).map((item, i) => {
+                                                            const name = item.name || item.source_name || 'Unnamed';
+                                                            const secondaryName = item.target_name || null;
+                                                            const type = item.type || item.source_type || 'Entity';
+                                                            const scoreValue = typeof item.score === 'number' ? item.score : typeof item.similarity === 'number' ? item.similarity : undefined;
+                                                            const communityValue = item.community ?? item.community_id;
+
+                                                            return (
+                                                                <motion.div
+                                                                    key={item.id || `${i}-${name}`}
+                                                                    initial={{ opacity: 0 }}
+                                                                    animate={{ opacity: 1 }}
+                                                                    transition={{ delay: i * 0.02 }}
+                                                                    className="grid grid-cols-12 gap-2 px-4 py-3 items-center border-t text-xs hover:bg-green-50/50 transition-colors"
+                                                                    style={{ borderColor: '#f0fdf4' }}
+                                                                >
+                                                                    <div className="col-span-1 text-gray-300 font-bold text-[10px]">{i + 1}</div>
+                                                                    <div className="col-span-5 font-semibold text-gray-700">
+                                                                        {secondaryName ? (
+                                                                            <div className="flex items-center gap-2 truncate">
+                                                                                <span className="truncate">{name}</span>
+                                                                                <ArrowLeftRight className="w-2.5 h-2.5 shrink-0 text-green-400" />
+                                                                                <span className="truncate">{secondaryName}</span>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="truncate">{name}</div>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="col-span-3">
+                                                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold"
+                                                                            style={{ background: '#dcfce7', color: '#166534' }}
+                                                                        >
+                                                                            {type}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="col-span-3 text-right font-mono font-bold text-[11px]" style={{ color: '#16a34a' }}>
+                                                                        {scoreValue !== undefined ? scoreValue.toFixed(4) :
+                                                                            communityValue !== undefined ? `Group ${communityValue}` : '—'}
+                                                                    </div>
+                                                                </motion.div>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             )}
