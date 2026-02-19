@@ -260,8 +260,9 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
             });
     }, [node.id, links, nodes]);
 
-    // Get node color
-    const nodeColor = NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
+    // Get node color (respect custom colors from filter panel)
+    const customColors = useGraphStore(state => state.filters.customNodeTypeColors);
+    const nodeColor = customColors[node.type] || NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
 
     return (
         <motion.div
@@ -424,7 +425,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                 <div className="mt-2 max-h-44 overflow-y-auto rounded-xl bg-white border border-gray-200 shadow-sm">
                                     {filteredNodes.length > 0 ? (
                                         filteredNodes.map(n => {
-                                            const nColor = NODE_TYPE_COLORS[n.type] || NODE_TYPE_COLORS.default;
+                                            const nColor = useGraphStore.getState().filters.customNodeTypeColors[n.type] || NODE_TYPE_COLORS[n.type] || NODE_TYPE_COLORS.default;
                                             return (
                                                 <button
                                                     key={n.id}
@@ -730,7 +731,7 @@ interface ConnectionItemProps {
 }
 
 function ConnectionItem({ node, relationship, properties, direction, onClick }: ConnectionItemProps) {
-    const color = NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
+    const color = useGraphStore.getState().filters.customNodeTypeColors[node.type] || NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
 
     // Extract identify properties (like herb)
     const herbName = properties?.herb || properties?.entity || properties?.name;

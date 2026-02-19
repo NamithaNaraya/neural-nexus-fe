@@ -8,7 +8,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { GraphNode } from '@/store/graphStore';
+import { GraphNode, useGraphStore } from '@/store/graphStore';
 import { NODE_TYPE_COLORS } from '../types';
 import { Circle, Link, ExternalLink } from 'lucide-react';
 import { formatDisplayName } from '@/utils/graphUtils';
@@ -31,7 +31,7 @@ export function NodeTooltip({ node }: NodeTooltipProps) {
     }, []);
 
     // Get node color
-    const color = NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
+    const color = useGraphStore.getState().filters.customNodeTypeColors[node.type] || NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
 
     // Calculate tooltip position (offset from cursor)
     const tooltipX = position.x + 15;

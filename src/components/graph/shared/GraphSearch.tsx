@@ -155,7 +155,7 @@ interface SearchResultItemProps {
 }
 
 function SearchResultItem({ node, isSelected, onClick }: SearchResultItemProps) {
-    const color = NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
+    const color = useGraphStore.getState().filters.customNodeTypeColors[node.type] || NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
 
     return (
         <button

@@ -11,6 +11,7 @@ import { BarChart } from './charts/BarChart';
 
 export function DataCanvas() {
     const { nodes, links, filters, filteredNodes, filteredLinks } = useGraphStore();
+    const customColors = filters.customNodeTypeColors || {};
 
     // Compute visible data based on current filters
     const visibleNodes = useMemo(() => filteredNodes(), [nodes, filters, filteredNodes]);
@@ -29,7 +30,7 @@ export function DataCanvas() {
             .map(([label, value]) => ({
                 label,
                 value,
-                color: NODE_TYPE_COLORS[label] || NODE_TYPE_COLORS.default,
+                color: customColors[label] || NODE_TYPE_COLORS[label] || NODE_TYPE_COLORS.default,
                 percentage: total > 0 ? (value / total) * 100 : 0
             }));
     }, [visibleNodes]);
@@ -48,7 +49,7 @@ export function DataCanvas() {
             .map(n => ({
                 label: n.name.length > 15 ? n.name.substring(0, 15) + '...' : n.name,
                 value: degrees[n.id] || 0,
-                color: NODE_TYPE_COLORS[n.type]
+                color: customColors[n.type] || NODE_TYPE_COLORS[n.type]
             }))
             .sort((a, b) => b.value - a.value)
             .slice(0, 10);
@@ -79,14 +80,14 @@ export function DataCanvas() {
                 types[n.type] = {
                     name: n.type,
                     children: [],
-                    color: NODE_TYPE_COLORS[n.type]
+                    color: customColors[n.type] || NODE_TYPE_COLORS[n.type]
                 };
                 root.children.push(types[n.type]);
             }
             types[n.type].children.push({
                 name: n.name,
                 value: 1,
-                color: NODE_TYPE_COLORS[n.type]
+                color: customColors[n.type] || NODE_TYPE_COLORS[n.type]
             });
         });
 

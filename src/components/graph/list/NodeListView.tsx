@@ -9,7 +9,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { NODE_TYPE_COLORS } from '../types';
-import { GraphNode } from '@/store/graphStore';
+import { GraphNode, useGraphStore } from '@/store/graphStore';
 import {
     Search,
     ArrowUpDown,
@@ -126,7 +126,7 @@ export function NodeListView({
                     <tbody className="divide-y divide-white/5">
                         {sortedNodes.map((node) => {
                             const isSelected = selectedNodes.includes(node.id);
-                            const typeColor = NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
+                            const typeColor = useGraphStore.getState().filters.customNodeTypeColors[node.type] || NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
 
                             return (
                                 <motion.tr
