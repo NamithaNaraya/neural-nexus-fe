@@ -203,6 +203,7 @@ export function GraphContainer({
         isolatedNodeId,
         analyticSelectionActive,
         analyticIncludeNeighbors,
+        nodeTypes,
     } = useGraphStore();
 
     // Get filtered data
@@ -427,15 +428,20 @@ export function GraphContainer({
     }, [nodes]);
 
     const handleNodeCreated = useCallback((newNode: any) => {
-        const { addNode } = useGraphStore.getState();
-        addNode({
+        const { addNode, selectNode: storeSelectNode } = useGraphStore.getState();
+        const nodeToAdd = {
             id: newNode.id,
             name: newNode.name,
             type: newNode.type,
-            description: newNode.description,
+            description: newNode.description || '',
             properties: newNode.properties || {},
             degree: 0,
-        });
+        };
+        addNode(nodeToAdd);
+        // Select and show the new node immediately
+        storeSelectNode(newNode.id);
+        setSelectedNodeForDetail(nodeToAdd as GraphNode);
+        setShowNodeDetail(true);
     }, []);
 
     const handleNodeUpdated = useCallback((node: any) => {
@@ -721,6 +727,7 @@ export function GraphContainer({
                 } : undefined}
                 folderId={folderId}
                 fileId={fileId}
+                graphNodeTypes={nodeTypes}
             />
 
             {relationshipSourceNode && (
