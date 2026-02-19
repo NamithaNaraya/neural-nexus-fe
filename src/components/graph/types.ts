@@ -57,26 +57,32 @@ export interface LinkVisualConfig {
     curvature: number;
 }
 
-// Extended Color Palette (Professional Classic Palette)
+// Extended Color Palette — maximally distinct hues (no two adjacent hues are close)
 const COLOR_PALETTE = [
-    '#10B981', // Emerald
     '#6366F1', // Indigo
     '#F43F5E', // Rose
+    '#10B981', // Emerald
     '#F59E0B', // Amber
-    '#0EA5E9', // Sky
     '#8B5CF6', // Violet
-    '#14B8A6', // Teal
+    '#0EA5E9', // Sky
     '#F97316', // Orange
-    '#64748B', // Slate
-    '#06B6D4', // Cyan
     '#EC4899', // Pink
-    '#84CC16', // Lime
+    '#14B8A6', // Teal
     '#3B82F6', // Blue
-    '#7C3AED', // Deep Purple
+    '#84CC16', // Lime
     '#EF4444', // Red
+    '#06B6D4', // Cyan
+    '#7C3AED', // Deep Purple
     '#2DD4BF', // Mint
-    '#F87171', // Soft Red
-    '#60A5FA', // Soft Blue
+    '#64748B', // Slate
+    '#D946EF', // Fuchsia
+    '#EA580C', // Deep Orange
+    '#0D9488', // Dark Teal
+    '#A855F7', // Purple
+    '#E11D48', // Crimson
+    '#059669', // Green
+    '#CA8A04', // Dark Amber
+    '#4F46E5', // Deep Indigo
 ];
 
 // Helper to deterministically map a string to a color index
@@ -90,7 +96,11 @@ const getStringHash = (str: string): number => {
     return Math.abs(hash);
 };
 
-// Dynamic color proxy
+// Assigned type→color map to guarantee no two types share a color
+const assignedTypeColors = new Map<string, string>();
+const usedColorIndices = new Set<number>();
+
+// Dynamic color proxy — guarantees unique color per type
 export const NODE_TYPE_COLORS: Record<string, string> = new Proxy(
     {
         default: '#6B7280', // Gray default
@@ -102,14 +112,36 @@ export const NODE_TYPE_COLORS: Record<string, string> = new Proxy(
                 return target.default;
             }
 
-            // Check if we have a hardcoded override (keep 'default' just in case)
+            // Check if we have a hardcoded override
             if (prop in target) {
                 return target[prop];
             }
 
-            // Generate color from palette based on string hash
+            // Already assigned? Return it
+            if (assignedTypeColors.has(prop)) {
+                return assignedTypeColors.get(prop)!;
+            }
+
+            // Find an unused palette color, starting from the hash position
             const hash = getStringHash(prop);
-            return COLOR_PALETTE[hash % COLOR_PALETTE.length];
+            let idx = hash % COLOR_PALETTE.length;
+
+            // Walk forward through the palette to find unused color
+            for (let attempt = 0; attempt < COLOR_PALETTE.length; attempt++) {
+                const candidateIdx = (idx + attempt) % COLOR_PALETTE.length;
+                if (!usedColorIndices.has(candidateIdx)) {
+                    usedColorIndices.add(candidateIdx);
+                    const color = COLOR_PALETTE[candidateIdx];
+                    assignedTypeColors.set(prop, color);
+                    return color;
+                }
+            }
+
+            // Palette exhausted — generate a unique HSL color based on the assignment count
+            const hue = (assignedTypeColors.size * 137.508) % 360; // Golden angle for max spread
+            const color = `hsl(${Math.round(hue)}, 65%, 55%)`;
+            assignedTypeColors.set(prop, color);
+            return color;
         }
     }
 );

@@ -40,6 +40,8 @@ interface AlgorithmResultItem {
     name?: string;
     type?: string;
     score?: number;
+    hub_score?: number;
+    auth_score?: number;
     community?: number;
     community_id?: number | string;
     source_name?: string;
@@ -67,7 +69,7 @@ interface AlgorithmDrawerProps {
     onChangeScope?: () => void;
 }
 
-type AlgorithmCategory = 'centrality' | 'community' | 'prediction';
+type AlgorithmCategory = 'centrality' | 'community' | 'prediction' | 'decomposition' | 'pathfinding' | 'topology';
 
 interface AlgorithmConfig {
     key: string;
@@ -82,8 +84,8 @@ interface AlgorithmConfig {
 
 // ─── API Helper ─────────────────────────────────────────────
 
-async function fetchAlgorithm(endpoint: string, folderId?: string, nodeIds?: string[]): Promise<AlgorithmResult> {
-    const params: Record<string, any> = {};
+async function fetchAlgorithm(endpoint: string, folderId?: string, nodeIds?: string[], extraParams?: Record<string, any>): Promise<AlgorithmResult> {
+    const params: Record<string, any> = { ...extraParams };
     if (folderId) params.folder_id = folderId;
     if (nodeIds && nodeIds.length > 0) params.node_ids = nodeIds;
     return api.get<AlgorithmResult>(endpoint, params);
@@ -135,11 +137,95 @@ const algorithms: AlgorithmConfig[] = [
         benefit: 'Great for finding duplicates or related entities.',
     },
     {
-        key: 'link-prediction', name: 'Link Prediction', description: 'Predict missing links',
+        key: 'link-prediction', name: 'Common Neighbors', description: 'Basic link prediction',
         icon: <GitBranch className="w-4 h-4" />, category: 'prediction',
-        endpoint: '/analytics/link-prediction',
-        simpleInfo: 'Predicts which nodes should likely be connected but aren\'t yet.',
-        benefit: 'Discovers missing relationships in your knowledge.',
+        endpoint: '/analytics/link-prediction?method=common_neighbors',
+        simpleInfo: 'Predicts connections based on the number of shared neighbors.',
+        benefit: 'Best for finding logical connections between related entities.',
+    },
+    {
+        key: 'adamic-adar', name: 'Adamic Adar', description: 'Advanced prediction',
+        icon: <Sparkles className="w-4 h-4" />, category: 'prediction',
+        endpoint: '/analytics/link-prediction?method=adamic_adar',
+        simpleInfo: 'A weighted predictor that prioritizes rare shared connections.',
+        benefit: 'Highlights unique, non-obvious relationships.',
+    },
+    {
+        key: 'resource-allocation', name: 'Resource Distribution', description: 'Flow-based prediction',
+        icon: <ArrowLeftRight className="w-4 h-4" />, category: 'prediction',
+        endpoint: '/analytics/link-prediction?method=resource_allocation',
+        simpleInfo: 'Predicts links by simulating how information "flows" between nodes.',
+        benefit: 'Excellent for finding high-probability hidden links.',
+    },
+    {
+        key: 'hits', name: 'HITS', description: 'Hubs & Authorities',
+        icon: <Users className="w-4 h-4" />, category: 'centrality',
+        endpoint: '/analytics/centrality/hits',
+        simpleInfo: 'Identifies authority sources and hub aggregators of information.',
+        benefit: 'Great for finding the most expert/reliable sources in data.',
+    },
+    {
+        key: 'wcc', name: 'Connected Islands', description: 'Find isolated groups',
+        icon: <Layers className="w-4 h-4" />, category: 'community',
+        endpoint: '/analytics/community/wcc',
+        simpleInfo: 'Finds groups of nodes that are completely disconnected from the rest.',
+        benefit: 'Helps identify silos or fragmented parts of your knowledge graph.',
+    },
+    {
+        key: 'k-core', name: 'Core Analysis', description: 'Find the graph center',
+        icon: <Target className="w-4 h-4" />, category: 'decomposition',
+        endpoint: '/analytics/community/kcore',
+        simpleInfo: 'Finds the "inner sanctum" of your graph where everything is densly connected.',
+        benefit: 'Identifies the most robust and stable heart of your data.',
+    },
+    {
+        key: 'shortest-path', name: 'Shortest Path', description: 'Find Dijkstra path',
+        icon: <Share2 className="w-4 h-4" />, category: 'pathfinding',
+        endpoint: '/analytics/path/shortest',
+        simpleInfo: 'Finds the most efficient route between two specific nodes.',
+        benefit: 'Crucial for logic-chain analysis and connection deep-dives.',
+    },
+    {
+        key: 'articlerank', name: 'ArticleRank', description: 'Diverse influence',
+        icon: <BarChart3 className="w-4 h-4" />, category: 'centrality',
+        endpoint: '/analytics/centrality/articlerank',
+        simpleInfo: 'A variant of PageRank that handles heterogenous graphs better.',
+        benefit: 'Great for ranking entities with varying connection types.',
+    },
+    {
+        key: 'bfs', name: 'BFS Traversal', description: 'Breadth-first search',
+        icon: <Zap className="w-4 h-4" />, category: 'pathfinding',
+        endpoint: '/analytics/path/traversal?method=bfs',
+        simpleInfo: 'Explores nodes layer by layer from a starting point.',
+        benefit: 'Finds the closest "neighbors" within a specific distance.',
+    },
+    {
+        key: 'dfs', name: 'DFS Traversal', description: 'Depth-first search',
+        icon: <Activity className="w-4 h-4" />, category: 'pathfinding',
+        endpoint: '/analytics/path/traversal?method=dfs',
+        simpleInfo: 'Follows a path as far as possible before backtracking.',
+        benefit: 'Useful for exploring deep hierarchies or long sequences.',
+    },
+    {
+        key: 'random-walk', name: 'Random Walk', description: 'Simulated exploration',
+        icon: <Play className="w-4 h-4" />, category: 'pathfinding',
+        endpoint: '/analytics/path/random-walk',
+        simpleInfo: 'Simulates a user "wandering" through the graph randomly.',
+        benefit: 'Uncovers non-obvious paths and associative links.',
+    },
+    {
+        key: 'topological-sort', name: 'Logical Sequence', description: 'Topo-Sort (DAG)',
+        icon: <ChevronRight className="w-4 h-4" />, category: 'topology',
+        endpoint: '/analytics/topology/topological-sort',
+        simpleInfo: 'Orders nodes in a logical linear sequence (for DAGs).',
+        benefit: 'Perfect for understanding process flows or timelines.',
+    },
+    {
+        key: 'triangles', name: 'Triangle Count', description: 'Local density',
+        icon: <Activity className="w-4 h-4" />, category: 'community',
+        endpoint: '/analytics/community/triangles',
+        simpleInfo: 'Counts local triangles to measure how tight-knit groups are.',
+        benefit: 'Reveals which parts of the graph have the strongest collaboration.',
     },
 ];
 
@@ -147,39 +233,79 @@ const CATEGORIES: { key: AlgorithmCategory; label: string; icon: React.ReactNode
     { key: 'centrality', label: 'Centrality', icon: <TrendingUp className="w-4 h-4" />, color: '#4ade80' },
     { key: 'community', label: 'Community', icon: <Network className="w-4 h-4" />, color: '#34d399' },
     { key: 'prediction', label: 'Prediction', icon: <Lightbulb className="w-4 h-4" />, color: '#6ee7b7' },
+    { key: 'decomposition', label: 'Decomposition', icon: <Layers className="w-4 h-4" />, color: '#10b981' },
+    { key: 'pathfinding', label: 'Pathfinding', icon: <Zap className="w-4 h-4" />, color: '#059669' },
+    { key: 'topology', label: 'Topology', icon: <Network className="w-4 h-4" />, color: '#047857' },
 ];
 
-// ─── Human-friendly summary builder ────────────────────────
-
-function buildSummary(algo: AlgorithmConfig, result: AlgorithmResult): string {
-    const count = result.results?.length || 0;
+function buildSummary(algo: AlgorithmConfig, result: AlgorithmResult, totalNodes: number): string {
+    const resultCount = result.results?.length || 0;
     const top = result.results?.[0];
 
     switch (algo.category) {
         case 'centrality':
-            if (top) {
-                return `Out of ${count} nodes analyzed, "${top.name}" (${top.type || 'Entity'}) is the most ${algo.key === 'pagerank' ? 'influential' : algo.key === 'betweenness' ? 'critical bridge' : 'centrally located'} with a score of ${top.score?.toFixed(4) || 'N/A'}. ${result.insight || ''}`;
+            if (algo.key === 'hits' && top) {
+                const topHub = result.results?.reduce((a, b) => (a.hub_score || 0) > (b.hub_score || 0) ? a : b);
+                return `Across all ${totalNodes} entities in the graph, HITS analysis identified "${top.name}" as the top authority (score: ${top.auth_score?.toFixed(4) || 'N/A'}), meaning it is the most referenced and trusted source. ${topHub?.name !== top.name ? `Meanwhile, "${topHub?.name}" emerged as the primary hub, actively linking to and aggregating many other entities.` : 'It also acts as a leading hub, both receiving and distributing information.'} ${result.insight || ''}`;
             }
-            return result.insight || `Analysis complete. ${count} nodes ranked.`;
+            if (top) {
+                const trait = algo.key === 'pagerank' || algo.key === 'articlerank' ? 'influential' : algo.key === 'betweenness' ? 'critical bridge' : 'centrally located';
+                const second = result.results?.[1];
+                let summary = `After analyzing all ${totalNodes} entities in the graph, "${top.name}" (${top.type || 'Entity'}) emerged as the most ${trait} node with a score of ${top.score?.toFixed(4) || 'N/A'}.`;
+                if (second) {
+                    summary += ` It is followed closely by "${second.name}" (score: ${second.score?.toFixed(4)}). The top ${resultCount} results are shown below, ranked by significance.`;
+                }
+                if (result.insight) summary += ` ${result.insight}`;
+                return summary;
+            }
+            return result.insight || `Analysis complete across ${totalNodes} entities. ${resultCount} results ranked.`;
 
         case 'community': {
-            const communities = new Set(result.results?.map(r => r.community ?? r.score));
-            return `Found ${communities.size} distinct communities across ${count} nodes. ${result.insight || 'Nodes within the same community share dense connections.'}`;
+            const communities = new Set(result.results?.map(r => r.community ?? r.community_id ?? r.score));
+            const commSizes = Array.from(communities).map(c =>
+                result.results?.filter(r => (r.community ?? r.community_id ?? r.score) === c).length || 0
+            );
+            const largest = Math.max(...commSizes, 0);
+            const smallest = Math.min(...commSizes, 0);
+            let summary = `Analysis of ${totalNodes} entities revealed ${communities.size} distinct communities.`;
+            if (communities.size > 1) {
+                summary += ` The largest community contains ${largest} members, while the smallest has ${smallest}. Entities within the same community share significantly denser connections with each other than with the rest of the graph.`;
+            } else if (communities.size === 1) {
+                summary += ` All analyzed entities belong to a single, tightly-knit cluster, indicating a highly cohesive dataset.`;
+            }
+            if (result.insight) summary += ` ${result.insight}`;
+            return summary;
         }
 
         case 'prediction':
             if (algo.key === 'node-similarity' && top) {
-                return `Found ${count} similar node pairs. The most similar pair has a similarity score of ${top.score?.toFixed(4) || 'N/A'}. ${result.insight || ''}`;
+                return `Compared all ${totalNodes} entities and found ${resultCount} significantly similar pairs. The strongest match is "${top.source_name || top.name}" ↔ "${top.target_name}" with ${((top.score || top.similarity || 0) * 100).toFixed(1)}% Jaccard similarity, meaning they share nearly identical connection patterns. ${result.insight || ''}`;
             }
-            if (algo.key === 'link-prediction') {
-                return `Predicted ${count} potential missing connections. ${result.insight || 'These are relationships that likely exist but haven\'t been documented yet.'}`;
+            if (['link-prediction', 'adamic-adar', 'resource-allocation'].includes(algo.key)) {
+                return `Scanned ${totalNodes} entities for potential hidden connections and predicted ${resultCount} candidate links. ${top ? `The strongest prediction is "${top.source_name}" ↔ "${top.target_name}" (score: ${top.score?.toFixed(4) || 'N/A'}), suggesting these entities are very likely to be related but not yet connected.` : ''} ${result.insight || ''}`;
             }
-            return result.insight || `${count} results found.`;
+            return result.insight || `${resultCount} results found across ${totalNodes} entities.`;
 
+        case 'decomposition':
+            if (top && result.results) {
+                const maxCore = Math.max(...result.results.map(r => r.score || 0));
+                return `K-Core decomposition of ${totalNodes} entities identified ${resultCount} nodes in the stable core (k ≥ ${(result.parameters as any)?.k || 3}). The densest core level reached is ${maxCore}, occupied by the most interconnected entities. ${result.insight || ''}`;
+            }
+            return result.insight || `Decomposition complete. Grouped ${resultCount} of ${totalNodes} entities into structural layers.`;
 
+        case 'pathfinding':
+            if (algo.key === 'shortest-path' && result.results?.length > 0) {
+                const source = result.results[0].name;
+                const target = result.results[result.results.length - 1].name;
+                return `Successfully traced the shortest route from "${source}" to "${target}" through ${resultCount} intermediate entities, with a total traversal cost of ${(result as any).total_cost?.toFixed(2) || 'N/A'}. Each step represents the most efficient hop between related concepts.`;
+            }
+            return result.insight || `Exploration complete. Traversed ${resultCount} entities out of the ${totalNodes} in the graph.`;
+
+        case 'topology':
+            return result.insight || `Topological ordering complete. Arranged ${resultCount} of ${totalNodes} entities into a logical sequence based on their directional dependencies.`;
 
         default:
-            return result.insight || `Processed ${count} results.`;
+            return result.insight || `Processed ${resultCount} results across ${totalNodes} entities.`;
     }
 }
 
@@ -227,20 +353,41 @@ export function AlgorithmDrawer({
     // Run algorithm on target nodes
     const runAlgorithm = useCallback(async () => {
         if (!selectedAlgorithm) return;
+
+        // Pathfinding validation
+        if (selectedAlgorithm.category === 'pathfinding' && selectedNodes.length === 0) {
+            setError('Please select a starting node in the graph first.');
+            return;
+        }
+
+        if (selectedAlgorithm.key === 'shortest-path' && selectedNodes.length < 2) {
+            setError('Shortest Path requires exactly 2 selected nodes (Source and Target).');
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
         setResult(null);
 
         try {
             const ids = nodeIds.length > 0 && nodeIds.length < nodes.length ? nodeIds : undefined;
-            const data = await fetchAlgorithm(selectedAlgorithm.endpoint, folderId, ids);
+            const extra: Record<string, any> = {};
+
+            if (selectedAlgorithm.category === 'pathfinding' || selectedAlgorithm.key === 'random-walk') {
+                extra.source_id = selectedNodes[0];
+                if (selectedAlgorithm.key === 'shortest-path') {
+                    extra.target_id = selectedNodes[1];
+                }
+            }
+
+            const data = await fetchAlgorithm(selectedAlgorithm.endpoint, folderId, ids, extra);
             setResult(data);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Algorithm failed. Please try again.');
         } finally {
             setIsLoading(false);
         }
-    }, [selectedAlgorithm, folderId, nodeIds, nodes.length]);
+    }, [selectedAlgorithm, folderId, nodeIds, nodes.length, selectedNodes]);
 
     if (!isOpen) return null;
 
@@ -480,13 +627,13 @@ export function AlgorithmDrawer({
 
                                     {/* Algorithm description */}
                                     <div className="mt-4 grid grid-cols-2 gap-4">
-                                        <div className="p-3 rounded-xl" style={{ background: '#f0fdf4' }}>
-                                            <span className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: '#6b7280' }}>What it does</span>
-                                            <p className="text-xs text-gray-600 leading-relaxed">{selectedAlgorithm.simpleInfo}</p>
+                                        <div className="p-4 rounded-xl border" style={{ background: '#f8fffe', borderColor: '#d1fae5', borderLeft: '3px solid #86efac' }}>
+                                            <span className="text-[9px] font-bold uppercase tracking-wider block mb-1.5" style={{ color: '#6b7280' }}>What it does</span>
+                                            <p className="text-xs text-gray-700 leading-relaxed">{selectedAlgorithm.simpleInfo}</p>
                                         </div>
-                                        <div className="p-3 rounded-xl" style={{ background: '#f0fdf4' }}>
-                                            <span className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: '#16a34a' }}>Why it helps</span>
-                                            <p className="text-xs text-gray-600 leading-relaxed">{selectedAlgorithm.benefit}</p>
+                                        <div className="p-4 rounded-xl border" style={{ background: '#f0fdf4', borderColor: '#bbf7d0', borderLeft: '3px solid #22c55e' }}>
+                                            <span className="text-[9px] font-bold uppercase tracking-wider block mb-1.5" style={{ color: '#16a34a' }}>Why it helps</span>
+                                            <p className="text-xs text-gray-700 leading-relaxed">{selectedAlgorithm.benefit}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -517,18 +664,24 @@ export function AlgorithmDrawer({
                                             <motion.div
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
-                                                className="p-5 rounded-2xl border"
-                                                style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}
+                                                className="rounded-2xl border overflow-hidden"
+                                                style={{ borderColor: '#86efac', boxShadow: '0 2px 12px rgba(34, 197, 94, 0.08)' }}
                                             >
-                                                <div className="flex items-start gap-3 mb-3">
-                                                    <Sparkles className="w-5 h-5 mt-0.5 shrink-0" style={{ color: '#22c55e' }} />
-                                                    <div>
-                                                        <h4 className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#166534' }}>
-                                                            Summary
-                                                        </h4>
-                                                        <p className="text-sm text-gray-700 leading-relaxed">
-                                                            {buildSummary(selectedAlgorithm, result)}
-                                                        </p>
+                                                {/* Accent bar */}
+                                                <div style={{ height: 3, background: 'linear-gradient(90deg, #22c55e, #86efac, #bbf7d0)' }} />
+                                                <div className="p-5" style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f8fffe 100%)' }}>
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="p-2 rounded-lg shrink-0" style={{ background: '#dcfce7' }}>
+                                                            <Sparkles className="w-4 h-4" style={{ color: '#16a34a' }} />
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#166534' }}>
+                                                                Analysis Summary
+                                                            </h4>
+                                                            <p className="text-[13px] text-gray-700 leading-[1.7]">
+                                                                {buildSummary(selectedAlgorithm, result, nodeCount)}
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </motion.div>
@@ -548,10 +701,10 @@ export function AlgorithmDrawer({
                                                         </div>
                                                     </div>
 
-                                                    <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#d1fae5' }}>
+                                                    <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#a7f3d0', boxShadow: '0 1px 6px rgba(16, 185, 129, 0.06)' }}>
                                                         {/* Table Header */}
-                                                        <div className="grid grid-cols-12 gap-2 px-4 py-2.5 text-[9px] font-bold uppercase tracking-wider"
-                                                            style={{ background: '#f0fdf4', color: '#6b7280' }}
+                                                        <div className="grid grid-cols-12 gap-2 px-5 py-3 text-[9px] font-bold uppercase tracking-wider border-b"
+                                                            style={{ background: '#ecfdf5', color: '#374151', borderColor: '#a7f3d0' }}
                                                         >
                                                             <div className="col-span-1">#</div>
                                                             <div className="col-span-5">Name</div>
@@ -573,11 +726,11 @@ export function AlgorithmDrawer({
                                                                     initial={{ opacity: 0 }}
                                                                     animate={{ opacity: 1 }}
                                                                     transition={{ delay: i * 0.02 }}
-                                                                    className="grid grid-cols-12 gap-2 px-4 py-3 items-center border-t text-xs hover:bg-green-50/50 transition-colors"
-                                                                    style={{ borderColor: '#f0fdf4' }}
+                                                                    className="grid grid-cols-12 gap-2 px-5 py-3 items-center border-t text-xs hover:bg-green-50/60 transition-colors"
+                                                                    style={{ borderColor: '#d1fae5', background: i % 2 === 0 ? '#fefffe' : '#f8fdfb' }}
                                                                 >
-                                                                    <div className="col-span-1 text-gray-300 font-bold text-[10px]">{i + 1}</div>
-                                                                    <div className="col-span-5 font-semibold text-gray-700">
+                                                                    <div className="col-span-1 font-bold text-[10px]" style={{ color: '#9ca3af' }}>{i + 1}</div>
+                                                                    <div className="col-span-5 font-semibold text-gray-800">
                                                                         {secondaryName ? (
                                                                             <div className="flex items-center gap-2 truncate">
                                                                                 <span className="truncate">{name}</span>
@@ -597,7 +750,13 @@ export function AlgorithmDrawer({
                                                                     </div>
                                                                     <div className="col-span-3 text-right font-mono font-bold text-[11px]" style={{ color: '#16a34a' }}>
                                                                         {scoreValue !== undefined ? scoreValue.toFixed(4) :
-                                                                            communityValue !== undefined ? `Group ${communityValue}` : '—'}
+                                                                            item.hub_score !== undefined ? (
+                                                                                <div className="flex flex-col text-[9px] leading-tight">
+                                                                                    <span>A: {item.auth_score?.toFixed(3)}</span>
+                                                                                    <span className="text-gray-400">H: {item.hub_score?.toFixed(3)}</span>
+                                                                                </div>
+                                                                            ) :
+                                                                                communityValue !== undefined ? `Group ${communityValue}` : '—'}
                                                                     </div>
                                                                 </motion.div>
                                                             );

@@ -55,7 +55,8 @@ class APIClient {
                     searchParams.append(key, String(value));
                 }
             });
-            url += `?${searchParams.toString()}`;
+            const separator = url.includes('?') ? '&' : '?';
+            url += `${separator}${searchParams.toString()}`;
         }
 
         // Add auth header
