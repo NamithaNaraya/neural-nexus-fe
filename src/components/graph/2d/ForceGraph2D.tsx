@@ -704,23 +704,30 @@ export function ForceGraph2D({
                     const t = typeof link.target === 'string' ? link.target : (link.target as D3Node).id;
                     if (!s || !t) return;
 
-                    // 1. Context Filtering: If we are in "Herb Mode", only follow HAS_QUALITY links
-                    // that match our origin herb name.
                     const linkType = (link.type || '').toUpperCase().replace(/[\s-]/g, '_');
 
-                    if (originHerbName && linkType === 'HAS_QUALITY') {
-                        const herbProp = (link.properties?.herb as string || '').trim();
-                        if (!herbProp) return; // Skip if no herb property on a quality link in context mode
+                    // In Herb context mode:
+                    // Hop 0: Follow HAS_PROPERTY from Herb → PropertyType (forward only)
+                    // Hop 1+: Follow only HAS_QUALITY links that match our herb
+                    //         Block HAS_PROPERTY (would leak to sibling Herbs)
+                    if (originHerbName) {
+                        if (hop > 0 && linkType === 'HAS_PROPERTY') {
+                            return; // Don't follow HAS_PROPERTY back to other herbs
+                        }
 
-                        const v = herbProp.toLowerCase();
-                        const o = originHerbName.toLowerCase();
-                        const matchesOrigin = v === o || o.includes(v) || v.includes(o);
+                        if (linkType === 'HAS_QUALITY') {
+                            const herbProp = (link.properties?.herb as string || '').trim();
+                            if (!herbProp) return;
 
-                        if (!matchesOrigin) return;
+                            const v = herbProp.toLowerCase();
+                            const o = originHerbName.toLowerCase();
+                            const matchesOrigin = v === o || o.includes(v) || v.includes(o);
+
+                            if (!matchesOrigin) return;
+                        }
                     }
 
-                    // 2. Traversal: Add neighbors to the focus set
-                    // We allow bidirectional traversal for all hops to support more complex graph paths
+                    // Traversal: forward direction
                     if (currentLevel.includes(s)) {
                         focusLinkKeys.add(`${s}-${t}`);
                         if (!neighbors.has(t)) {
@@ -728,7 +735,8 @@ export function ForceGraph2D({
                             nextLevel.push(t);
                         }
                     }
-                    if (currentLevel.includes(t)) {
+                    // Reverse direction only on hop 0 (to pick up incoming links to the focus node)
+                    if (hop === 0 && currentLevel.includes(t)) {
                         focusLinkKeys.add(`${s}-${t}`);
                         if (!neighbors.has(s)) {
                             neighbors.add(s);
