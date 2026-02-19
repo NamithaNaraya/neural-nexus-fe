@@ -1,8 +1,9 @@
 /**
  * Algorithm Drawer
  * 
- * Slide-out drawer containing algorithm panels.
- * Reduces clutter on the main graph view.
+ * Simplified analytics panel.
+ * Uses existing graph filters for scope.
+ * Pastel green theme with clean result summaries.
  */
 'use client';
 
@@ -13,37 +14,33 @@ import {
     Activity,
     Network,
     Share2,
-    Lightbulb,
-    TrendingUp,
-    Layers,
     Target,
     Zap,
-    PieChart,
-    GitBranch,
+    TrendingUp,
+    Layers,
     Search,
     BarChart3,
-    Info,
-    ChevronLeft,
+    PieChart,
+    GitBranch,
+    Lightbulb,
     ChevronRight,
-    Check,
-    ArrowRight,
+    Play,
     Sparkles,
-    Brain,
-    Globe,
-    BoxSelect,
-    MousePointer2,
     Users,
+    ArrowLeftRight,
+    CheckCircle2,
 } from 'lucide-react';
-import { LoadingSpinner } from '@/components/shared';
 import { api } from '@/lib/api';
 import { useGraphStore } from '@/store/graphStore';
 
-// Result types
+// ─── Types ──────────────────────────────────────────────────
+
 interface AlgorithmResultItem {
     id: string;
     name: string;
     type?: string;
     score?: number;
+    community?: number;
     [key: string]: unknown;
 }
 
@@ -59,8 +56,6 @@ interface AlgorithmDrawerProps {
     isOpen: boolean;
     onClose: () => void;
     folderId?: string;
-
-    // Externalized Scope State
     runOnSelection?: boolean;
     initialSetupPhase?: boolean;
     includeNeighbors?: boolean;
@@ -80,768 +75,509 @@ interface AlgorithmConfig {
     benefit: string;
 }
 
-// Helper to fetch algorithm results
+// ─── API Helper ─────────────────────────────────────────────
+
 async function fetchAlgorithm(endpoint: string, folderId?: string, nodeIds?: string[]): Promise<AlgorithmResult> {
     const params: Record<string, any> = {};
     if (folderId) params.folder_id = folderId;
     if (nodeIds && nodeIds.length > 0) params.node_ids = nodeIds;
-
     return api.get<AlgorithmResult>(endpoint, params);
 }
 
+// ─── Algorithm Definitions ──────────────────────────────────
 
 const algorithms: AlgorithmConfig[] = [
     {
-        key: 'pagerank',
-        name: 'PageRank',
-        description: 'Find influential nodes',
-        icon: <TrendingUp className="w-4 h-4" />,
-        category: 'centrality',
+        key: 'pagerank', name: 'PageRank', description: 'Most influential nodes',
+        icon: <TrendingUp className="w-4 h-4" />, category: 'centrality',
         endpoint: '/analytics/centrality/pagerank',
-        simpleInfo: "Evaluates the relative importance of nodes based on the quality and quantity of their connections.",
-        benefit: "Reveals high-authority hubs and primary influence centers in your dataset."
+        simpleInfo: 'Finds the most important nodes based on how many quality connections they have.',
+        benefit: 'Reveals the key players and authority hubs in your data.',
     },
     {
-        key: 'betweenness',
-        name: 'Betweenness',
-        description: 'Find bridge nodes',
-        icon: <Share2 className="w-4 h-4" />,
-        category: 'centrality',
+        key: 'betweenness', name: 'Betweenness', description: 'Bridge & connector nodes',
+        icon: <Share2 className="w-4 h-4" />, category: 'centrality',
         endpoint: '/analytics/centrality/betweenness',
-        simpleInfo: "Identifies 'bridge' nodes that serve as critical connectors between isolated data clusters.",
-        benefit: "Pinpoints bottleneck entities that control the flow of information across your network."
+        simpleInfo: 'Finds nodes that act as bridges connecting different groups.',
+        benefit: 'Identifies bottleneck entities that control information flow.',
     },
     {
-        key: 'closeness',
-        name: 'Closeness',
-        description: 'Find central nodes',
-        icon: <Target className="w-4 h-4" />,
-        category: 'centrality',
+        key: 'closeness', name: 'Closeness', description: 'Centrally located nodes',
+        icon: <Target className="w-4 h-4" />, category: 'centrality',
         endpoint: '/analytics/centrality/closeness',
-        simpleInfo: "Measures how quickly a node can access all other pieces of information in the dataset.",
-        benefit: "Detects the most efficiently positioned nodes for data distribution or gathering."
+        simpleInfo: 'Finds nodes that are closest to all other nodes in the network.',
+        benefit: 'Shows which entities can reach everything most efficiently.',
     },
     {
-        key: 'louvain',
-        name: 'Louvain',
-        description: 'Find communities',
-        icon: <Network className="w-4 h-4" />,
-        category: 'community',
+        key: 'louvain', name: 'Louvain', description: 'Detect communities',
+        icon: <Network className="w-4 h-4" />, category: 'community',
         endpoint: '/analytics/community/louvain',
-        simpleInfo: "Uncovers deep community structures by grouping nodes into highly cohesive thematic clusters.",
-        benefit: "Exposes logical segmentations and hidden organizational patterns in complex data."
+        simpleInfo: 'Groups nodes into communities or clusters based on dense connections.',
+        benefit: 'Shows natural groupings and hidden structure in your data.',
     },
     {
-        key: 'leiden',
-        name: 'Leiden',
-        description: 'Precise communities',
-        icon: <Layers className="w-4 h-4" />,
-        category: 'community',
+        key: 'leiden', name: 'Leiden', description: 'Precise communities',
+        icon: <Layers className="w-4 h-4" />, category: 'community',
         endpoint: '/analytics/community/leiden',
-        simpleInfo: "Utilizes advanced modularity optimization to find extremely precise and well-defined communities.",
-        benefit: "Provides high-resolution clustering for more accurate cross-modality data analysis."
+        simpleInfo: 'An improved community detection that finds very precise groups.',
+        benefit: 'Gives you the most accurate clustering of your data.',
     },
     {
-        key: 'node-similarity',
-        name: 'Similarity',
-        description: 'Find similar pairs',
-        icon: <Search className="w-4 h-4" />,
-        category: 'prediction',
+        key: 'node-similarity', name: 'Similarity', description: 'Find similar pairs',
+        icon: <Search className="w-4 h-4" />, category: 'prediction',
         endpoint: '/analytics/similarity/nodes',
-        simpleInfo: "Compares structural overlap between nodes to find entities with identical connection profiles.",
-        benefit: "Ideal for identifying duplicates, related entities, or making data recommendations."
+        simpleInfo: 'Compares nodes to find those with similar connection patterns.',
+        benefit: 'Great for finding duplicates or related entities.',
     },
     {
-        key: 'link-prediction',
-        name: 'Link Prediction',
-        description: 'Predict connections',
-        icon: <GitBranch className="w-4 h-4" />,
-        category: 'prediction',
+        key: 'link-prediction', name: 'Link Prediction', description: 'Predict missing links',
+        icon: <GitBranch className="w-4 h-4" />, category: 'prediction',
         endpoint: '/analytics/link-prediction',
-        simpleInfo: "Analyzes existing relationship patterns to forecast likely future connections between entities.",
-        benefit: "Anticipates growth trends and discovers missing links before they are explicitly documented."
+        simpleInfo: 'Predicts which nodes should likely be connected but aren\'t yet.',
+        benefit: 'Discovers missing relationships in your knowledge.',
     },
     {
-        key: 'health',
-        name: 'Graph Health',
-        description: 'Overall quality score',
-        icon: <Activity className="w-4 h-4" />,
-        category: 'analysis',
+        key: 'health', name: 'Graph Health', description: 'Overall quality score',
+        icon: <Activity className="w-4 h-4" />, category: 'analysis',
         endpoint: '/analytics/health',
-        simpleInfo: "Checks how well-connected and structured your entire network is.",
-        benefit: "Gives you a high-level view of your data's integrity and quality."
+        simpleInfo: 'Checks how well-connected and structured your network is.',
+        benefit: 'Gives a high-level view of your data quality and integrity.',
     },
     {
-        key: 'completeness',
-        name: 'Completeness',
-        description: 'Knowledge coverage',
-        icon: <PieChart className="w-4 h-4" />,
-        category: 'analysis',
+        key: 'completeness', name: 'Completeness', description: 'Knowledge coverage',
+        icon: <PieChart className="w-4 h-4" />, category: 'analysis',
         endpoint: '/analytics/completeness',
-        simpleInfo: "Analyzes how much information is missing from your nodes and relationships.",
-        benefit: "Highlights gaps in your data where you need more information."
+        simpleInfo: 'Analyzes how much information is missing from your data.',
+        benefit: 'Highlights gaps where you need more data.',
     },
     {
-        key: 'degree-distribution',
-        name: 'Connectivity',
-        description: 'Connection patterns',
-        icon: <BarChart3 className="w-4 h-4" />,
-        category: 'analysis',
+        key: 'degree-distribution', name: 'Connectivity', description: 'Connection patterns',
+        icon: <BarChart3 className="w-4 h-4" />, category: 'analysis',
         endpoint: '/analytics/degree-distribution',
-        simpleInfo: "Shows the general patterns of how nodes are connecting to each other.",
-        benefit: "Reveals the underlying structural logic of your entire network."
+        simpleInfo: 'Shows patterns of how nodes connect to each other.',
+        benefit: 'Reveals the underlying structure of your network.',
     },
 ];
 
-const categoryLabels: Record<AlgorithmCategory, { label: string; icon: React.ReactNode }> = {
-    centrality: { label: 'Centrality', icon: <TrendingUp className="w-4 h-4" /> },
-    community: { label: 'Community', icon: <Network className="w-4 h-4" /> },
-    prediction: { label: 'Prediction', icon: <Lightbulb className="w-4 h-4" /> },
-    analysis: { label: 'Analysis', icon: <Activity className="w-4 h-4" /> },
-};
+const CATEGORIES: { key: AlgorithmCategory; label: string; icon: React.ReactNode; color: string }[] = [
+    { key: 'centrality', label: 'Centrality', icon: <TrendingUp className="w-4 h-4" />, color: '#4ade80' },
+    { key: 'community', label: 'Community', icon: <Network className="w-4 h-4" />, color: '#34d399' },
+    { key: 'prediction', label: 'Prediction', icon: <Lightbulb className="w-4 h-4" />, color: '#6ee7b7' },
+    { key: 'analysis', label: 'Analysis', icon: <Activity className="w-4 h-4" />, color: '#a7f3d0' },
+];
+
+// ─── Human-friendly summary builder ────────────────────────
+
+function buildSummary(algo: AlgorithmConfig, result: AlgorithmResult): string {
+    const count = result.results?.length || 0;
+    const top = result.results?.[0];
+
+    switch (algo.category) {
+        case 'centrality':
+            if (top) {
+                return `Out of ${count} nodes analyzed, "${top.name}" (${top.type || 'Entity'}) is the most ${algo.key === 'pagerank' ? 'influential' : algo.key === 'betweenness' ? 'critical bridge' : 'centrally located'} with a score of ${top.score?.toFixed(4) || 'N/A'}. ${result.insight || ''}`;
+            }
+            return result.insight || `Analysis complete. ${count} nodes ranked.`;
+
+        case 'community': {
+            const communities = new Set(result.results?.map(r => r.community ?? r.score));
+            return `Found ${communities.size} distinct communities across ${count} nodes. ${result.insight || 'Nodes within the same community share dense connections.'}`;
+        }
+
+        case 'prediction':
+            if (algo.key === 'node-similarity' && top) {
+                return `Found ${count} similar node pairs. The most similar pair has a similarity score of ${top.score?.toFixed(4) || 'N/A'}. ${result.insight || ''}`;
+            }
+            if (algo.key === 'link-prediction') {
+                return `Predicted ${count} potential missing connections. ${result.insight || 'These are relationships that likely exist but haven\'t been documented yet.'}`;
+            }
+            return result.insight || `${count} results found.`;
+
+        case 'analysis':
+            return result.insight || `Analysis complete with ${count} data points.`;
+
+        default:
+            return result.insight || `Processed ${count} results.`;
+    }
+}
+
+// ─── Main Component ─────────────────────────────────────────
 
 export function AlgorithmDrawer({
     isOpen,
     onClose,
     folderId,
-    runOnSelection: externalRunOnSelection = false,
-    initialSetupPhase = false, // Default to false now as we unify
-    includeNeighbors: externalIncludeNeighbors = false,
 }: AlgorithmDrawerProps) {
-    const { nodes, nodeTypes, selectedNodes, setSelectedNodes, links } = useGraphStore();
+    const { filteredNodes, filteredLinks, nodes, links } = useGraphStore();
 
-    // UI state
-    const [activeTab, setActiveTab] = useState<'scope' | 'types' | 'nodes' | 'algorithms'>('algorithms');
-    const [activeCategory, setActiveCategory] = useState<AlgorithmCategory>('centrality');
-    const [selectedAlgorithm, setSelectedAlgorithm] = useState<string | null>(null);
+    // State
+    const [expandedCategory, setExpandedCategory] = useState<AlgorithmCategory | null>(null);
+    const [selectedAlgorithm, setSelectedAlgorithm] = useState<AlgorithmConfig | null>(null);
     const [result, setResult] = useState<AlgorithmResult | null>(null);
-
-    // Selection state (internal to drawer until "Applied")
-    const [selectedScope, setSelectedScope] = useState<'global' | 'targeted'>(externalRunOnSelection ? 'targeted' : 'global');
-    const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-    const [internalSelectedIds, setInternalSelectedIds] = useState<string[]>(selectedNodes);
-    const [nodeSearchQuery, setNodeSearchQuery] = useState('');
-    const [includeNeighbors, setIncludeNeighbors] = useState(externalIncludeNeighbors);
-
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Sync from store when opened or store changes
-    React.useEffect(() => {
-        if (isOpen) {
-            setInternalSelectedIds(selectedNodes);
-            if (selectedNodes.length > 0) setSelectedScope('targeted');
-        }
-    }, [isOpen, selectedNodes]);
+    // Derive filtered counts from existing graph filters
+    const visibleNodes = React.useMemo(() => filteredNodes(), [filteredNodes, nodes]);
+    const visibleLinks = React.useMemo(() => filteredLinks(), [filteredLinks, links]);
+    const nodeCount = visibleNodes.length;
+    const linkCount = visibleLinks.length;
+    const nodeIds = React.useMemo(() => visibleNodes.map(n => n.id), [visibleNodes]);
 
-    // Derived Data for entity selection
-    const filteredNodes = React.useMemo(() => {
-        if (!nodeSearchQuery) return nodes.slice(0, 50);
-        const q = nodeSearchQuery.toLowerCase();
-        return nodes.filter(n =>
-            n.name.toLowerCase().includes(q) ||
-            n.type.toLowerCase().includes(q)
-        ).slice(0, 100);
-    }, [nodes, nodeSearchQuery]);
-
-    // Calculate effective targeted nodes for algorithm execution
-    const effectiveTargetedIds = React.useMemo(() => {
-        if (selectedScope === 'global' && selectedTypes.length === 0 && internalSelectedIds.length === 0) return [];
-
-        // Base selection from types + individual nodes
-        const typeNodeIds = nodes
-            .filter(n => selectedTypes.includes(n.type))
-            .map(n => n.id);
-
-        const baseSet = new Set([...typeNodeIds, ...internalSelectedIds]);
-
-        if (!includeNeighbors) return Array.from(baseSet);
-
-        const neighborIds = new Set(baseSet);
-        links.forEach(link => {
-            const s = typeof link.source === 'string' ? link.source : (link.source as any).id;
-            const t = typeof link.target === 'string' ? link.target : (link.target as any).id;
-
-            if (baseSet.has(s)) neighborIds.add(t);
-            if (baseSet.has(t)) neighborIds.add(s);
-        });
-        return Array.from(neighborIds);
-    }, [selectedScope, selectedTypes, internalSelectedIds, includeNeighbors, nodes, links]);
-
-    const runAlgorithm = useCallback(async (config: AlgorithmConfig) => {
-        setSelectedAlgorithm(config.key);
+    // Run algorithm on filtered nodes
+    const runAlgorithm = useCallback(async () => {
+        if (!selectedAlgorithm) return;
         setIsLoading(true);
         setError(null);
         setResult(null);
 
         try {
-            const nodeIds = effectiveTargetedIds.length > 0 ? effectiveTargetedIds : undefined;
-            const data = await fetchAlgorithm(config.endpoint, folderId, nodeIds);
+            const ids = nodeIds.length > 0 && nodeIds.length < nodes.length ? nodeIds : undefined;
+            const data = await fetchAlgorithm(selectedAlgorithm.endpoint, folderId, ids);
             setResult(data);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Algorithm failed');
+            setError(err instanceof Error ? err.message : 'Algorithm failed. Please try again.');
         } finally {
             setIsLoading(false);
         }
-    }, [folderId, effectiveTargetedIds]);
-
-    const handleApplySelection = () => {
-        setSelectedNodes(effectiveTargetedIds);
-        setActiveTab('algorithms');
-    };
-
-    const navItems = [
-        { id: 'scope', label: 'Domain', icon: <Globe className="w-4 h-4" /> },
-        { id: 'types', label: 'Categories', icon: <Layers className="w-4 h-4" /> },
-        { id: 'nodes', label: 'Entities', icon: <Target className="w-4 h-4" /> },
-        { id: 'algorithms', label: 'Processors', icon: <Zap className="w-4 h-4" /> },
-    ];
+    }, [selectedAlgorithm, folderId, nodeIds, nodes.length]);
 
     if (!isOpen) return null;
 
     return (
         <>
             {/* Backdrop */}
-            <AnimatePresence>
-                {isOpen && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-background/40 dark:bg-black/40 backdrop-blur-xl z-[190]"
-                        onClick={onClose}
-                    />
-                )}
-            </AnimatePresence>
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[190]"
+                onClick={onClose}
+            />
 
             {/* Drawer */}
-            <AnimatePresence>
-                {isOpen && (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.98, y: 10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.98, y: 10 }}
-                        transition={{ duration: 0.3 }}
-                        className="fixed inset-4 md:inset-8 lg:left-[10%] lg:right-[10%] lg:top-[10%] lg:bottom-[10%] bg-white/95 dark:bg-slate-950/90 backdrop-blur-3xl z-[201] flex flex-col overflow-hidden text-foreground rounded-[2.5rem] shadow-[0_32px_128px_rgba(0,0,0,0.4)] border border-white/10"
-                    >
-                        {/* Header */}
-                        <div className="flex items-center justify-between px-10 py-6 border-b border-black/5 dark:border-white/5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md shrink-0">
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 rounded-2xl bg-primary/10 text-primary">
-                                    <Zap className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h2 className="text-2xl font-bold tracking-tight font-heading">Neural Analytics Engine</h2>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-0.5">Automated Intelligence Pipeline • Ready</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-6">
-                                <div className="flex flex-col items-end">
-                                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest leading-none mb-1">Active Scope</span>
-                                    <span className="text-xs font-bold text-primary">
-                                        {effectiveTargetedIds.length > 0 ? `${effectiveTargetedIds.length} Nodes Target` : 'Global Network Scan'}
-                                    </span>
-                                </div>
-                                <button
-                                    onClick={onClose}
-                                    className="p-2.5 rounded-2xl hover:bg-black/5 dark:hover:bg-white/5 transition-all text-muted-foreground hover:text-foreground border border-black/5 dark:border-white/10 shadow-sm"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
+            <motion.div
+                initial={{ opacity: 0, y: 20, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.97 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+                className="fixed inset-4 md:inset-8 lg:left-[8%] lg:right-[8%] lg:top-[6%] lg:bottom-[6%] z-[201] flex flex-col overflow-hidden rounded-3xl shadow-2xl border"
+                style={{
+                    background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 30%, #ffffff 100%)',
+                    borderColor: '#bbf7d0',
+                }}
+            >
+                {/* ── Header ── */}
+                <div className="flex items-center justify-between px-8 py-5 border-b shrink-0"
+                    style={{ borderColor: '#d1fae5', background: 'rgba(240, 253, 244, 0.8)' }}
+                >
+                    <div className="flex items-center gap-4">
+                        <div className="p-2.5 rounded-xl" style={{ background: '#dcfce7' }}>
+                            <Zap className="w-5 h-5" style={{ color: '#16a34a' }} />
                         </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-gray-800 tracking-tight">Graph Analytics</h2>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#16a34a' }}>
+                                Neo4j GDS Algorithms
+                            </p>
+                        </div>
+                    </div>
 
-                        {/* Unified Layout */}
-                        <div className="flex-1 flex overflow-hidden">
-                            {/* Unified Sidebar */}
-                            <div className="w-72 flex flex-col border-r border-black/5 dark:border-white/5 bg-black/[0.01] dark:bg-white/[0.01]">
-                                {/* Navigation Tabs */}
-                                <div className="p-6 space-y-1">
-                                    <span className="block text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-4 px-1">Pipeline Configuration</span>
-                                    {navItems.map(item => (
+                    {/* Stats Pill */}
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3 px-4 py-2 rounded-full text-xs font-bold"
+                            style={{ background: '#dcfce7', color: '#166534' }}
+                        >
+                            <span className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full" style={{ background: '#22c55e' }} />
+                                {nodeCount} nodes
+                            </span>
+                            <span style={{ color: '#bbf7d0' }}>|</span>
+                            <span className="flex items-center gap-1.5">
+                                <ArrowLeftRight className="w-3 h-3" />
+                                {linkCount} links
+                            </span>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="p-2 rounded-xl hover:bg-red-50 transition-colors text-gray-400 hover:text-red-400"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* ── Body: Sidebar + Main ── */}
+                <div className="flex-1 flex overflow-hidden">
+                    {/* ── Sidebar: Categories + Algorithms ── */}
+                    <div className="w-64 flex flex-col border-r overflow-y-auto"
+                        style={{ borderColor: '#d1fae5', background: 'rgba(240, 253, 244, 0.4)' }}
+                    >
+                        <div className="p-5 space-y-1">
+                            <span className="block text-[9px] font-bold uppercase tracking-widest mb-3 px-1" style={{ color: '#6b7280' }}>
+                                Algorithm Categories
+                            </span>
+
+                            {CATEGORIES.map(cat => {
+                                const isExpanded = expandedCategory === cat.key;
+                                const catAlgos = algorithms.filter(a => a.category === cat.key);
+
+                                return (
+                                    <div key={cat.key}>
+                                        {/* Category button */}
                                         <button
-                                            key={item.id}
-                                            onClick={() => {
-                                                setActiveTab(item.id as any);
-                                                if (item.id === 'algorithms' && selectedAlgorithm) {
-                                                    // Keep current algorithm
-                                                }
+                                            onClick={() => setExpandedCategory(isExpanded ? null : cat.key)}
+                                            className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all"
+                                            style={{
+                                                background: isExpanded ? '#dcfce7' : 'transparent',
+                                                color: isExpanded ? '#166534' : '#6b7280',
                                             }}
-                                            className={`
-                                                w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold transition-all
-                                                ${activeTab === item.id
-                                                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                                                    : 'text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground'}
-                                            `}
                                         >
-                                            <div className="flex items-center gap-3">
-                                                {React.cloneElement(item.icon as React.ReactElement, { className: 'w-4 h-4' })}
-                                                {item.label}
+                                            <div className="flex items-center gap-2.5">
+                                                {React.cloneElement(cat.icon as React.ReactElement, { className: 'w-4 h-4' })}
+                                                {cat.label}
                                             </div>
-                                            <ChevronRight className={`w-3 h-3 opacity-30 ${activeTab === item.id ? 'opacity-100' : ''}`} />
+                                            <ChevronRight
+                                                className="w-3 h-3 transition-transform"
+                                                style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                                            />
                                         </button>
-                                    ))}
-                                </div>
 
-                                {/* Contextual Sidebar Content */}
-                                <div className="flex-1 overflow-y-auto p-6 space-y-4 border-t border-black/5 dark:border-white/5">
-                                    {activeTab === 'algorithms' ? (
-                                        <>
-                                            <span className="block text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-2 px-1">Processing Modules</span>
-                                            {Object.entries(categoryLabels).map(([key, { label, icon }]) => (
-                                                <div key={key} className="space-y-1">
-                                                    <button
-                                                        onClick={() => setActiveCategory(key as AlgorithmCategory)}
-                                                        className={`
-                                                            w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[11px] font-bold transition-all
-                                                            ${activeCategory === key ? 'text-primary bg-primary/5' : 'text-muted-foreground/60 hover:text-foreground'}
-                                                        `}
-                                                    >
-                                                        {React.cloneElement(icon as React.ReactElement, { className: 'w-3.5 h-3.5' })}
-                                                        {label}
-                                                    </button>
-
-                                                    {activeCategory === key && (
-                                                        <div className="pl-6 space-y-1 py-1">
-                                                            {algorithms.filter(a => a.category === key).map(algo => (
+                                        {/* Sub-algorithms */}
+                                        <AnimatePresence>
+                                            {isExpanded && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    transition={{ duration: 0.2 }}
+                                                    className="overflow-hidden"
+                                                >
+                                                    <div className="pl-5 pr-1 py-1 space-y-0.5">
+                                                        {catAlgos.map(algo => {
+                                                            const isActive = selectedAlgorithm?.key === algo.key;
+                                                            return (
                                                                 <button
                                                                     key={algo.key}
                                                                     onClick={() => {
-                                                                        setSelectedAlgorithm(algo.key);
+                                                                        setSelectedAlgorithm(algo);
                                                                         setResult(null);
                                                                         setError(null);
                                                                     }}
-                                                                    className={`
-                                                                        w-full text-left px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all
-                                                                        ${selectedAlgorithm === algo.key ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}
-                                                                    `}
+                                                                    className="w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all"
+                                                                    style={{
+                                                                        background: isActive ? '#bbf7d0' : 'transparent',
+                                                                        color: isActive ? '#166534' : '#9ca3af',
+                                                                    }}
                                                                 >
-                                                                    {algo.name}
+                                                                    <div className="font-bold">{algo.name}</div>
+                                                                    <div className="text-[9px] mt-0.5 opacity-70">{algo.description}</div>
                                                                 </button>
-                                                            ))}
-                                                        </div>
-                                                    )}
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Info Footer */}
+                        <div className="mt-auto p-5 border-t" style={{ borderColor: '#d1fae5' }}>
+                            <div className="p-3 rounded-xl text-[10px] leading-relaxed" style={{ background: '#f0fdf4', color: '#6b7280' }}>
+                                <strong className="block mb-1" style={{ color: '#166534' }}>💡 Tip</strong>
+                                Use the graph filters (node types, relationships) to narrow your analysis scope before running algorithms.
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ── Main Content Area ── */}
+                    <div className="flex-1 flex flex-col overflow-hidden" style={{ background: '#fefffe' }}>
+                        {!selectedAlgorithm ? (
+                            /* Empty state */
+                            <div className="flex-1 flex flex-col items-center justify-center text-center p-12">
+                                <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6"
+                                    style={{ background: '#dcfce7' }}
+                                >
+                                    <Network className="w-10 h-10" style={{ color: '#86efac' }} />
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-700 mb-2">Select an Algorithm</h3>
+                                <p className="text-sm text-gray-400 max-w-sm">
+                                    Pick a category from the sidebar, then choose an algorithm to run on your
+                                    <strong className="mx-1" style={{ color: '#16a34a' }}>{nodeCount} filtered nodes</strong>
+                                    and
+                                    <strong className="mx-1" style={{ color: '#16a34a' }}>{linkCount} relationships</strong>.
+                                </p>
+                            </div>
+                        ) : (
+                            /* Algorithm detail + results */
+                            <div className="flex-1 flex flex-col overflow-hidden">
+                                {/* Algorithm Info Header */}
+                                <div className="px-8 py-6 border-b shrink-0" style={{ borderColor: '#d1fae5' }}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-3 rounded-xl" style={{ background: '#dcfce7' }}>
+                                                {React.cloneElement(selectedAlgorithm.icon as React.ReactElement, {
+                                                    className: 'w-5 h-5',
+                                                    style: { color: '#16a34a' },
+                                                })}
+                                            </div>
+                                            <div>
+                                                <h3 className="text-lg font-bold text-gray-800">{selectedAlgorithm.name}</h3>
+                                                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                                                    {selectedAlgorithm.category} algorithm
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Run Button */}
+                                        <button
+                                            onClick={runAlgorithm}
+                                            disabled={isLoading}
+                                            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:shadow-lg active:scale-95 disabled:opacity-50"
+                                            style={{
+                                                background: isLoading
+                                                    ? '#86efac'
+                                                    : 'linear-gradient(135deg, #22c55e, #16a34a)',
+                                                boxShadow: isLoading ? 'none' : '0 4px 14px rgba(34, 197, 94, 0.3)',
+                                            }}
+                                        >
+                                            {isLoading ? (
+                                                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                            ) : (
+                                                <Play className="w-4 h-4 fill-current" />
+                                            )}
+                                            {isLoading ? 'Running...' : 'Run Analysis'}
+                                        </button>
+                                    </div>
+
+                                    {/* Algorithm description */}
+                                    <div className="mt-4 grid grid-cols-2 gap-4">
+                                        <div className="p-3 rounded-xl" style={{ background: '#f0fdf4' }}>
+                                            <span className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: '#6b7280' }}>What it does</span>
+                                            <p className="text-xs text-gray-600 leading-relaxed">{selectedAlgorithm.simpleInfo}</p>
+                                        </div>
+                                        <div className="p-3 rounded-xl" style={{ background: '#f0fdf4' }}>
+                                            <span className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: '#16a34a' }}>Why it helps</span>
+                                            <p className="text-xs text-gray-600 leading-relaxed">{selectedAlgorithm.benefit}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Results Area */}
+                                <div className="flex-1 overflow-y-auto p-8">
+                                    {error && (
+                                        <div className="p-4 mb-6 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-semibold">
+                                            ⚠️ {error}
+                                        </div>
+                                    )}
+
+                                    {isLoading ? (
+                                        <div className="flex-1 flex flex-col items-center justify-center py-20">
+                                            <div className="relative mb-6">
+                                                <div className="w-16 h-16 border-4 rounded-full animate-spin"
+                                                    style={{ borderColor: '#dcfce7', borderTopColor: '#22c55e' }}
+                                                />
+                                                <Activity className="absolute inset-0 m-auto w-6 h-6 animate-pulse" style={{ color: '#22c55e' }} />
+                                            </div>
+                                            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#22c55e' }}>
+                                                Analyzing {nodeCount} nodes...
+                                            </p>
+                                        </div>
+                                    ) : result ? (
+                                        <div className="space-y-6">
+                                            {/* Summary Card */}
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                className="p-5 rounded-2xl border"
+                                                style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}
+                                            >
+                                                <div className="flex items-start gap-3 mb-3">
+                                                    <Sparkles className="w-5 h-5 mt-0.5 shrink-0" style={{ color: '#22c55e' }} />
+                                                    <div>
+                                                        <h4 className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#166534' }}>
+                                                            Summary
+                                                        </h4>
+                                                        <p className="text-sm text-gray-700 leading-relaxed">
+                                                            {buildSummary(selectedAlgorithm, result)}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                            ))}
-                                        </>
+                                            </motion.div>
+
+                                            {/* Results Table */}
+                                            {result.results && result.results.length > 0 && (
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                                                            Detailed Results ({result.results.length})
+                                                        </span>
+                                                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold"
+                                                            style={{ background: '#dcfce7', color: '#166534' }}
+                                                        >
+                                                            <CheckCircle2 className="w-3 h-3" />
+                                                            Complete
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#d1fae5' }}>
+                                                        {/* Table Header */}
+                                                        <div className="grid grid-cols-12 gap-2 px-4 py-2.5 text-[9px] font-bold uppercase tracking-wider"
+                                                            style={{ background: '#f0fdf4', color: '#6b7280' }}
+                                                        >
+                                                            <div className="col-span-1">#</div>
+                                                            <div className="col-span-5">Name</div>
+                                                            <div className="col-span-3">Type</div>
+                                                            <div className="col-span-3 text-right">Score</div>
+                                                        </div>
+
+                                                        {/* Table Rows */}
+                                                        {result.results.slice(0, 30).map((item, i) => (
+                                                            <motion.div
+                                                                key={item.id || i}
+                                                                initial={{ opacity: 0 }}
+                                                                animate={{ opacity: 1 }}
+                                                                transition={{ delay: i * 0.03 }}
+                                                                className="grid grid-cols-12 gap-2 px-4 py-3 items-center border-t text-xs hover:bg-green-50/50 transition-colors"
+                                                                style={{ borderColor: '#f0fdf4' }}
+                                                            >
+                                                                <div className="col-span-1 text-gray-300 font-bold text-[10px]">{i + 1}</div>
+                                                                <div className="col-span-5 font-semibold text-gray-700 truncate">{item.name}</div>
+                                                                <div className="col-span-3">
+                                                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold"
+                                                                        style={{ background: '#dcfce7', color: '#166534' }}
+                                                                    >
+                                                                        {item.type || 'Entity'}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="col-span-3 text-right font-mono font-bold text-[11px]" style={{ color: '#16a34a' }}>
+                                                                    {item.score !== undefined ? item.score.toFixed(4) :
+                                                                        item.community !== undefined ? `Group ${item.community}` : '—'}
+                                                                </div>
+                                                            </motion.div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     ) : (
-                                        <div className="h-full flex flex-col justify-end pb-4">
-                                            <p className="text-[10px] text-muted-foreground italic leading-relaxed px-1">
-                                                Adjust your selection to focus the engine on specific network segments.
+                                        /* No results yet */
+                                        <div className="flex flex-col items-center justify-center py-20 text-center">
+                                            <Search className="w-12 h-12 mb-4" style={{ color: '#d1fae5' }} />
+                                            <p className="text-sm text-gray-400">
+                                                Click <strong style={{ color: '#22c55e' }}>Run Analysis</strong> to start
                                             </p>
                                         </div>
                                     )}
                                 </div>
                             </div>
-
-                            {/* Main Display Area */}
-                            <div className="flex-1 flex flex-col bg-white/50 dark:bg-slate-900/30 overflow-hidden">
-                                <AnimatePresence mode="wait">
-                                    {activeTab === 'scope' && (
-                                        <motion.div
-                                            key="scope-view"
-                                            initial={{ opacity: 0, x: 10 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            exit={{ opacity: 0, x: -10 }}
-                                            className="p-12 h-full flex flex-col max-w-3xl"
-                                        >
-                                            <div className="mb-12">
-                                                <h3 className="text-3xl font-bold mb-3 tracking-tight">Analysis Domain</h3>
-                                                <p className="text-muted-foreground font-medium italic">Define how broadly the engine should traverse connections.</p>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-6">
-                                                <button
-                                                    onClick={() => setSelectedScope('global')}
-                                                    className={`
-                                                        p-8 rounded-[2.5rem] border text-left transition-all relative group
-                                                        ${selectedScope === 'global'
-                                                            ? 'bg-primary/5 border-primary/40 ring-1 ring-primary/20'
-                                                            : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/5 dark:border-white/5 hover:border-black/10 dark:hover:border-white/10'}
-                                                    `}
-                                                >
-                                                    <div className={`mb-6 p-4 rounded-2xl w-fit ${selectedScope === 'global' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30' : 'bg-black/5 dark:bg-white/5 text-muted-foreground'}`}>
-                                                        <Globe className="w-8 h-8" />
-                                                    </div>
-                                                    <h4 className="text-xl font-bold mb-2">Global Network Scan</h4>
-                                                    <p className="text-xs text-muted-foreground leading-relaxed">Map intelligence across the entire active dataset. Best for cross-context insights.</p>
-                                                    {selectedScope === 'global' && <Check className="absolute top-6 right-6 w-5 h-5 text-primary" />}
-                                                </button>
-
-                                                <button
-                                                    onClick={() => setSelectedScope('targeted')}
-                                                    className={`
-                                                        p-8 rounded-[2.5rem] border text-left transition-all relative group
-                                                        ${selectedScope === 'targeted'
-                                                            ? 'bg-primary/5 border-primary/40 ring-1 ring-primary/20'
-                                                            : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/5 dark:border-white/5 hover:border-black/10 dark:hover:border-white/10'}
-                                                    `}
-                                                >
-                                                    <div className={`mb-6 p-4 rounded-2xl w-fit ${selectedScope === 'targeted' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30' : 'bg-black/5 dark:bg-white/5 text-muted-foreground'}`}>
-                                                        <BoxSelect className="w-8 h-8" />
-                                                    </div>
-                                                    <h4 className="text-xl font-bold mb-2">Targeted Intersection</h4>
-                                                    <p className="text-xs text-muted-foreground leading-relaxed">Focus discovery on specific entity types or manually selected data points.</p>
-                                                    {selectedScope === 'targeted' && <Check className="absolute top-6 right-6 w-5 h-5 text-primary" />}
-                                                </button>
-                                            </div>
-
-                                            <div className="mt-12 p-8 rounded-[2rem] bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/5">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="p-3 rounded-xl bg-primary/10 text-primary">
-                                                            <Network className="w-5 h-5" />
-                                                        </div>
-                                                        <div>
-                                                            <h5 className="font-bold text-sm">Neighborhood Expansion</h5>
-                                                            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">Include immediate connections</p>
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => setIncludeNeighbors(!includeNeighbors)}
-                                                        className={`
-                                                            w-12 h-6 rounded-full transition-all relative flex items-center px-1
-                                                            ${includeNeighbors ? 'bg-primary' : 'bg-black/10 dark:bg-white/10'}
-                                                        `}
-                                                    >
-                                                        <motion.div
-                                                            animate={{ x: includeNeighbors ? 24 : 0 }}
-                                                            className="w-4 h-4 rounded-full bg-white shadow-md"
-                                                        />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {activeTab === 'types' && (
-                                        <motion.div
-                                            key="types-view"
-                                            initial={{ opacity: 0, x: 10 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            exit={{ opacity: 0, x: -10 }}
-                                            className="p-12 h-full flex flex-col max-w-3xl"
-                                        >
-                                            <div className="mb-10 flex items-end justify-between">
-                                                <div>
-                                                    <h3 className="text-3xl font-bold mb-2 tracking-tight">Category Filters</h3>
-                                                    <p className="text-sm text-muted-foreground italic">Select node classes to isolate for processing.</p>
-                                                </div>
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedTypes([]);
-                                                        setSelectedScope('global');
-                                                    }}
-                                                    className="text-[10px] font-extrabold text-primary hover:text-primary/70 uppercase tracking-[0.2em] pb-1 transition-colors"
-                                                >
-                                                    Clear All
-                                                </button>
-                                            </div>
-
-                                            <div className="grid grid-cols-3 gap-3 overflow-y-auto pr-2 custom-scrollbar">
-                                                {nodeTypes.map(type => {
-                                                    const isSelected = selectedTypes.includes(type);
-                                                    return (
-                                                        <button
-                                                            key={type}
-                                                            onClick={() => {
-                                                                setSelectedTypes(prev =>
-                                                                    prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-                                                                );
-                                                                setSelectedScope('targeted');
-                                                            }}
-                                                            className={`
-                                                                flex items-center justify-between px-5 py-4 rounded-[1.5rem] border transition-all text-sm font-bold
-                                                                ${isSelected
-                                                                    ? 'bg-primary/5 border-primary/30 text-primary ring-1 ring-primary/20'
-                                                                    : 'bg-black/[0.02] dark:bg-white/[0.02] border-black/5 dark:border-white/5 hover:bg-black/[0.04] dark:hover:bg-white/[0.04]'
-                                                                }
-                                                            `}
-                                                        >
-                                                            {type}
-                                                            {isSelected && <Check className="w-4 h-4" />}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {activeTab === 'nodes' && (
-                                        <motion.div
-                                            key="nodes-view"
-                                            initial={{ opacity: 0, x: 10 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            exit={{ opacity: 0, x: -10 }}
-                                            className="p-12 h-full flex flex-col max-w-3xl"
-                                        >
-                                            <div className="mb-8">
-                                                <h3 className="text-3xl font-bold mb-2 tracking-tight">Specific Entities</h3>
-                                                <p className="text-sm text-muted-foreground italic mb-6">Individually pick data points for granular interrogation.</p>
-
-                                                <div className="relative group">
-                                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                                                    <input
-                                                        type="text"
-                                                        value={nodeSearchQuery}
-                                                        onChange={(e) => setNodeSearchQuery(e.target.value)}
-                                                        placeholder="Search the neural network for specific entities..."
-                                                        className="w-full pl-12 pr-6 py-4 rounded-2xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/5 dark:border-white/5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-transparent transition-all"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="flex-1 overflow-y-auto pr-3 space-y-2 custom-scrollbar">
-                                                {filteredNodes.map(node => {
-                                                    const isSelected = internalSelectedIds.includes(node.id);
-                                                    return (
-                                                        <button
-                                                            key={node.id}
-                                                            onClick={() => {
-                                                                setInternalSelectedIds(prev =>
-                                                                    prev.includes(node.id) ? prev.filter(i => i !== node.id) : [...prev, node.id]
-                                                                );
-                                                                setSelectedScope('targeted');
-                                                            }}
-                                                            className={`
-                                                                w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left group
-                                                                ${isSelected
-                                                                    ? 'bg-primary/5 border-primary/30 shadow-sm'
-                                                                    : 'bg-transparent border-black/5 dark:border-white/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
-                                                                }
-                                                            `}
-                                                        >
-                                                            <div className="flex items-center gap-4 min-w-0 pr-4">
-                                                                <div className={`p-2 rounded-xl text-muted-foreground group-hover:text-primary transition-colors ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-black/5 dark:bg-white/5'}`}>
-                                                                    <Target className="w-4 h-4" />
-                                                                </div>
-                                                                <div className="min-w-0">
-                                                                    <div className={`text-sm font-bold leading-tight truncate ${isSelected ? 'text-primary' : ''}`}>{node.name}</div>
-                                                                    <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mt-0.5">{node.type}</div>
-                                                                </div>
-                                                            </div>
-                                                            {isSelected && <Check className="w-4 h-4 text-primary shrink-0" />}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {activeTab === 'algorithms' && (
-                                        <motion.div
-                                            key="algorithms-view"
-                                            initial={{ opacity: 0, scale: 0.99 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.99 }}
-                                            className="h-full flex flex-col"
-                                        >
-                                            {!selectedAlgorithm ? (
-                                                <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
-                                                    <div className="w-24 h-24 rounded-[2.5rem] bg-black/5 dark:bg-white/5 flex items-center justify-center mb-8 border border-black/5 dark:border-white/5 rotate-12 group-hover:rotate-0 transition-transform">
-                                                        <Network className="w-12 h-12 text-muted-foreground/20" />
-                                                    </div>
-                                                    <h3 className="text-2xl font-bold mb-3 tracking-tight">System Ready for Protocol Selection</h3>
-                                                    <p className="text-sm text-muted-foreground max-w-sm font-medium italic">
-                                                        The intelligence pipeline is active. Please select a processing module from the left to begin discovery.
-                                                    </p>
-                                                </div>
-                                            ) : (
-                                                <div className="flex-1 flex overflow-hidden">
-                                                    {/* Algorithm Overview */}
-                                                    <div className="w-[440px] flex flex-col border-r border-black/5 dark:border-white/5 p-12 shrink-0">
-                                                        {(() => {
-                                                            const algo = algorithms.find(a => a.key === selectedAlgorithm);
-                                                            if (!algo) return null;
-                                                            return (
-                                                                <>
-                                                                    <div className="flex items-center gap-6 mb-10">
-                                                                        <div className="p-5 rounded-3xl bg-primary text-primary-foreground shadow-2xl shadow-primary/30">
-                                                                            {React.cloneElement(algo.icon as React.ReactElement, { className: 'w-8 h-8' })}
-                                                                        </div>
-                                                                        <div>
-                                                                            <h3 className="text-3xl font-extrabold tracking-tighter">{algo.name}</h3>
-                                                                            <p className="text-[11px] text-primary font-black uppercase tracking-[0.25em]">{algo.category} PROTOCOL</p>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    <div className="space-y-10 flex-1">
-                                                                        <section>
-                                                                            <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4">Mechanism Overview</h4>
-                                                                            <p className="text-[13px] text-foreground/80 leading-relaxed font-medium">
-                                                                                {algo.simpleInfo}
-                                                                            </p>
-                                                                        </section>
-
-                                                                        <section>
-                                                                            <h4 className="text-[10px] font-black text-emerald-500/80 uppercase tracking-widest mb-4">Discovery Benefit</h4>
-                                                                            <div className="p-6 rounded-[2rem] bg-emerald-500/5 border border-emerald-500/10 backdrop-blur-sm">
-                                                                                <p className="text-xs font-bold text-foreground/90 leading-relaxed italic">
-                                                                                    "{algo.benefit}"
-                                                                                </p>
-                                                                            </div>
-                                                                        </section>
-
-                                                                        {result && (
-                                                                            <div className="animate-in fade-in slide-in-from-bottom-6 duration-700">
-                                                                                <div className="p-6 rounded-[2.5rem] bg-gradient-to-br from-primary/10 via-transparent to-transparent border border-primary/20 shadow-xl shadow-primary/5">
-                                                                                    <div className="flex items-center gap-3 mb-4">
-                                                                                        <Sparkles className="w-5 h-5 text-primary" />
-                                                                                        <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-primary">Intelligence Insight</h3>
-                                                                                    </div>
-                                                                                    <p className="text-xs leading-relaxed font-bold italic text-foreground/90">
-                                                                                        {result.insight || "Pipeline analysis concluded. Structural data successfully re-indexed."}
-                                                                                    </p>
-                                                                                </div>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-
-                                                                    <div className="pt-8">
-                                                                        <button
-                                                                            onClick={() => runAlgorithm(algo)}
-                                                                            disabled={isLoading || (selectedScope === 'targeted' && effectiveTargetedIds.length === 0)}
-                                                                            className={`
-                                                                                w-full flex items-center justify-center gap-4 py-5 rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] transition-all
-                                                                                ${isLoading
-                                                                                    ? 'bg-primary/50 text-white cursor-wait'
-                                                                                    : 'bg-primary text-primary-foreground shadow-2xl shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-1 active:translate-y-0'
-                                                                                }
-                                                                                ${selectedScope === 'targeted' && effectiveTargetedIds.length === 0 ? 'opacity-50 cursor-not-allowed grayscale' : ''}
-                                                                            `}
-                                                                        >
-                                                                            {isLoading ? (
-                                                                                <div className="w-5 h-5 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-                                                                            ) : (
-                                                                                <Zap className="w-5 h-5 fill-current" />
-                                                                            )}
-                                                                            {selectedScope === 'global' ? 'Execute Global Scan' : `Initialize Set Scan `}
-                                                                        </button>
-                                                                    </div>
-                                                                </>
-                                                            );
-                                                        })()}
-                                                    </div>
-
-                                                    {/* Results Stream */}
-                                                    <div className="flex-1 flex flex-col p-12 min-h-0 bg-black/[0.012] dark:bg-white/[0.012]">
-                                                        {error && (
-                                                            <div className="p-5 mb-8 rounded-2xl bg-destructive/10 text-destructive text-[11px] font-black border border-destructive/20 animate-in shake uppercase tracking-widest">
-                                                                System Alert: {error}
-                                                            </div>
-                                                        )}
-
-                                                        {isLoading ? (
-                                                            <div className="flex-1 flex flex-col items-center justify-center">
-                                                                <div className="relative mb-8 scale-150">
-                                                                    <div className="w-20 h-20 border-[6px] border-primary/10 border-t-primary rounded-full animate-spin" />
-                                                                    <Activity className="absolute inset-0 m-auto w-8 h-8 text-primary animate-pulse" />
-                                                                </div>
-                                                                <p className="text-[11px] font-black uppercase tracking-[0.3em] text-primary">Deciphering Neural Signals...</p>
-                                                            </div>
-                                                        ) : result ? (
-                                                            <div className="flex-1 flex flex-col min-h-0">
-                                                                <div className="flex items-center justify-between mb-8">
-                                                                    <div className="flex items-center gap-4">
-                                                                        <Network className="w-5 h-5 text-primary" />
-                                                                        <span className="text-[11px] font-black uppercase tracking-[0.25em] text-muted-foreground">
-                                                                            {result.results?.length || 0} Entities Computed
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-sm shadow-emerald-500/10">
-                                                                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                                                        <span className="text-[10px] font-black uppercase tracking-[0.15em]">Pattern Locked</span>
-                                                                    </div>
-                                                                </div>
-
-                                                                <div className="flex-1 overflow-y-auto pr-4 space-y-3 custom-scrollbar">
-                                                                    {result.results?.slice(0, 50).map((item, i) => (
-                                                                        <motion.div
-                                                                            initial={{ opacity: 0, y: 15 }}
-                                                                            animate={{ opacity: 1, y: 0 }}
-                                                                            transition={{ delay: i * 0.04 }}
-                                                                            key={item.id || i}
-                                                                            className="flex items-center justify-between p-5 rounded-[1.5rem] bg-white dark:bg-white/5 border border-black/5 dark:border-white/5 hover:border-primary/40 transition-all group/item shadow-sm hover:shadow-xl hover:shadow-primary/5"
-                                                                        >
-                                                                            <div className="flex items-center gap-6 min-w-0">
-                                                                                <div className="p-3.5 rounded-2xl bg-black/[0.04] dark:bg-white/[0.04] text-muted-foreground group-hover/item:text-primary transition-colors group-hover/item:bg-primary/5">
-                                                                                    {item.type?.toLowerCase().includes('person') ? <Users className="w-5 h-5" /> : <Target className="w-5 h-5" />}
-                                                                                </div>
-                                                                                <div className="min-w-0">
-                                                                                    <div className="font-extrabold text-[15px] truncate tracking-tight">{item.name}</div>
-                                                                                    <div className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-1 opacity-60">{item.type || 'Entity'}</div>
-                                                                                </div>
-                                                                            </div>
-                                                                            {item.score !== undefined && (
-                                                                                <div className="text-right ml-4">
-                                                                                    <div className="text-[9px] text-muted-foreground font-black uppercase mb-1.5 opacity-40">Salience Score</div>
-                                                                                    <div className="px-4 py-1.5 rounded-xl bg-primary/5 text-xs font-mono font-black text-primary border border-primary/10 shadow-inner">
-                                                                                        {item.score.toFixed(4)}
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                        </motion.div>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex-1 flex flex-col items-center justify-center text-center opacity-30 grayscale saturate-0 scale-110">
-                                                                <Search className="w-16 h-16 mb-6 text-muted-foreground/40" />
-                                                                <p className="text-xs font-black uppercase tracking-[0.4em]">Signal Inactive</p>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
-                        </div>
-
-                        {/* Unified Action Bar (Selection only) */}
-                        {activeTab !== 'algorithms' && (
-                            <div className="px-10 py-6 border-t border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] flex items-center justify-between shrink-0">
-                                <div className="flex items-center gap-8">
-                                    <div className="flex flex-col">
-                                        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] leading-none mb-1.5">Entity Coverage</span>
-                                        <span className="text-xs font-black">
-                                            {selectedScope === 'global' ? 'Entire Active Network' : `${effectiveTargetedIds.length} Targeted Points`}
-                                        </span>
-                                    </div>
-                                    <div className="h-8 w-px bg-black/5 dark:bg-white/5" />
-                                    <div className="flex flex-col">
-                                        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] leading-none mb-1.5">Expansion</span>
-                                        <span className="text-xs font-black">{includeNeighbors ? 'Active (Neighbors Included)' : 'Direct Only'}</span>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-4">
-                                    <button
-                                        onClick={() => {
-                                            setActiveTab('algorithms');
-                                            setSelectedAlgorithm(null);
-                                        }}
-                                        className="px-8 py-3 rounded-xl text-[10px] font-black hover:bg-black/5 dark:hover:bg-white/5 transition-all uppercase tracking-[0.25em]"
-                                    >
-                                        Back to Modules
-                                    </button>
-                                    <button
-                                        onClick={handleApplySelection}
-                                        className="px-10 py-4 rounded-2xl bg-foreground text-background shadow-2xl hover:scale-[1.02] active:scale-100 transition-all font-black text-[11px] uppercase tracking-[0.3em] flex items-center gap-4"
-                                    >
-                                        Lock Scope
-                                        <ArrowRight className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
                         )}
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                    </div>
+                </div>
+            </motion.div>
         </>
     );
 }

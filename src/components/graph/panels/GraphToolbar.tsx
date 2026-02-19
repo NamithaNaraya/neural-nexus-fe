@@ -86,8 +86,6 @@ export function GraphToolbar({
 }: GraphToolbarProps) {
     const router = useRouter();
     const [showAlgorithmDrawer, setShowAlgorithmDrawer] = useState(false);
-    const [includeNeighbors, setIncludeNeighbors] = useState(false);
-    const [runOnSelection, setRunOnSelection] = useState(false);
 
     const {
         setFilters,
@@ -254,8 +252,6 @@ export function GraphToolbar({
                 isOpen={showAlgorithmDrawer}
                 onClose={() => setShowAlgorithmDrawer(false)}
                 folderId={folderId}
-                runOnSelection={runOnSelection}
-                includeNeighbors={includeNeighbors}
             />
 
             {/* Selection Locker */}
