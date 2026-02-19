@@ -96,6 +96,8 @@ function GraphContent() {
                 target: l.target || l.target_id,
                 type: l.type || l.relationship_type || 'RELATED_TO',
                 strength: l.strength || l.weight || 1,
+                properties: l.properties || {},
+                description: l.description,
             }));
 
             setGraphData(nodes, links);

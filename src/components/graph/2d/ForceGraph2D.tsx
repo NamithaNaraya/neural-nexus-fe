@@ -17,7 +17,7 @@ import { useGraphStore, GraphNode, GraphLink } from '@/store/graphStore';
 import { NODE_TYPE_COLORS, RELATIONSHIP_COLORS } from '../types';
 import { useSSE, PHASE_LABELS } from '@/hooks/useSSE';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import { formatDisplayName } from '@/utils/graphUtils';
+import { formatDisplayName, cleanLabel } from '@/utils/graphUtils';
 
 // Helper functions moved to shared utils
 
@@ -656,9 +656,10 @@ export function ForceGraph2D({
             const focusD3Node = d3Nodes.find(n => n.id === focusNodeId);
             let originHerbName = '';
 
-            // Helper to get type even if property is missing
+            // Helper to get type even if property is missing - USE cleanLabel
             const getNodeType = (node: D3Node) => {
-                return node.type || 'Entity';
+                const raw = node.type || 'Entity';
+                return cleanLabel(raw);
             };
 
             const focusType = focusD3Node ? getNodeType(focusD3Node) : '';
@@ -678,6 +679,18 @@ export function ForceGraph2D({
 
             if (originHerbName) {
                 console.log(`[BFS] Focus: ${focusD3Node?.name} (${focusType}) Origin Herb: ${originHerbName}`);
+                // DIAGNOSTIC: Dump all HAS_QUALITY links and their properties
+                const qualityLinks = d3Links.filter(l => {
+                    const lt = (l.type || '').toUpperCase().replace(/[\s-]/g, '_');
+                    return lt === 'HAS_QUALITY';
+                });
+                console.log(`[BFS DIAG] Found ${qualityLinks.length} HAS_QUALITY links. Details:`, qualityLinks.map(l => ({
+                    source: typeof l.source === 'string' ? l.source : (l.source as D3Node).id,
+                    target: typeof l.target === 'string' ? l.target : (l.target as D3Node).id,
+                    type: l.type,
+                    properties: l.properties,
+                    hasHerbProp: !!(l.properties?.herb),
+                })));
             }
 
             let currentLevel = [...seeds];
@@ -691,33 +704,23 @@ export function ForceGraph2D({
                     const t = typeof link.target === 'string' ? link.target : (link.target as D3Node).id;
                     if (!s || !t) return;
 
-                    // 2. Apply persistent context filtering
-                    if (originHerbName && link.type === 'HAS_QUALITY') {
-                        if (!link.properties || !link.properties.herb) {
-                            // Diagnostic: Log why it's dimmed if it's a direct connection of the focused node
-                            if (hop === 0 && s === focusNodeId) {
-                                console.log(`[BFS Skip] Link ${s}->${t} is dimmed. Reason: Missing {herb: "${originHerbName}"} property.`, {
-                                    link_type: link.type,
-                                    link_props: link.properties,
-                                    all_link_data: link
-                                });
-                            }
-                            return;
-                        }
-                        const herbProp = link.properties.herb as string;
+                    // 1. Context Filtering: If we are in "Herb Mode", only follow HAS_QUALITY links
+                    // that match our origin herb name.
+                    const linkType = (link.type || '').toUpperCase().replace(/[\s-]/g, '_');
+
+                    if (originHerbName && linkType === 'HAS_QUALITY') {
+                        const herbProp = (link.properties?.herb as string || '').trim();
+                        if (!herbProp) return; // Skip if no herb property on a quality link in context mode
+
                         const v = herbProp.toLowerCase();
                         const o = originHerbName.toLowerCase();
                         const matchesOrigin = v === o || o.includes(v) || v.includes(o);
 
                         if (!matchesOrigin) return;
-
-                        if (hop === 1 || (hop === 0 && s === focusNodeId)) {
-                            console.log(`[BFS] MATCH! ${s}->${t} belongs to ${herbProp}`);
-                        }
                     }
 
-                    // Hop 0: follow both directions
-                    // Hop 1+: follow forward only
+                    // 2. Traversal: Add neighbors to the focus set
+                    // We allow bidirectional traversal for all hops to support more complex graph paths
                     if (currentLevel.includes(s)) {
                         focusLinkKeys.add(`${s}-${t}`);
                         if (!neighbors.has(t)) {
@@ -725,7 +728,7 @@ export function ForceGraph2D({
                             nextLevel.push(t);
                         }
                     }
-                    if (hop === 0 && currentLevel.includes(t)) {
+                    if (currentLevel.includes(t)) {
                         focusLinkKeys.add(`${s}-${t}`);
                         if (!neighbors.has(s)) {
                             neighbors.add(s);
@@ -734,6 +737,7 @@ export function ForceGraph2D({
                     }
                 });
                 currentLevel = nextLevel;
+                if (currentLevel.length === 0) break;
             }
         }
 

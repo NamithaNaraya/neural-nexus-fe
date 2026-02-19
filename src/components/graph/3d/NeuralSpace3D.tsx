@@ -15,7 +15,7 @@ import * as THREE from 'three';
 import { SphereGeometry } from 'three';
 import { GraphNode, GraphLink } from '@/store/graphStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import { formatDisplayName } from '@/utils/graphUtils';
+import { formatDisplayName, cleanLabel } from '@/utils/graphUtils';
 
 // Modular Components
 import { InstancedNodes } from './components/Nodes';
@@ -234,8 +234,12 @@ function Scene(props: SceneProps) {
             const focusData = focusNode ? nodeMap.get(focusNode) : null;
             let originHerbName = '';
 
-            // Helper for fallback types
-            const getNodeType = (n: any) => n?.type || n?.labels?.[0] || 'Entity';
+            // Helper for fallback types - USE cleanLabel for robust matching
+            const getNodeType = (n: any) => {
+                const raw = n?.type || n?.labels?.[0] || 'Entity';
+                return cleanLabel(raw);
+            };
+
             const focusType = focusData ? getNodeType(focusData) : '';
 
             if (focusType === 'Herb') {
