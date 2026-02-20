@@ -125,17 +125,22 @@ export function ReasoningAssistant() {
                     reasoningOutcome: response
                 });
             } else {
-                // Regular Discovery RAG
+                // Enhanced Discovery RAG (10 features)
                 const response = await docAiApi.query.ask({
                     question: userQuery,
                     scope: { type: 'folder', id: activeFolderId },
                     session_id: currentSessionId
-                }) as { answer: string; citations: Citation[] };
+                }) as { answer: string; citations: Citation[]; grounding_score?: number; ml_insights_count?: number; predictions_count?: number };
 
                 addMessage(currentSessionId, {
                     role: "assistant",
                     content: response.answer,
-                    citations: response.citations
+                    citations: response.citations,
+                    metadata: {
+                        groundingScore: response.grounding_score ?? 0,
+                        mlInsights: response.ml_insights_count ?? 0,
+                        predictions: response.predictions_count ?? 0,
+                    }
                 });
             }
         } catch (err: any) {
@@ -257,6 +262,32 @@ export function ReasoningAssistant() {
                                                 </ReactMarkdown>
                                             )}
                                         </div>
+
+                                        {/* Enhanced RAG Indicators (Feature 10: Grounding Score) */}
+                                        {msg.role === 'assistant' && (msg as any).metadata && (
+                                            <div className="flex items-center gap-2 mt-1.5 ml-1">
+                                                {(msg as any).metadata.groundingScore > 0 && (
+                                                    <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${(msg as any).metadata.groundingScore >= 0.7
+                                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                                            : (msg as any).metadata.groundingScore >= 0.4
+                                                                ? 'bg-amber-50 text-amber-600 border-amber-200'
+                                                                : 'bg-red-50 text-red-500 border-red-200'
+                                                        }`}>
+                                                        {Math.round((msg as any).metadata.groundingScore * 100)}% grounded
+                                                    </span>
+                                                )}
+                                                {(msg as any).metadata.mlInsights > 0 && (
+                                                    <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 border border-purple-200">
+                                                        {(msg as any).metadata.mlInsights} ML insights
+                                                    </span>
+                                                )}
+                                                {(msg as any).metadata.predictions > 0 && (
+                                                    <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-pink-50 text-pink-600 border border-pink-200">
+                                                        {(msg as any).metadata.predictions} predictions
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
 
                                         {/* Citations */}
                                         {/* {msg.citations && msg.citations.length > 0 && (

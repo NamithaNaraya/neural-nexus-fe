@@ -17,6 +17,12 @@ export interface Outcome {
     graph_interventions?: any;
 }
 
+export interface RAGMetadata {
+    groundingScore: number;      // Feature 10: 0-1 confidence
+    mlInsights: number;          // Feature 3+6: structurally similar nodes found
+    predictions: number;         // Feature 4+5: ML predictions injected
+}
+
 export interface Message {
     id: string;
     role: "user" | "assistant";
@@ -25,6 +31,7 @@ export interface Message {
     citations?: Citation[];
     isReasoning?: boolean;
     reasoningOutcome?: Outcome;
+    metadata?: RAGMetadata;      // Enhanced RAG intelligence indicators
 }
 
 interface ReasoningState {
