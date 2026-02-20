@@ -58,6 +58,8 @@ interface GraphToolbarProps {
     totalLinkCount?: number;
     selectedCount?: number;
     isSidebarOpen?: boolean;
+    focusNodeIds?: Set<string>;
+    focusLinkIds?: Set<string>;
     onMerge?: () => void;
 }
 
@@ -81,6 +83,8 @@ export function GraphToolbar({
     totalNodeCount = 0,
     totalLinkCount = 0,
     selectedCount = 0,
+    focusNodeIds,
+    focusLinkIds,
     isSidebarOpen = false,
     onMerge,
 }: GraphToolbarProps) {
@@ -220,11 +224,11 @@ export function GraphToolbar({
                                 <span className="text-[9px] text-muted-foreground font-semibold uppercase tracking-widest leading-none">Nodes</span>
                                 <div className="flex items-baseline gap-1.5 mt-0.5">
                                     <span className="text-sm font-bold text-foreground leading-none">
-                                        {nodeCount} <span className="text-[10px] text-muted-foreground/60 font-medium">/</span> {totalNodeCount}
+                                        {selectedCount > 0 && focusNodeIds ? focusNodeIds.size : nodeCount} <span className="text-[10px] text-muted-foreground/60 font-medium">/</span> {totalNodeCount}
                                     </span>
                                     {selectedCount > 0 && (
                                         <span className="text-[10px] font-bold text-cyan-400/90 leading-none">
-                                            ({selectedCount} SELECTED)
+                                            (FOCUSED)
                                         </span>
                                     )}
                                 </div>
@@ -238,7 +242,7 @@ export function GraphToolbar({
                                 <span className="text-[9px] text-muted-foreground font-semibold uppercase tracking-widest leading-none">Links</span>
                                 <div className="flex items-baseline gap-1.5 mt-0.5">
                                     <span className="text-sm font-bold text-foreground leading-none">
-                                        {linkCount} <span className="text-[10px] text-muted-foreground/60 font-medium">/</span> {totalLinkCount}
+                                        {selectedCount > 0 && focusLinkIds ? focusLinkIds.size : linkCount} <span className="text-[10px] text-muted-foreground/60 font-medium">/</span> {totalLinkCount}
                                     </span>
                                 </div>
                             </div>
@@ -252,6 +256,8 @@ export function GraphToolbar({
                 isOpen={showAlgorithmDrawer}
                 onClose={() => setShowAlgorithmDrawer(false)}
                 folderId={folderId}
+                focusNodeIds={focusNodeIds ? Array.from(focusNodeIds) : undefined}
+                focusLinkIds={focusLinkIds ? Array.from(focusLinkIds) : undefined}
             />
 
             {/* Selection Locker */}

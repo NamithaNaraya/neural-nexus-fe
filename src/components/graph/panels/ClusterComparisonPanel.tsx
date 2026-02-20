@@ -427,8 +427,20 @@ export function ClusterComparisonPanel({
                 <ComparisonView
                     isOpen={showVisualComparison}
                     onClose={() => setShowVisualComparison(false)}
-                    leftCluster={leftCluster}
-                    rightCluster={rightCluster}
+                    leftItem={{ type: leftCluster.type, id: leftCluster.id, name: leftCluster.name, nodeCount: leftCluster.node_ids?.length || 0 }}
+                    rightItem={{ type: rightCluster.type, id: rightCluster.id, name: rightCluster.name, nodeCount: rightCluster.node_ids?.length || 0 }}
+                    onCompare={async () => ({
+                        common: result?.common_entities || [],
+                        uniqueLeft: result?.unique_left || [],
+                        uniqueRight: result?.unique_right || [],
+                        bridges: result?.bridges.map(b => ({
+                            id: b.id,
+                            leftConnections: b.left_connections,
+                            rightConnections: b.right_connections
+                        })) || [],
+                        semanticSimilarity: result?.semantic_similarity || 0,
+                        structuralSimilarity: result?.structural_similarity || 0,
+                    })}
                 />
             )}
         </motion.div>

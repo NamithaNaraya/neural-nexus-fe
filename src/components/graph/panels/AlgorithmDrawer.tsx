@@ -67,6 +67,8 @@ interface AlgorithmDrawerProps {
     initialSetupPhase?: boolean;
     includeNeighbors?: boolean;
     onChangeScope?: () => void;
+    focusNodeIds?: string[];
+    focusLinkIds?: string[];
 }
 
 type AlgorithmCategory = 'centrality' | 'community' | 'prediction' | 'decomposition' | 'pathfinding' | 'topology';
@@ -315,27 +317,46 @@ export function AlgorithmDrawer({
     isOpen,
     onClose,
     folderId,
+    focusNodeIds,
+    focusLinkIds,
 }: AlgorithmDrawerProps) {
     const { filteredNodes, filteredLinks, nodes, links, filters, selectedNodes } = useGraphStore();
 
     // State
-    const [scopeMode, setScopeMode] = useState<'filtered' | 'selected'>('filtered');
     const [expandedCategory, setExpandedCategory] = useState<AlgorithmCategory | null>(null);
     const [selectedAlgorithm, setSelectedAlgorithm] = useState<AlgorithmConfig | null>(null);
     const [result, setResult] = useState<AlgorithmResult | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Derive count based on scope mode
+    // Automatic Scope Detection:
+    // If user has selected nodes, we analyze that specific "Focus Set" (neighbors).
+    // Otherwise, we analyze the entire currently filtered graph.
+    const isSelectionMode = selectedNodes.length > 0;
+
     const visibleNodes = React.useMemo(() => {
-        if (scopeMode === 'selected' && selectedNodes.length > 0) {
+        if (isSelectionMode) {
+            // Intelligent Scope: Use the highlighted focus set (neighbors)
+            if (focusNodeIds && focusNodeIds.length > 0) {
+                return nodes.filter(n => focusNodeIds.includes(n.id));
+            }
+            // Fallback to just the raw selected nodes if no focus set calculated yet
             return nodes.filter(n => selectedNodes.includes(n.id));
         }
         return filteredNodes();
-    }, [filteredNodes, nodes, filters, scopeMode, selectedNodes]);
+    }, [filteredNodes, nodes, filters, isSelectionMode, selectedNodes, focusNodeIds]);
 
     const visibleLinks = React.useMemo(() => {
-        if (scopeMode === 'selected' && selectedNodes.length > 0) {
+        if (isSelectionMode) {
+            if (focusNodeIds && focusNodeIds.length > 0) {
+                const nodeSet = new Set(focusNodeIds);
+                return links.filter(l => {
+                    const s = typeof l.source === 'object' ? (l.source as any).id : l.source;
+                    const t = typeof l.target === 'object' ? (l.target as any).id : l.target;
+                    return nodeSet.has(s) && nodeSet.has(t);
+                });
+            }
+
             const selectedSet = new Set(selectedNodes);
             return links.filter(l => {
                 const s = typeof l.source === 'object' ? (l.source as any).id : l.source;
@@ -344,7 +365,7 @@ export function AlgorithmDrawer({
             });
         }
         return filteredLinks();
-    }, [filteredLinks, links, filters, scopeMode, selectedNodes]);
+    }, [filteredLinks, links, filters, isSelectionMode, selectedNodes, focusNodeIds]);
 
     const nodeCount = visibleNodes.length;
     const linkCount = visibleLinks.length;
@@ -430,38 +451,18 @@ export function AlgorithmDrawer({
                         </div>
                     </div>
 
-                    {/* Stats Pill & Scope Toggle */}
+                    {/* Stats Pill */}
                     <div className="flex items-center gap-4">
-                        {/* Scope Toggle */}
-                        <div className="flex items-center gap-1 bg-green-100/40 p-1 rounded-xl border border-green-200/50">
-                            <button
-                                onClick={() => {
-                                    setScopeMode('filtered');
-                                    setResult(null);
-                                }}
-                                className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${scopeMode === 'filtered' ? 'bg-white text-green-700 shadow-sm' : 'text-green-600/60 hover:text-green-700'
-                                    }`}
-                            >
-                                Filtered
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setScopeMode('selected');
-                                    setResult(null);
-                                }}
-                                disabled={selectedNodes.length === 0}
-                                className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${scopeMode === 'selected' ? 'bg-white text-green-700 shadow-sm' : 'text-green-600/60 hover:text-green-700'
-                                    } disabled:opacity-30 disabled:cursor-not-allowed`}
-                            >
-                                Selected ({selectedNodes.length})
-                            </button>
-                        </div>
-
                         <div className="flex items-center gap-3 px-4 py-2.5 rounded-full text-xs font-bold"
                             style={{ background: '#dcfce7', color: '#166534' }}
                         >
+                            <span className="flex items-center gap-1.5 border-r border-green-300/50 pr-3 mr-1">
+                                <span className={`w-2 h-2 rounded-full ${isSelectionMode ? 'animate-pulse' : ''}`}
+                                    style={{ background: isSelectionMode ? '#22c55e' : '#4ade80' }}
+                                />
+                                {isSelectionMode ? 'Selected' : 'All'}
+                            </span>
                             <span className="flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full" style={{ background: '#22c55e' }} />
                                 {nodeCount} nodes
                             </span>
                             <span style={{ color: '#bbf7d0' }}>|</span>
@@ -578,7 +579,7 @@ export function AlgorithmDrawer({
                                 <h3 className="text-xl font-bold text-gray-700 mb-2">Select an Algorithm</h3>
                                 <p className="text-sm text-gray-400 max-w-sm">
                                     Pick a category from the sidebar, then choose an algorithm to run on your
-                                    <strong className="mx-1" style={{ color: '#16a34a' }}>{nodeCount} {scopeMode} nodes</strong>
+                                    <strong className="mx-1" style={{ color: '#16a34a' }}>{nodeCount} {isSelectionMode ? 'selected' : 'visible'} nodes</strong>
                                     and
                                     <strong className="mx-1" style={{ color: '#16a34a' }}>{linkCount} relationships</strong>.
                                 </p>
@@ -655,7 +656,7 @@ export function AlgorithmDrawer({
                                                 <Activity className="absolute inset-0 m-auto w-6 h-6 animate-pulse" style={{ color: '#22c55e' }} />
                                             </div>
                                             <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#22c55e' }}>
-                                                Analyzing {nodeCount} {scopeMode} nodes...
+                                                Analyzing {nodeCount} {isSelectionMode ? 'selected' : 'visible'} nodes...
                                             </p>
                                         </div>
                                     ) : result ? (

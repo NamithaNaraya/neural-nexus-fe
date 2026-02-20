@@ -354,7 +354,7 @@ export const useGraphStore = create<GraphState>()(
 
         // Computed filtered data
         filteredNodes: () => {
-            const { nodes, links, filters, isolatedNodeId } = get();
+            const { nodes, links, filters, isolatedNodeId, discoveredNodeIds } = get();
 
             // ISOLATION MODE: If a node is isolated, only show it and its neighbors
             if (isolatedNodeId) {
@@ -373,8 +373,8 @@ export const useGraphStore = create<GraphState>()(
                 return nodes.filter(node => neighbors.has(node.id));
             }
 
-            return nodes.filter((node) => {
-                // HARD FILTERS: Type and File must always match if active
+            // 1. Identify Candidate Nodes (Attribute Filters)
+            const candidateNodes = nodes.filter((node) => {
                 // Filter by node type
                 if (filters.nodeTypes.length > 0 && !filters.nodeTypes.includes(node.type)) {
                     return false;
@@ -385,18 +385,7 @@ export const useGraphStore = create<GraphState>()(
                     return false;
                 }
 
-                // DISCOVERY OVERRIDE: If the node was explicitly discovered/clicked, it's visible (unless type/file filtered)
-                if (get().discoveredNodeIds.has(node.id)) {
-                    return true;
-                }
-
-                // SOFT FILTERS: Apply to undiscovered nodes
-                // Filter by minimum degree
-                if (filters.minDegree > 0 && (node.degree || 0) < filters.minDegree) {
-                    return false;
-                }
-
-                // Filter by search query
+                // Filter by search query (if exists)
                 if (filters.searchQuery) {
                     const query = filters.searchQuery.toLowerCase();
                     const matchesName = node.name.toLowerCase().includes(query);
@@ -407,8 +396,50 @@ export const useGraphStore = create<GraphState>()(
                     }
                 }
 
-                // Filter by orphan status (Apply LAST so other filters run first)
-                if (!filters.showOrphans && (node.degree || 0) === 0) {
+                return true;
+            });
+
+            // 2. Identify Candidate Links (to calculate dynamic degree)
+            // We need to know which links are "active" to determine if a node is an orphan in the current view
+            const candidateNodeIds = new Set(candidateNodes.map(n => n.id));
+
+            // Calculate dynamic degrees based on filtered links
+            const dynamicDegrees = new Map<string, number>();
+            candidateNodes.forEach(n => dynamicDegrees.set(n.id, 0));
+
+            links.forEach(link => {
+                const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
+                const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
+
+                // Check Link Type Filter
+                if (filters.relationshipTypes.length > 0 && !filters.relationshipTypes.includes(link.type)) {
+                    return;
+                }
+
+                // Check endpoints existence in candidate nodes
+                if (candidateNodeIds.has(sourceId) && candidateNodeIds.has(targetId)) {
+                    dynamicDegrees.set(sourceId, (dynamicDegrees.get(sourceId) || 0) + 1);
+                    dynamicDegrees.set(targetId, (dynamicDegrees.get(targetId) || 0) + 1);
+                }
+            });
+
+            // 3. Apply Topological Filters (Orphans, Min Degree) using Dynamic Degree
+            return candidateNodes.filter(node => {
+                // DISCOVERY OVERRIDE: Keep discovered nodes visible regardless of topology
+                if (discoveredNodeIds.has(node.id)) {
+                    return true;
+                }
+
+                const degree = dynamicDegrees.get(node.id) || 0;
+
+                // Filter by minimum degree
+                if (filters.minDegree > 0 && degree < filters.minDegree) {
+                    return false;
+                }
+
+                // Filter by orphan status
+                // If "Hide Isolated Nodes" is ON (!showOrphans), remove nodes with 0 visible connections
+                if (!filters.showOrphans && degree === 0) {
                     return false;
                 }
 
@@ -418,11 +449,15 @@ export const useGraphStore = create<GraphState>()(
 
         filteredLinks: () => {
             const { links, filters } = get();
-            const filteredNodeIds = new Set(get().filteredNodes().map((n) => n.id));
+            const filteredNodesList = get().filteredNodes();
+            const filteredNodeIds = new Set(filteredNodesList.map((n) => n.id));
 
             return links.filter((link) => {
+                const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
+                const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
+
                 // Both source and target must be in filtered nodes
-                if (!filteredNodeIds.has(link.source) || !filteredNodeIds.has(link.target)) {
+                if (!filteredNodeIds.has(sourceId) || !filteredNodeIds.has(targetId)) {
                     return false;
                 }
 

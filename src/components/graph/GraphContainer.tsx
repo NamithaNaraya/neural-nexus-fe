@@ -514,6 +514,96 @@ export function GraphContainer({
         return `${base} ${immersive} ${className}`;
     }, [isFullscreen, className]);
 
+    // Focus/Neighborhood Statistics Calculation
+    const focusData = useMemo(() => {
+        if (selectedNodes.length === 0) return { nodes: new Set<string>(), links: new Set<string>() };
+
+        // Logic mirrors ForceGraph2D's Property-Aware BFS to ensure stats match visuals
+        const seeds = [...selectedNodes];
+        const neighbors = new Set<string>(seeds);
+        const focusLinkKeys = new Set<string>();
+
+        // 1. Identify "Origin Herb" context
+        let originHerbName = '';
+        const getNodeType = (n: GraphNode) => n.type || 'Entity';
+
+        const selectedHerbs = selectedNodes
+            .map(id => nodes.find(n => n.id === id))
+            .filter(n => n && getNodeType(n) === 'Herb');
+
+        if (selectedHerbs.length === 1 && selectedHerbs[0]) {
+            originHerbName = selectedHerbs[0].name;
+        }
+
+        // 2. Multi-Hop BFS
+        let currentLevel = [...seeds];
+        const MAX_HOPS = 3;
+
+        for (let hop = 0; hop < MAX_HOPS; hop++) {
+            const nextLevel: string[] = [];
+
+            visibleLinks.forEach(link => {
+                const s = typeof link.source === 'object' ? (link.source as any).id : link.source;
+                const t = typeof link.target === 'object' ? (link.target as any).id : link.target;
+
+                if (!s || !t) return;
+
+                const linkType = (link.type || '').toUpperCase().replace(/[\s-]/g, '_');
+
+                // Intelligent Filtering (matching ForceGraph2D)
+                if (originHerbName) {
+                    // Don't follow HAS_PROPERTY outwards from Properties to other Herbs
+                    if (hop > 0 && linkType === 'HAS_PROPERTY') {
+                        return;
+                    }
+
+                    // Strict HAS_QUALITY filtering
+                    if (linkType === 'HAS_QUALITY') {
+                        const herbProp = (link.properties?.herb as string || '').trim();
+                        // If link has specific herb context, it MUST match origin
+                        if (herbProp) {
+                            const v = herbProp.toLowerCase();
+                            const o = originHerbName.toLowerCase();
+                            if (!(v === o || o.includes(v) || v.includes(o))) {
+                                return;
+                            }
+                        } else {
+                            // If no herb prop on HAS_QUALITY, ForceGraph2D usually skips in strict mode
+                            // We'll skip to be safe/conservative
+                            return;
+                        }
+                    }
+                }
+
+                // Forward traversal
+                if (currentLevel.includes(s)) {
+                    focusLinkKeys.add(`${s}-${t}-${link.type}`);
+                    if (!neighbors.has(t)) {
+                        neighbors.add(t);
+                        nextLevel.push(t);
+                    }
+                }
+
+                // Backwards traversal (only on first hop to catch incoming)
+                if (hop === 0 && currentLevel.includes(t)) {
+                    focusLinkKeys.add(`${s}-${t}-${link.type}`);
+                    if (!neighbors.has(s)) {
+                        neighbors.add(s);
+                        nextLevel.push(s);
+                    }
+                }
+            });
+
+            currentLevel = nextLevel;
+            if (currentLevel.length === 0) break;
+        }
+
+        return {
+            nodes: neighbors,
+            links: focusLinkKeys
+        };
+    }, [selectedNodes, visibleLinks, nodes]);
+
     return (
         <div className={containerClasses}>
             {/* Toolbar */}
@@ -532,6 +622,8 @@ export function GraphContainer({
                     totalNodeCount={nodes.length}
                     totalLinkCount={links.length}
                     selectedCount={selectedNodes.length}
+                    focusNodeIds={focusData.nodes}
+                    focusLinkIds={focusData.links}
                     isSidebarOpen={showNodeDetail}
                     onCreateNode={handleCreateNode}
                     onMerge={() => setShowMergeModal(true)}
@@ -687,27 +779,31 @@ export function GraphContainer({
             </AnimatePresence>
 
             {/* Mobile 2D Lock Warning */}
-            {isLocked && lockReason && (
-                <motion.div
-                    initial={{ y: -50, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    className="absolute top-16 left-1/2 -translate-x-1/2 z-40 px-4 py-2 bg-amber-500/20 border border-amber-500/40 rounded-lg flex items-center gap-2"
-                >
-                    <AlertTriangle className="w-4 h-4 text-amber-500" />
-                    <span className="text-sm text-amber-500">{lockReason}</span>
-                </motion.div>
-            )}
+            {
+                isLocked && lockReason && (
+                    <motion.div
+                        initial={{ y: -50, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        className="absolute top-16 left-1/2 -translate-x-1/2 z-40 px-4 py-2 bg-amber-500/20 border border-amber-500/40 rounded-lg flex items-center gap-2"
+                    >
+                        <AlertTriangle className="w-4 h-4 text-amber-500" />
+                        <span className="text-sm text-amber-500">{lockReason}</span>
+                    </motion.div>
+                )
+            }
 
             {/* Immersive Mode Toggle Button (when in immersive) */}
-            {isFullscreen && (
-                <button
-                    onClick={toggleImmersive}
-                    className="absolute top-4 right-4 z-50 p-2 bg-background/80 backdrop-blur-sm rounded-lg border border-border hover:bg-muted transition-colors"
-                    title="Exit Immersive Mode"
-                >
-                    <Minimize2 className="w-5 h-5 text-foreground" />
-                </button>
-            )}
+            {
+                isFullscreen && (
+                    <button
+                        onClick={toggleImmersive}
+                        className="absolute top-4 right-4 z-50 p-2 bg-background/80 backdrop-blur-sm rounded-lg border border-border hover:bg-muted transition-colors"
+                        title="Exit Immersive Mode"
+                    >
+                        <Minimize2 className="w-5 h-5 text-foreground" />
+                    </button>
+                )
+            }
 
             {/* CRUD Modals */}
             <NodeEditorModal
@@ -730,18 +826,20 @@ export function GraphContainer({
                 graphNodeTypes={nodeTypes}
             />
 
-            {relationshipSourceNode && (
-                <RelationshipEditorModal
-                    isOpen={showRelationshipEditor}
-                    onClose={() => {
-                        setShowRelationshipEditor(false);
-                        setRelationshipSourceNode(null);
-                    }}
-                    onSuccess={handleRelationshipCreated}
-                    sourceNode={relationshipSourceNode}
-                    availableNodes={nodes}
-                />
-            )}
+            {
+                relationshipSourceNode && (
+                    <RelationshipEditorModal
+                        isOpen={showRelationshipEditor}
+                        onClose={() => {
+                            setShowRelationshipEditor(false);
+                            setRelationshipSourceNode(null);
+                        }}
+                        onSuccess={handleRelationshipCreated}
+                        sourceNode={relationshipSourceNode}
+                        availableNodes={nodes}
+                    />
+                )
+            }
 
             <DeleteConfirmModal
                 isOpen={showDeleteConfirm}
@@ -755,22 +853,24 @@ export function GraphContainer({
                 itemName={deleteTargetNode?.name}
             />
 
-            {showMergeModal && (
-                <MergeNodesModal
-                    nodes={nodes.filter(n => selectedNodes.includes(n.id))}
-                    onClose={() => setShowMergeModal(false)}
-                    onSuccess={() => {
-                        clearSelection();
-                        // Query invalidation handled inside modal
-                    }}
-                />
-            )}
+            {
+                showMergeModal && (
+                    <MergeNodesModal
+                        nodes={nodes.filter(n => selectedNodes.includes(n.id))}
+                        onClose={() => setShowMergeModal(false)}
+                        onSuccess={() => {
+                            clearSelection();
+                            // Query invalidation handled inside modal
+                        }}
+                    />
+                )
+            }
 
             {/* Unified AI Assistant Overlay */}
             <div className="z-[150] pointer-events-none fixed inset-0">
                 <ReasoningAssistant />
             </div>
-        </div>
+        </div >
 
     );
 }
