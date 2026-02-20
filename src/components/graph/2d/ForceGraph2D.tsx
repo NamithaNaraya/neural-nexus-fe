@@ -55,6 +55,7 @@ interface D3Link {
     type: string;
     strength?: number;
     properties?: Record<string, unknown>;
+    color?: string;
 }
 
 // Ingestion Progress UI for 2D
@@ -222,6 +223,7 @@ export function ForceGraph2D({
                 type: l.type,
                 strength: l.strength,
                 properties: l.properties,
+                color: l.color,
             });
             return acc;
         }, []);
@@ -246,7 +248,7 @@ export function ForceGraph2D({
     // Get link color
     const getLinkColor = useCallback((link: D3Link) => {
         const customRelColors = useGraphStore.getState().filters.customRelationshipColors;
-        return customRelColors[link.type] || RELATIONSHIP_COLORS[link.type] || RELATIONSHIP_COLORS.default;
+        return link.color || customRelColors[link.type] || RELATIONSHIP_COLORS[link.type] || RELATIONSHIP_COLORS.default;
     }, []);
 
     // Handle resize
@@ -801,6 +803,7 @@ export function ForceGraph2D({
                 // Use custom color if available
                 return getLinkColor(d);
             })
+            .attr('stroke-dasharray', d => d.properties?.isPredicted ? '8,4' : 'none')
             .attr('stroke-opacity', d => {
                 const sourceId = typeof d.source === 'string' ? d.source : (d.source as D3Node).id;
                 const targetId = typeof d.target === 'string' ? d.target : (d.target as D3Node).id;
@@ -808,8 +811,9 @@ export function ForceGraph2D({
                 const isLinkFocused = focusNodeId && (neighbors.has(sourceId) && neighbors.has(targetId));
                 const isPathLink = focusLinkKeys.has(`${sourceId}-${targetId}`);
                 const isCorrelation = analyticSelectionActive && selectedNodes.includes(sourceId) && selectedNodes.includes(targetId);
+                const isPredicted = Boolean(d.properties?.isPredicted);
 
-                if (isCorrelation) return 1;
+                if (isCorrelation || isPredicted) return 1;
                 if (isLinkFocused || isPathLink) return 0.8;
                 if (focusNodeId) return 0.04;
 
@@ -822,7 +826,9 @@ export function ForceGraph2D({
 
                 const isCorrelation = analyticSelectionActive && selectedNodes.includes(sourceId) && selectedNodes.includes(targetId);
                 const isPathLink = focusLinkKeys.has(`${sourceId}-${targetId}`);
-                if (isCorrelation) return 2.5;
+                const isPredicted = Boolean(d.properties?.isPredicted);
+
+                if (isCorrelation || isPredicted) return 2.5;
                 if (isPathLink || (focusNodeId && (neighbors.has(sourceId) && neighbors.has(targetId)))) return 2.5;
                 if (selectedNodes.includes(sourceId) || selectedNodes.includes(targetId)) return 2.5;
                 return 1.5;

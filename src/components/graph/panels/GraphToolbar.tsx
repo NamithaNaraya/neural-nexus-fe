@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { AlgorithmDrawer } from './AlgorithmDrawer';
 import { AnalyticsSelectionLocker } from './AnalyticsSelectionLocker';
+import { MachineLearningDrawer } from './ml/MachineLearningDrawer';
 import { useGraphStore } from '@/store/graphStore';
 
 interface GraphToolbarProps {
@@ -90,6 +91,7 @@ export function GraphToolbar({
 }: GraphToolbarProps) {
     const router = useRouter();
     const [showAlgorithmDrawer, setShowAlgorithmDrawer] = useState(false);
+    const [showMlDrawer, setShowMlDrawer] = useState(false);
 
     const {
         setFilters,
@@ -190,6 +192,12 @@ export function GraphToolbar({
                             title="Graph Analytics"
                             className="text-amber-500 hover:bg-amber-500/10"
                         />
+                        <ToolbarButton
+                            onClick={() => setShowMlDrawer(true)}
+                            icon={<Box className="w-4 h-4" />}
+                            title="Machine Learning"
+                            className="text-pink-500 hover:bg-pink-500/10 border-pink-500/20"
+                        />
                         {onResetCamera && (
                             <ToolbarButton
                                 onClick={onResetCamera}
@@ -258,6 +266,13 @@ export function GraphToolbar({
                 folderId={folderId}
                 focusNodeIds={focusNodeIds ? Array.from(focusNodeIds) : undefined}
                 focusLinkIds={focusLinkIds ? Array.from(focusLinkIds) : undefined}
+            />
+
+            {/* Machine Learning Drawer */}
+            <MachineLearningDrawer
+                isOpen={showMlDrawer}
+                onClose={() => setShowMlDrawer(false)}
+                currentFolderId={folderId}
             />
 
             {/* Selection Locker */}

@@ -70,15 +70,16 @@ export function RelationshipLinks({
                     );
                 }
 
+                const isPredicted = Boolean(link.properties?.isPredicted);
                 const isPartOfFocus = focusIds.includes(sourceId) || focusIds.includes(targetId);
                 const isPathMatch = focusLinkIds.has(`${sourceId}-${targetId}`) || (focusNodeIds.has(sourceId) && focusNodeIds.has(targetId));
-                const isHighlighted = isPartOfFocus || isContextMatch || isPathMatch;
+                const isHighlighted = isPartOfFocus || isContextMatch || isPathMatch || isPredicted;
 
-                const opacity = hasFocus ? (isHighlighted ? 1.0 : 0.05) : 0.8;
-                const baseColor = RELATIONSHIP_COLORS[link.type] || RELATIONSHIP_COLORS.default;
+                const opacity = hasFocus && !isPredicted ? (isHighlighted ? 1.0 : 0.05) : (isPredicted ? 0.9 : 0.8);
+                const baseColor = link.color || RELATIONSHIP_COLORS[link.type] || RELATIONSHIP_COLORS.default;
 
                 // Enhance context matches or path matches with a slightly distinct appearance
-                const width = isHighlighted ? (isPathMatch && !isPartOfFocus ? 1.4 : 1.2) : 0.6;
+                const width = isHighlighted ? (isPathMatch && !isPartOfFocus ? 1.4 : isPredicted ? 2.5 : 1.2) : 0.6;
 
                 const start = new THREE.Vector3(source.x || 0, source.y || 0, source.z || 0);
                 const end = new THREE.Vector3(target.x || 0, target.y || 0, target.z || 0);
