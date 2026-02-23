@@ -79,6 +79,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
     const [relSearch, setRelSearch] = useState('');
     const [isCreatingRel, setIsCreatingRel] = useState(false);
     const [availableRelTypes, setAvailableRelTypes] = useState<string[]>([]);
+    const [showRelTypeSuggestions, setShowRelTypeSuggestions] = useState(false);
     const [availableNodeTypes, setAvailableNodeTypes] = useState<string[]>([]);
     const [details, setDetails] = useState<NodeDetails | null>(null);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
@@ -451,19 +452,63 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                             <div>
                                 <label className="text-[11px] text-gray-500 font-semibold mb-2 block">Relationship Type</label>
                                 <div className="relative">
-                                    <select
-                                        value={relType}
-                                        onChange={(e) => setRelType(e.target.value)}
-                                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/40 appearance-none cursor-pointer font-medium"
-                                    >
-                                        {availableRelTypes.map(type => (
-                                            <option key={type} value={type} className="bg-white text-gray-800">{type.replace(/_/g, ' ')}</option>
-                                        ))}
-                                    </select>
+                                    <input
+                                        type="text"
+                                        value={relType.replace(/_/g, ' ')}
+                                        onChange={(e) => {
+                                            // Auto-uppercase and replace spaces with underscores for storage
+                                            const raw = e.target.value.toUpperCase();
+                                            setRelType(raw.replace(/\s+/g, '_'));
+                                            setShowRelTypeSuggestions(true);
+                                        }}
+                                        onFocus={() => setShowRelTypeSuggestions(true)}
+                                        onBlur={() => {
+                                            // Delay to allow click on suggestion
+                                            setTimeout(() => setShowRelTypeSuggestions(false), 200);
+                                        }}
+                                        placeholder="Type or select a relationship..."
+                                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/40 font-medium uppercase tracking-wide"
+                                    />
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
                                         <ChevronRight className="w-4 h-4 rotate-90" />
                                     </div>
                                 </div>
+                                {/* Suggestions dropdown */}
+                                {showRelTypeSuggestions && (() => {
+                                    const query = relType.replace(/_/g, ' ').toLowerCase();
+                                    const filtered = availableRelTypes
+                                        .filter(t => t.replace(/_/g, ' ').toLowerCase().includes(query))
+                                        .slice(0, 5);
+                                    const exactMatch = availableRelTypes.some(t => t === relType);
+                                    return (filtered.length > 0 || (!exactMatch && relType.trim())) ? (
+                                        <div className="mt-1 max-h-48 overflow-y-auto rounded-xl bg-white border border-gray-200 shadow-lg z-10 relative">
+                                            {!exactMatch && relType.trim().length > 0 && (
+                                                <button
+                                                    onClick={() => {
+                                                        setShowRelTypeSuggestions(false);
+                                                    }}
+                                                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 transition-all flex items-center gap-2 border-b border-gray-100 text-primary font-medium"
+                                                >
+                                                    <Plus className="w-3.5 h-3.5" />
+                                                    Create &quot;{relType.replace(/_/g, ' ')}&quot;
+                                                </button>
+                                            )}
+                                            {filtered.map(type => (
+                                                <button
+                                                    key={type}
+                                                    onClick={() => {
+                                                        setRelType(type);
+                                                        setShowRelTypeSuggestions(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition-all flex items-center justify-between border-b border-gray-100 last:border-b-0 font-medium ${relType === type ? 'bg-primary/10 text-primary' : 'text-gray-700'}`}
+                                                >
+                                                    <span>{type.replace(/_/g, ' ')}</span>
+                                                    {relType === type && <Check className="w-4 h-4 text-primary" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : null;
+                                })()}
                             </div>
 
                             {/* Connection Preview */}

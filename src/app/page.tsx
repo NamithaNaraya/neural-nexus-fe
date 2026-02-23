@@ -46,13 +46,16 @@ export default function HomePage() {
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ duration: 0.5 }}
-                    className="relative z-10"
+                    className="relative z-10 flex flex-col items-center"
                 >
-                    <h1 className="text-5xl font-bold text-architect-text mb-4">
-                        <span className="text-emerald">Neural</span> Nexus
+                    <div className="w-24 h-24 mb-6 rounded-3xl overflow-hidden shadow-2xl flex items-center justify-center bg-white/5 p-2 border border-border">
+                        <img src="/logo.png" alt="NESSO Botanica Logo" className="w-full h-full object-contain" />
+                    </div>
+                    <h1 className="text-5xl font-bold text-foreground mb-4 uppercase tracking-tighter">
+                        <span className="text-emerald">NESSO</span> Botanica
                     </h1>
-                    <p className="text-architect-muted text-lg mb-8">
-                        Knowledge Graph Platform
+                    <p className="text-muted-foreground font-semibold uppercase tracking-widest text-sm mb-8">
+                        Natural & Essential Oils.
                     </p>
 
                     {/* Loading Spinner */}

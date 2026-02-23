@@ -199,8 +199,9 @@ export function GraphContainer({
         zoomToNode,
         resetCamera,
         addToDiscovery,
-        setIsolatedNode,
-        isolatedNodeId,
+        focusPruneOnNode,
+        prePruneNodes,
+        undoPrune,
         analyticSelectionActive,
         analyticIncludeNeighbors,
         nodeTypes,
@@ -273,7 +274,7 @@ export function GraphContainer({
     const pathMutation = useShortestPath();
 
     // Handlers
-    const handleNodeDoubleClick = useCallback(async (nodeId: string) => {
+    const handleNodeExpand = useCallback(async (nodeId: string) => {
         console.log('Progressive Node Expansion:', nodeId);
 
         // Select the expanded node (highlight it + neighbors)
@@ -322,6 +323,13 @@ export function GraphContainer({
             console.error('Expansion failed:', err);
         }
     }, [expandMutation]);
+
+    // Double-click: Focus prune — permanently remove all non-connected nodes
+    const handleNodeDoubleClick = useCallback((nodeId: string) => {
+        console.log('Focus prune on node:', nodeId);
+        focusPruneOnNode(nodeId);
+        selectNode(nodeId, false);
+    }, [focusPruneOnNode, selectNode]);
 
     // Unified Click (Left or Right): Show Detail Sidebar
     const handleNodeClick = useCallback((nodeId: string, event?: any) => {
@@ -630,6 +638,25 @@ export function GraphContainer({
                 />
             )}
 
+            {/* Prune Focus Mode Indicator */}
+            {prePruneNodes && (
+                <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-2.5 rounded-full bg-amber-500/90 backdrop-blur-md text-white shadow-lg border border-amber-400/50"
+                >
+                    <span className="text-xs font-bold uppercase tracking-wider">✄ Focus Prune Active:</span>
+                    <span className="text-sm font-semibold">{nodes.length} nodes visible</span>
+                    <button
+                        onClick={undoPrune}
+                        className="ml-2 px-3 py-1 rounded-full bg-white/20 hover:bg-white/30 text-xs font-bold transition-colors"
+                    >
+                        Restore Full Graph
+                    </button>
+                </motion.div>
+            )}
+
             {/* Main Graph Content Area */}
             <div className="flex-1 relative min-h-0 flex flex-col">
                 {isGraphLoading ? (
@@ -768,7 +795,7 @@ export function GraphContainer({
                         }}
                         onEdit={() => handleEditNode(selectedNodeForDetail.id)}
                         onDelete={() => handleDeleteNode(selectedNodeForDetail.id)}
-                        onExpand={handleNodeDoubleClick}
+                        onExpand={handleNodeExpand}
                         onFocus={(id) => zoomToNode?.(id)}
                         onCreateNode={handleCreateNode}
                         onInitiateAnalysis={(node) => {

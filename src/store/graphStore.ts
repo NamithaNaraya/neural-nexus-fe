@@ -106,6 +106,7 @@ interface GraphState {
     filters: FilterConfig;
     setFilters: (filters: Partial<FilterConfig>) => void;
     resetFilters: () => void;
+    removePredictedLinks: () => void;
     filteredNodes: () => GraphNode[];
     filteredLinks: () => GraphLink[];
 
@@ -153,9 +154,11 @@ interface GraphState {
     removeFromDiscovery: (id: string) => void;
     clearDiscovery: () => void;
 
-    // Isolation (Focus on a specific neighborhood)
-    isolatedNodeId: string | null;
-    setIsolatedNode: (id: string | null) => void;
+    // Isolation / Prune Focus
+    prePruneNodes: GraphNode[] | null;
+    prePruneLinks: GraphLink[] | null;
+    focusPruneOnNode: (nodeId: string) => void;
+    undoPrune: () => void;
 
     // Analytics Selection Flow
     analyticSelectionActive: boolean;
@@ -225,7 +228,6 @@ export const useGraphStore = create<GraphState>()(
             expandedNodes: new Set(),
             expandedChildren: new Map(),
             targetNode: null,
-            isolatedNodeId: null
         }),
 
         // Selection
@@ -249,7 +251,7 @@ export const useGraphStore = create<GraphState>()(
         deselectNode: (id) => set((state) => ({
             selectedNodes: state.selectedNodes.filter((n) => n !== id),
         })),
-        clearSelection: () => set({ selectedNodes: [], isolatedNodeId: null }),
+        clearSelection: () => set({ selectedNodes: [] }),
         setSelectedNodes: (ids) => set({ selectedNodes: ids }),
         setHoveredNode: (id) => set({ hoveredNode: id }),
         selectNodeWithNeighbors: (id) => {
@@ -273,9 +275,58 @@ export const useGraphStore = create<GraphState>()(
             });
         },
 
-        // Isolation
-        isolatedNodeId: null,
-        setIsolatedNode: (id) => set({ isolatedNodeId: id }),
+        // Isolation / Prune Focus
+        prePruneNodes: null,
+        prePruneLinks: null,
+        undoPrune: () => set((state) => {
+            if (!state.prePruneNodes || !state.prePruneLinks) return state; // Nothing to restore
+
+            return {
+                nodes: state.prePruneNodes,
+                links: state.prePruneLinks,
+                nodeCount: state.prePruneNodes.length,
+                linkCount: state.prePruneLinks.length,
+                nodeTypes: Array.from(new Set(state.prePruneNodes.map(n => n.type))),
+                linkTypes: Array.from(new Set(state.prePruneLinks.map(l => l.type))),
+                prePruneNodes: null, // Clear backup
+                prePruneLinks: null
+            };
+        }),
+
+        // Focus Prune: permanently remove non-connected nodes from graph
+        focusPruneOnNode: (nodeId) => set((state) => {
+            const neighbors = new Set<string>();
+            neighbors.add(nodeId);
+
+            // Find all immediate neighbors
+            state.links.forEach(link => {
+                const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
+                const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
+                if (sourceId === nodeId) neighbors.add(targetId);
+                if (targetId === nodeId) neighbors.add(sourceId);
+            });
+
+            const prunedNodes = state.nodes.filter(n => neighbors.has(n.id));
+            const prunedLinks = state.links.filter(l => {
+                const s = typeof l.source === 'object' ? (l.source as any).id : l.source;
+                const t = typeof l.target === 'object' ? (l.target as any).id : l.target;
+                return neighbors.has(s) && neighbors.has(t);
+            });
+
+            return {
+                nodes: prunedNodes,
+                links: prunedLinks,
+                nodeCount: prunedNodes.length,
+                linkCount: prunedLinks.length,
+                nodeTypes: Array.from(new Set(prunedNodes.map(n => n.type))),
+                linkTypes: Array.from(new Set(prunedLinks.map(l => l.type))),
+                selectedNodes: state.selectedNodes.filter(id => neighbors.has(id)),
+
+                // Back up the original state if we haven't already (allows consecutive prunes without losing original graph)
+                prePruneNodes: state.prePruneNodes || state.nodes,
+                prePruneLinks: state.prePruneLinks || state.links,
+            };
+        }),
 
         // Expanded Nodes (Double-click expansion tracking)
         expandedNodes: new Set<string>(),
@@ -350,28 +401,30 @@ export const useGraphStore = create<GraphState>()(
         setFilters: (newFilters) => set((state) => ({
             filters: { ...state.filters, ...newFilters },
         })),
-        resetFilters: () => set({ filters: defaultFilters }),
+        resetFilters: () => {
+            // Also remove predicted links when resetting filters
+            const state = get();
+            const cleanLinks = state.links.filter(l => !l.properties?.isPredicted);
+            set({
+                filters: defaultFilters,
+                links: cleanLinks,
+                linkCount: cleanLinks.length,
+                linkTypes: Array.from(new Set(cleanLinks.map(l => l.type))),
+            });
+        },
+
+        removePredictedLinks: () => set((state) => {
+            const cleanLinks = state.links.filter(l => !l.properties?.isPredicted);
+            return {
+                links: cleanLinks,
+                linkCount: cleanLinks.length,
+                linkTypes: Array.from(new Set(cleanLinks.map(l => l.type))),
+            };
+        }),
 
         // Computed filtered data
         filteredNodes: () => {
-            const { nodes, links, filters, isolatedNodeId, discoveredNodeIds } = get();
-
-            // ISOLATION MODE: If a node is isolated, only show it and its neighbors
-            if (isolatedNodeId) {
-                const neighbors = new Set<string>();
-                neighbors.add(isolatedNodeId);
-
-                // Find all immediate neighbors
-                links.forEach(link => {
-                    const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
-                    const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
-
-                    if (sourceId === isolatedNodeId) neighbors.add(targetId);
-                    if (targetId === isolatedNodeId) neighbors.add(sourceId);
-                });
-
-                return nodes.filter(node => neighbors.has(node.id));
-            }
+            const { nodes, links, filters, discoveredNodeIds } = get();
 
             // 1. Identify Candidate Nodes (Attribute Filters)
             const candidateNodes = nodes.filter((node) => {

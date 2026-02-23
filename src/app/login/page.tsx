@@ -1,23 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
     const router = useRouter();
-    const { login, isLoading, error, clearError } = useAuthStore();
+    const { login, isAuthenticated, isLoading, error, clearError, checkAuth, isHydrated } = useAuthStore();
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+        checkAuth();
+    }, [checkAuth]);
+
+    // Redirect if already authenticated
+    useEffect(() => {
+        if (isHydrated && isAuthenticated) {
+            router.push("/library");
+        }
+    }, [isAuthenticated, isHydrated, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         clearError();
-
         try {
             await login(email, password);
             router.push("/library");
@@ -26,160 +38,186 @@ export default function LoginPage() {
         }
     };
 
+    if (!mounted) return null;
+
+    // Generate static background elements
+    const bgNodes = [...Array(20)].map((_, i) => ({
+        cx: (i * 17 + 7) % 100,
+        cy: (i * 23 + 13) % 100,
+        duration: 2 + (i % 4),
+        delay: (i % 5) * 0.4,
+    }));
+
+    const bgLines = [...Array(12)].map((_, i) => ({
+        x1: (i * 19 + 5) % 100,
+        y1: (i * 29 + 11) % 100,
+        x2: (i * 31 + 17) % 100,
+        y2: (i * 13 + 23) % 100,
+        duration: 3 + (i % 3),
+        delay: (i % 4) * 0.5,
+    }));
+
     return (
         <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden">
-            {/* Animated Background */}
+            {/* Animated Neural Background */}
             <div className="absolute inset-0">
-                <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-emerald/5" />
-                <motion.div
-                    className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald/10 rounded-full blur-3xl"
-                    animate={{
-                        scale: [1, 1.2, 1],
-                        opacity: [0.3, 0.5, 0.3],
-                    }}
-                    transition={{
-                        duration: 8,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                    }}
-                />
-                <motion.div
-                    className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-primary/10 rounded-full blur-3xl"
-                    animate={{
-                        scale: [1, 1.3, 1],
-                        opacity: [0.2, 0.4, 0.2],
-                    }}
-                    transition={{
-                        duration: 10,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                        delay: 1,
-                    }}
-                />
+                <svg
+                    className="w-full h-full opacity-20"
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                >
+                    {bgNodes.map((node, i) => (
+                        <motion.circle
+                            key={i}
+                            cx={node.cx}
+                            cy={node.cy}
+                            r={0.4}
+                            fill="#10B981"
+                            initial={{ opacity: 0.2 }}
+                            animate={{ opacity: [0.2, 0.7, 0.2] }}
+                            transition={{
+                                duration: node.duration,
+                                repeat: Infinity,
+                                delay: node.delay,
+                            }}
+                        />
+                    ))}
+                    {bgLines.map((line, i) => (
+                        <motion.line
+                            key={`l-${i}`}
+                            x1={line.x1}
+                            y1={line.y1}
+                            x2={line.x2}
+                            y2={line.y2}
+                            stroke="#10B981"
+                            strokeWidth={0.08}
+                            initial={{ opacity: 0.05 }}
+                            animate={{ opacity: [0.05, 0.3, 0.05] }}
+                            transition={{
+                                duration: line.duration,
+                                repeat: Infinity,
+                                delay: line.delay,
+                            }}
+                        />
+                    ))}
+                </svg>
             </div>
+
+            {/* Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-background via-background/95 to-emerald/5" />
 
             {/* Login Card */}
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="relative z-10 w-full max-w-md p-8"
+                initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="relative z-10 w-full max-w-md mx-4"
             >
-                <div className="bg-card border border-border p-8 rounded-2xl shadow-xl">
-                    {/* Logo */}
-                    <div className="text-center mb-8">
-                        <motion.h1
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.2 }}
-                            className="text-3xl font-bold text-foreground mb-2"
-                        >
-                            <span className="text-emerald">Neural</span> Nexus
-                        </motion.h1>
-                        <p className="text-muted-foreground">
-                            Welcome to the Knowledge Graph Platform
+                <div className="bg-card/80 backdrop-blur-xl border border-border rounded-2xl shadow-2xl shadow-emerald/5 p-8">
+                    {/* Logo & Branding */}
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="text-center mb-8"
+                    >
+                        <div className="w-20 h-20 mx-auto mb-5 rounded-2xl overflow-hidden shadow-lg flex items-center justify-center bg-white/5 p-2 border border-border">
+                            <img
+                                src="/logo.png"
+                                alt="NESSO Botanica Logo"
+                                className="w-full h-full object-contain"
+                            />
+                        </div>
+                        <h1 className="text-3xl font-bold text-foreground mb-1">
+                            <span className="text-emerald">NESSO</span> Botanica
+                        </h1>
+                        <p className="text-muted-foreground text-sm font-medium uppercase tracking-widest">
+                            Natural & Essential Oils
                         </p>
-                    </div>
+                    </motion.div>
 
-                    {/* Form */}
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        {/* Email */}
+                    {/* Error Message */}
+                    {error && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            className="mb-5 flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive"
+                        >
+                            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                            <span>{error}</span>
+                        </motion.div>
+                    )}
+
+                    {/* Login Form */}
+                    <form onSubmit={handleSubmit} className="space-y-5">
                         <div>
-                            <label
-                                htmlFor="email"
-                                className="block text-sm font-medium text-foreground mb-2"
-                            >
+                            <label className="block text-sm font-medium text-foreground mb-2">
                                 Email
                             </label>
                             <input
-                                id="email"
+                                id="login-email"
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                required
-                                autoComplete="email"
-                                className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald/50 focus:border-emerald/50 transition-all"
                                 placeholder="you@example.com"
+                                required
+                                autoFocus
+                                className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald/50 focus:border-emerald/50 transition-all"
                             />
                         </div>
 
-                        {/* Password */}
                         <div>
-                            <label
-                                htmlFor="password"
-                                className="block text-sm font-medium text-foreground mb-2"
-                            >
+                            <label className="block text-sm font-medium text-foreground mb-2">
                                 Password
                             </label>
                             <div className="relative">
                                 <input
-                                    id="password"
+                                    id="login-password"
                                     type={showPassword ? "text" : "password"}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    required
-                                    autoComplete="current-password"
-                                    className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald/50 focus:border-emerald/50 transition-all pr-12"
                                     placeholder="••••••••"
+                                    required
+                                    className="w-full px-4 py-3 pr-12 bg-muted/50 border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald/50 focus:border-emerald/50 transition-all"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
                                 >
-                                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                    {showPassword ? (
+                                        <EyeOff className="w-5 h-5" />
+                                    ) : (
+                                        <Eye className="w-5 h-5" />
+                                    )}
                                 </button>
                             </div>
                         </div>
 
-                        {/* Error Message */}
-                        {error && (
-                            <motion.div
-                                initial={{ opacity: 0, y: -10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm"
-                            >
-                                {error}
-                            </motion.div>
-                        )}
-
-                        {/* Submit Button */}
-                        <button
+                        <motion.button
                             type="submit"
-                            disabled={isLoading}
-                            className="w-full py-3 px-4 bg-emerald hover:bg-emerald-dark text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald/20"
+                            disabled={isLoading || !email || !password}
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                            className="w-full py-3 bg-emerald hover:bg-emerald-dark text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {isLoading ? (
                                 <>
                                     <Loader2 className="w-5 h-5 animate-spin" />
-                                    Signing in...
+                                    <span>Signing in...</span>
                                 </>
                             ) : (
-                                "Sign In"
+                                <span>Sign In</span>
                             )}
-                        </button>
+                        </motion.button>
                     </form>
-
-                    {/* Footer */}
-                    <div className="mt-6 text-center text-sm text-muted-foreground">
-                        <p>
-                            Don&apos;t have an account?{" "}
-                            <a
-                                href="/register"
-                                className="text-emerald hover:text-emerald-dark transition-colors"
-                            >
-                                Create one
-                            </a>
-                        </p>
-                    </div>
                 </div>
 
-                {/* Version */}
-                <p className="text-center text-muted-foreground text-xs mt-4">
-                    Version 2.1.0
+                {/* Footer */}
+                <p className="text-center text-xs text-muted-foreground mt-6">
+                    Knowledge Graph Intelligence Platform
                 </p>
             </motion.div>
         </div>
     );
 }
-

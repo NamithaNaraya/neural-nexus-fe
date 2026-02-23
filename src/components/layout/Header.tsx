@@ -38,15 +38,15 @@ export function Header({ showThemeToggle = true, minimal = false }: HeaderProps)
                     onClick={() => router.push('/library')}
                     className="group flex items-center gap-3 text-2xl font-black text-foreground hover:opacity-90 transition-all duration-300"
                 >
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary via-orange-500 to-rose-500 flex items-center justify-center shadow-lg shadow-primary/20 group-hover:rotate-12 transition-transform duration-500">
-                        <span className="text-white text-xl">N</span>
+                    <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-emerald/20 transition-transform duration-500 flex items-center justify-center bg-white/5 p-0.5 border border-border group-hover:rotate-3 shrink-0">
+                        <img src="/logo.png" alt="NESSO Botanica Logo" className="w-full h-full object-contain" />
                     </div>
-                    <div className="flex flex-col items-start leading-none">
-                        <span className="font-heading bg-clip-text text-transparent bg-gradient-to-r from-primary to-orange-500 bg-[length:200%_auto] animate-gradient-shift uppercase tracking-tighter">
-                            Neural
+                    <div className="flex flex-col items-start leading-none gap-0.5">
+                        <span className="font-heading text-emerald font-black uppercase tracking-tighter text-xl pt-0.5">
+                            NESSO Botanica
                         </span>
-                        <span className="font-heading text-foreground/40 text-[10px] uppercase tracking-[0.2em] font-bold">
-                            Nexus
+                        <span className="font-heading text-foreground/60 text-[8px] sm:text-[10px] uppercase tracking-[0.2em] font-bold">
+                            Natural & Essential Oils.
                         </span>
                     </div>
                 </button>

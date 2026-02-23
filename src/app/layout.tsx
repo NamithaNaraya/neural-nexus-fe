@@ -8,12 +8,12 @@ import { Providers } from '@/components/providers';
 import './globals.css';
 
 export const metadata: Metadata = {
-    title: 'Neural Nexus | Knowledge Graph Platform',
-    description: 'Enterprise-grade knowledge extraction and visualization platform',
-    keywords: ['knowledge graph', 'AI', 'data visualization', 'graph database'],
-    authors: [{ name: 'Neural Nexus Team' }],
+    title: 'NESSO Botanica | Natural & Essential Oils.',
+    description: 'Natural & Essential Oils.',
+    keywords: ['botanical', 'knowledge graph', 'AI', 'data visualization', 'plants'],
+    authors: [{ name: 'NESSO Botanica Team' }],
     icons: {
-        icon: '/favicon.svg',
+        icon: '/logo.png',
     },
 };
 

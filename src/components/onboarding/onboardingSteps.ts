@@ -16,7 +16,7 @@ export interface OnboardingStep {
 export const onboardingSteps: OnboardingStep[] = [
     {
         id: 'welcome',
-        title: 'Welcome to Neural Nexus! 🧠',
+        title: 'Welcome to NESSO Botanica! 🌿',
         description: 'Your intelligent knowledge graph that transforms documents into interconnected insights. Let\'s take a quick tour.',
         position: 'center',
     },
