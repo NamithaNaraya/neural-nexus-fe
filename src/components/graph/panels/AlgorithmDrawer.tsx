@@ -281,10 +281,10 @@ function buildSummary(algo: AlgorithmConfig, result: AlgorithmResult, totalNodes
 
         case 'prediction':
             if (algo.key === 'node-similarity' && top) {
-                return `Compared all ${totalNodes} entities and found ${resultCount} significantly similar pairs. The strongest match is "${top.source_name || top.name}" ↔ "${top.target_name}" with ${((top.score || top.similarity || 0) * 100).toFixed(1)}% Jaccard similarity, meaning they share nearly identical connection patterns. ${result.insight || ''}`;
+                return `Compared ${totalNodes} active nodes and found ${resultCount} significantly similar pairs. The strongest match is "${top.source_name || top.name}" ↔ "${top.target_name}" with ${((top.score || top.similarity || 0) * 100).toFixed(1)}% Jaccard similarity, meaning they share nearly identical connection patterns. ${result.insight || ''}`;
             }
             if (['link-prediction', 'adamic-adar', 'resource-allocation'].includes(algo.key)) {
-                return `Scanned ${totalNodes} entities for potential hidden connections and predicted ${resultCount} candidate links. ${top ? `The strongest prediction is "${top.source_name}" ↔ "${top.target_name}" (score: ${top.score?.toFixed(4) || 'N/A'}), suggesting these entities are very likely to be related but not yet connected.` : ''} ${result.insight || ''}`;
+                return `Analyzed ${totalNodes} active nodes to find hidden connections and predicted ${resultCount} new potential links. ${top ? `The strongest prediction is "${top.source_name}" ↔ "${top.target_name}" (score: ${top.score?.toFixed(4) || 'N/A'}), suggesting these entities are likely related but not yet connected in the graph.` : ''} ${result.insight || ''}`;
             }
             return result.insight || `${resultCount} results found across ${totalNodes} entities.`;
 
@@ -420,7 +420,30 @@ export function AlgorithmDrawer({
         setResult(null);
 
         try {
-            const ids = nodeIds.length > 0 && nodeIds.length < nodes.length ? nodeIds : undefined;
+            // ── Scoping Logic ──────────────────────────────────────
+            // Priority: selected nodes > filtered/focus view > folder
+            //
+            // 1. If user selected specific nodes → run on those IDs
+            // 2. If viewing a subset (filtered/file view) → run on visible IDs
+            // 3. If viewing a folder → folderId scopes it (no node_ids needed)
+            // 4. No scope → runs on entire graph
+
+            let ids: string[] | undefined;
+
+            if (isSelectionMode) {
+                // User explicitly selected nodes — always scope to those
+                ids = selectedNodes.length > 0 ? [...selectedNodes] : undefined;
+                // If we also have focus neighbors (BFS highlight), include them
+                // so algorithms can analyze the local subgraph
+                if (focusNodeIds && focusNodeIds.length > 0) {
+                    ids = focusNodeIds;
+                }
+            } else if (nodeIds.length > 0 && nodeIds.length < nodes.length) {
+                // Filtered view shows a subset of nodes (e.g., type filter, file filter)
+                ids = nodeIds;
+            }
+            // else: folderId alone will scope it on the backend
+
             const extra: Record<string, any> = {};
 
             if (selectedAlgorithm.category === 'pathfinding' || selectedAlgorithm.key === 'random-walk') {
@@ -443,7 +466,7 @@ export function AlgorithmDrawer({
         } finally {
             setIsLoading(false);
         }
-    }, [selectedAlgorithm, folderId, nodeIds, nodes.length, selectedNodes, datasetFingerprint]);
+    }, [selectedAlgorithm, folderId, nodeIds, nodes.length, selectedNodes, focusNodeIds, isSelectionMode, datasetFingerprint]);
 
     if (!isOpen) return null;
 
@@ -484,9 +507,11 @@ export function AlgorithmDrawer({
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-3 px-4 py-2.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                             <span className="flex items-center gap-1.5 border-r border-slate-300/50 dark:border-slate-600/50 pr-3 mr-1">
-                                <span className={`w-2 h-2 rounded-full ${isSelectionMode ? 'animate-pulse bg-emerald-500' : 'bg-indigo-400'}`}
+                                <span className={`w-2 h-2 rounded-full ${isSelectionMode ? 'animate-pulse bg-emerald-500' : folderId ? 'bg-indigo-400' : 'bg-amber-400'}`}
                                 />
-                                {isSelectionMode ? 'Selected' : 'All'}
+                                {isSelectionMode
+                                    ? `${selectedNodes.length} Selected`
+                                    : folderId ? 'Folder Scope' : 'All Data'}
                             </span>
                             <span className="flex items-center gap-1.5">
                                 {nodeCount} nodes
