@@ -11,6 +11,7 @@
 
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'sonner';
 import { CommandPaletteProvider } from '@/components/command-palette';
 import { useAuthStore } from '@/store/authStore';
 
@@ -127,6 +128,7 @@ export function Providers({ children }: ProvidersProps) {
         <ThemeProvider>
             <QueryClientProvider client={queryClient}>
                 <AuthProvider>
+                    <Toaster richColors closeButton position="top-right" theme="system" />
                     <CommandPaletteProvider>
                         {children}
                     </CommandPaletteProvider>

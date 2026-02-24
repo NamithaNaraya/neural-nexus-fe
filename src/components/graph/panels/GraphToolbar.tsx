@@ -32,7 +32,9 @@ import {
     ArrowLeft,
     Plus,
     GitMerge,
+    GitBranch,
 } from 'lucide-react';
+import { GlobalRenameModal } from './GlobalRenameModal';
 import { AlgorithmDrawer } from './AlgorithmDrawer';
 import { AnalyticsSelectionLocker } from './AnalyticsSelectionLocker';
 import { MachineLearningDrawer } from './ml/MachineLearningDrawer';
@@ -92,6 +94,7 @@ export function GraphToolbar({
     const router = useRouter();
     const [showAlgorithmDrawer, setShowAlgorithmDrawer] = useState(false);
     const [showMlDrawer, setShowMlDrawer] = useState(false);
+    const [showGlobalRenameModal, setShowGlobalRenameModal] = useState(false);
 
     const {
         setFilters,
@@ -176,6 +179,13 @@ export function GraphToolbar({
                                 className="text-primary hover:bg-primary/10 border-primary/20"
                             />
                         )}
+
+                        <ToolbarButton
+                            onClick={() => setShowGlobalRenameModal(true)}
+                            icon={<GitBranch className="w-4 h-4" />}
+                            title="Global Relationship Rename"
+                            className="text-purple-400"
+                        />
 
                         {selectedCount >= 2 && onMerge && (
                             <ToolbarButton
@@ -287,6 +297,12 @@ export function GraphToolbar({
                     setAnalyticSelectionActive(false);
                     setShowAlgorithmDrawer(true);
                 }}
+            />
+            {/* Global Rename Modal */}
+            <GlobalRenameModal
+                isOpen={showGlobalRenameModal}
+                onClose={() => setShowGlobalRenameModal(false)}
+                folderId={folderId}
             />
         </>
     );

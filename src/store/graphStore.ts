@@ -39,6 +39,7 @@ export interface GraphNode {
 }
 
 export interface GraphLink {
+    id?: string; // Neo4j internal ID or UUID
     source: string;
     target: string;
     type: string;
@@ -137,8 +138,10 @@ interface GraphState {
     updateNode: (id: string, updates: Partial<GraphNode>) => void;
     removeNode: (id: string) => void;
     addLink: (link: GraphLink) => void;
+    updateLink: (id: string, updates: Partial<GraphLink>) => void;
     addNodesAndLinks: (nodes: GraphNode[], links: GraphLink[]) => void;
     removeLink: (source: string, target: string) => void;
+    renameRelationshipTypeLocally: (oldType: string, newType: string, scope?: { folderId?: string, fileId?: string }) => void;
 
     // Layout
     layoutComplete: boolean;
@@ -619,6 +622,36 @@ export const useGraphStore = create<GraphState>()(
                 links: [...state.links, link],
                 linkCount: state.linkCount + 1,
                 linkTypes: Array.from(new Set([...state.linkTypes, link.type])),
+            };
+        }),
+        updateLink: (id, updates) => set((state) => ({
+            links: state.links.map((l) =>
+                l.id === id ? { ...l, ...updates } : l
+            ),
+        })),
+        renameRelationshipTypeLocally: (oldType, newType, scope) => set((state) => {
+            const updatedLinks = state.links.map(link => {
+                const matchesOldType = link.type === oldType;
+                if (!matchesOldType) return link;
+
+                // Apply scope filtering if provided
+                if (scope?.folderId) {
+                    const sId = typeof link.source === 'object' ? (link.source as any).id : link.source;
+                    const sourceNode = state.nodes.find(n => n.id === sId);
+                    if (sourceNode?.folderId !== scope.folderId) return link;
+                }
+                if (scope?.fileId) {
+                    const sId = typeof link.source === 'object' ? (link.source as any).id : link.source;
+                    const sourceNode = state.nodes.find(n => n.id === sId);
+                    if (sourceNode?.fileId !== scope.fileId) return link;
+                }
+
+                return { ...link, type: newType };
+            });
+
+            return {
+                links: updatedLinks,
+                linkTypes: Array.from(new Set(updatedLinks.map(l => l.type)))
             };
         }),
 

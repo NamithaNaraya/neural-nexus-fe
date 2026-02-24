@@ -107,6 +107,21 @@ export const graphApi = {
     deleteRelationship: (relationshipId: string) =>
         api.delete<{ success: boolean; relationship_id: string; message: string }>(`/graph/relationships/${relationshipId}`),
 
+    // Update a relationship
+    updateRelationship: (relationshipId: string, data: {
+        type?: string;
+        strength?: number;
+        properties?: Record<string, any>;
+    }) => api.put<{ success: boolean; relationship_id: string; message: string }>(`/graph/relationships/${relationshipId}`, data),
+
+    // Rename a relationship type globally
+    renameRelationshipType: (data: {
+        old_type: string;
+        new_type: string;
+        folder_id?: string;
+        file_id?: string;
+    }) => api.post<{ success: boolean; old_type: string; new_type: string; affected_count: number }>('/graph/relationships/type/rename', data),
+
     // === Herb Feature ===
     getHerbProperties: (herbName: string) =>
         api.get<{ properties: string[] }>(`/graph/herb/${encodeURIComponent(herbName)}/properties`),

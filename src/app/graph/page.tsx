@@ -34,8 +34,8 @@ function GraphContent() {
     const { setGraphData, setGraphLoading, setActiveFolder, clearGraph } = useGraphStore();
 
     // Fetch graph data - use folder or file graph
-    const { data: folderGraph, isLoading: folderLoading, error: folderError } = useFolderGraph(folderId || '');
-    const { data: fileGraph, isLoading: fileLoading, error: fileError } = useFileGraph(fileId || '');
+    const { data: folderGraph, isLoading: folderLoading, error: folderError, refetch: refetchFolder } = useFolderGraph(folderId || '');
+    const { data: fileGraph, isLoading: fileLoading, error: fileError, refetch: refetchFile } = useFileGraph(fileId || '');
 
     const graphData = fileId ? fileGraph : folderGraph;
     const isLoading = fileId ? fileLoading : folderLoading;
@@ -73,6 +73,21 @@ function GraphContent() {
         }
     }, [graphData]);
 
+    // Listen for graph updates (e.g. from NodeDetailPanel)
+    useEffect(() => {
+        const handleUpdate = () => {
+            console.log("Graph data update event received, refetching...");
+            if (fileId) {
+                refetchFile();
+            } else if (folderId) {
+                refetchFolder();
+            }
+        };
+
+        window.addEventListener('graph-data-updated', handleUpdate);
+        return () => window.removeEventListener('graph-data-updated', handleUpdate);
+    }, [fileId, folderId, refetchFile, refetchFolder]);
+
     // Graph store actions
     useEffect(() => {
         setGraphLoading(isLoading);
@@ -92,6 +107,7 @@ function GraphContent() {
             }));
 
             const links = (graphData.relationships || graphData.links || []).map((l: any) => ({
+                id: l.id, // Pass relationship ID to store
                 source: l.source || l.source_id,
                 target: l.target || l.target_id,
                 type: l.type || l.relationship_type || 'RELATED_TO',

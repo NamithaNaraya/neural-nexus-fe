@@ -11,11 +11,12 @@
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { GraphNode, useGraphStore } from '@/store/graphStore';
 import { formatDisplayName } from '@/utils/graphUtils';
 import { graphApi, NodeDetails } from '@/lib/api/graph';
 import { NODE_TYPE_COLORS } from '../types';
+import { GlobalRenameModal } from './GlobalRenameModal';
 import {
     X,
     Edit3,
@@ -32,8 +33,14 @@ import {
     Save,
     Check,
     BookOpen,
-    Layers
+    Layers,
+    GitBranch,
+    Settings,
+    Globe,
+    Folder,
+    File
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const HIDDEN_PROPERTIES = [
     'conflicts',
@@ -63,7 +70,7 @@ interface NodeDetailPanelProps {
 }
 
 export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onFocus, onInitiateAnalysis, onCreateNode }: NodeDetailPanelProps) {
-    const { nodes, links, selectNode, updateNode, zoomToNode, addLink } = useGraphStore();
+    const { nodes, links, selectNode, updateNode, zoomToNode, addLink, updateLink } = useGraphStore();
 
     // Edit state
     const [isEditing, setIsEditing] = useState(false);
@@ -83,6 +90,21 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
     const [availableNodeTypes, setAvailableNodeTypes] = useState<string[]>([]);
     const [details, setDetails] = useState<NodeDetails | null>(null);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
+    // Relationship state
+    const [editingRelId, setEditingRelId] = useState<string | null>(null);
+    const [editRelType, setEditRelType] = useState('');
+    const [isSavingRel, setIsSavingRel] = useState(false);
+    const [showEditRelSuggestions, setShowEditRelSuggestions] = useState(false);
+    const [showEditNormalizationNote, setShowEditNormalizationNote] = useState(false);
+    const [showRelNormalizationNote, setShowRelNormalizationNote] = useState(false);
+
+    // Global rename state
+    const [showGlobalRename, setShowGlobalRename] = useState(false);
+    const [renameOldType, setRenameOldType] = useState('');
+    const [renameNewType, setRenameNewType] = useState('');
+    const [renameScope, setRenameScope] = useState<'global' | 'folder' | 'file'>('global');
+    const [isRenamingGlobal, setIsRenamingGlobal] = useState(false);
 
     // Herb specific state
     const [herbProfile, setHerbProfile] = useState<Record<string, string[]> | null>(null);
@@ -225,6 +247,62 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
         }
     };
 
+    const handleUpdateRelationship = async (relId: string) => {
+        setIsSavingRel(true);
+        try {
+            await graphApi.updateRelationship(relId, {
+                type: editRelType
+            });
+
+            // Update local store immediately for instant UI feedback
+            updateLink(relId, { type: editRelType });
+
+            toast.success("Relationship updated successfully");
+            setEditingRelId(null);
+            // Refresh logic here if needed
+            window.dispatchEvent(new CustomEvent('graph-data-updated'));
+        } catch (error) {
+            console.error('Failed to update relationship:', error);
+            toast.error("Failed to update relationship");
+        } finally {
+            setIsSavingRel(false);
+        }
+    };
+
+    const handleDeleteRelationship = async (relId: string) => {
+        if (!confirm("Are you sure you want to delete this relationship?")) return;
+        try {
+            await graphApi.deleteRelationship(relId);
+            toast.success("Relationship deleted");
+            // Trigger refresh
+            window.dispatchEvent(new CustomEvent('graph-data-updated'));
+        } catch (error) {
+            console.error("Failed to delete relationship:", error);
+            toast.error("Failed to delete relationship");
+        }
+    };
+
+    const handleGlobalRename = async () => {
+        if (!renameOldType || !renameNewType) return;
+        setIsRenamingGlobal(true);
+        try {
+            await graphApi.renameRelationshipType({
+                old_type: renameOldType,
+                new_type: renameNewType,
+                folder_id: renameScope === 'folder' ? node.folderId : undefined,
+                file_id: renameScope === 'file' ? node.fileId : undefined
+            });
+            toast.success(`Renamed ${renameOldType} to ${renameNewType}`);
+            setShowGlobalRename(false);
+            window.dispatchEvent(new CustomEvent('graph-data-updated'));
+        } catch (error) {
+            console.error("Global rename failed:", error);
+            toast.error("Global rename failed");
+        } finally {
+            setIsRenamingGlobal(false);
+        }
+    };
+
     // Show all connections toggle
     const [showAllConnections, setShowAllConnections] = useState(false);
 
@@ -246,6 +324,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                 const connectedNodeId = isSource ? link.target : link.source;
                 const connectedNode = nodes.find(n => n.id === connectedNodeId);
                 return {
+                    id: link.id, // Ensure link has ID
                     node: connectedNode,
                     relationship: link.type,
                     direction: isSource ? 'outgoing' : 'incoming',
@@ -254,7 +333,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
             })
             .filter(c => {
                 if (!c.node) return false;
-                const key = `${c.node.id}_${c.relationship}_${c.direction}`;
+                const key = `${c.node.id}_${c.relationship}_${c.direction}_${c.id}`;
                 if (seen.has(key)) return false;
                 seen.add(key);
                 return true;
@@ -389,6 +468,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                 label="NEW CONNECTION"
                                 onClick={() => setIsRelating(true)}
                             />
+
                             <ActionButton
                                 icon={<Trash2 className="w-4 h-4" />}
                                 label="DELETE"
@@ -456,9 +536,14 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                         type="text"
                                         value={relType.replace(/_/g, ' ')}
                                         onChange={(e) => {
+                                            const raw = e.target.value;
                                             // Auto-uppercase and replace spaces with underscores for storage
-                                            const raw = e.target.value.toUpperCase();
-                                            setRelType(raw.replace(/\s+/g, '_'));
+                                            setRelType(raw.toUpperCase().replace(/\s+/g, '_'));
+                                            if (/[a-z\s]/.test(raw) && raw.length > 0) {
+                                                setShowRelNormalizationNote(true);
+                                            } else {
+                                                setShowRelNormalizationNote(false);
+                                            }
                                             setShowRelTypeSuggestions(true);
                                         }}
                                         onFocus={() => setShowRelTypeSuggestions(true)}
@@ -473,6 +558,18 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
                                         <ChevronRight className="w-4 h-4 rotate-90" />
                                     </div>
                                 </div>
+                                <AnimatePresence>
+                                    {showRelNormalizationNote && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -5 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className="mt-1 flex items-center gap-1.5 text-primary"
+                                        >
+                                            <AlertCircle className="w-3 h-3" />
+                                            <span className="text-[9px] font-bold uppercase">Auto-converted to UPPER_CASE</span>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                                 {/* Suggestions dropdown */}
                                 {showRelTypeSuggestions && (() => {
                                     const query = relType.replace(/_/g, ' ').toLowerCase();
@@ -540,21 +637,117 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
 
                 {/* ===== CONNECTIONS (FIRST) ===== */}
                 <div className="p-4 border-b border-white/10">
-                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
-                        <Link className="w-3.5 h-3.5" />
-                        Connections
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white/5 border border-white/5 font-bold">{connections.length}</span>
-                    </h4>
+                    <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
+                            <Link className="w-3.5 h-3.5" />
+                            Connections
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white/5 border border-white/5 font-bold">{connections.length}</span>
+                        </h4>
+                    </div>
+
+
+
                     <div className="space-y-1.5">
                         {(showAllConnections ? connections : connections.slice(0, 8)).map((connection, index) => (
-                            <ConnectionItem
-                                key={`${connection.node!.id}_${connection.relationship}_${index}`}
-                                node={connection.node!}
-                                relationship={connection.relationship}
-                                properties={connection.properties}
-                                direction={connection.direction as 'incoming' | 'outgoing'}
-                                onClick={() => selectNode(connection.node!.id)}
-                            />
+                            <div key={`${connection.node!.id}_${connection.relationship}_${index}`}>
+                                {editingRelId === connection.id ? (
+                                    <div className="p-3 rounded-2xl bg-white/5 border border-primary/30 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-bold text-primary uppercase">Edit Relationship</span>
+                                            <button onClick={() => setEditingRelId(null)} className="text-muted-foreground hover:text-white">
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                        <div className="relative group">
+                                            <input
+                                                type="text"
+                                                value={editRelType.replace(/_/g, ' ')}
+                                                onChange={(e) => {
+                                                    const raw = e.target.value;
+                                                    setEditRelType(raw.toUpperCase().replace(/\s+/g, '_'));
+                                                    if (/[a-z\s]/.test(raw) && raw.length > 0) {
+                                                        setShowEditNormalizationNote(true);
+                                                    } else {
+                                                        setShowEditNormalizationNote(false);
+                                                    }
+                                                    setShowEditRelSuggestions(true);
+                                                }}
+                                                onFocus={() => setShowEditRelSuggestions(true)}
+                                                onBlur={() => setTimeout(() => setShowEditRelSuggestions(false), 200)}
+                                                className="w-full bg-white dark:bg-black border border-white/10 rounded-lg px-3 py-2 text-xs text-foreground font-bold uppercase tracking-wider focus:ring-1 focus:ring-primary focus:outline-none"
+                                                placeholder="RELATIONSHIP_TYPE"
+                                                autoFocus
+                                            />
+                                            <AnimatePresence>
+                                                {showEditRelSuggestions && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, y: -5 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0, y: -5 }}
+                                                        className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-zinc-900 border border-white/10 rounded-lg shadow-xl z-50 max-h-40 overflow-y-auto scrollbar-thin"
+                                                    >
+                                                        {availableRelTypes
+                                                            .filter(t => t.toLowerCase().includes(editRelType.toLowerCase()))
+                                                            .map(type => (
+                                                                <button
+                                                                    key={type}
+                                                                    onClick={() => {
+                                                                        setEditRelType(type);
+                                                                        setShowEditRelSuggestions(false);
+                                                                        setShowEditNormalizationNote(false);
+                                                                    }}
+                                                                    className="w-full px-3 py-2 text-left text-[10px] font-bold hover:bg-primary/10 transition-colors border-b border-white/5 last:border-0"
+                                                                >
+                                                                    {type.replace(/_/g, ' ')}
+                                                                </button>
+                                                            ))}
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+                                            <AnimatePresence>
+                                                {showEditNormalizationNote && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        className="mt-1 flex items-center gap-1 text-primary"
+                                                    >
+                                                        <AlertCircle className="w-2.5 h-2.5" />
+                                                        <span className="text-[8px] font-bold uppercase">Converted to UPPER_CASE</span>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleUpdateRelationship(connection.id!)}
+                                                disabled={isSavingRel}
+                                                className="flex-1 py-1.5 bg-primary text-white text-[9px] font-bold uppercase rounded-lg disabled:opacity-50"
+                                            >
+                                                {isSavingRel ? 'SAVING...' : 'SAVE'}
+                                            </button>
+                                            <button
+                                                onClick={() => setEditingRelId(null)}
+                                                className="flex-1 py-1.5 bg-white/5 text-muted-foreground text-[9px] font-bold uppercase rounded-lg"
+                                            >
+                                                CANCEL
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <ConnectionItem
+                                        node={connection.node!}
+                                        relationship={connection.relationship}
+                                        properties={connection.properties}
+                                        direction={connection.direction as 'incoming' | 'outgoing'}
+                                        onClick={() => selectNode(connection.node!.id)}
+                                        onEdit={() => {
+                                            setEditingRelId(connection.id || null);
+                                            setEditRelType(connection.relationship);
+                                        }}
+                                        onDelete={() => handleDeleteRelationship(connection.id!)}
+                                    />
+                                )}
+                            </div>
                         ))}
                         {connections.length > 8 && !showAllConnections && (
                             <button
@@ -730,8 +923,8 @@ function ActionButton({ icon, label, onClick, variant = 'default', disabled, pri
             onClick={onClick}
             disabled={disabled}
             className={`
-                flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest
-                transition-all duration-300 shadow-sm hover:shadow-lg active:scale-95
+                flex-1 flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-2xl text-[8px] font-bold uppercase tracking-widest
+                transition-all duration-300 shadow-sm hover:shadow-lg active:scale-95 min-w-0
                 ${disabled ? 'opacity-30 cursor-not-allowed' : 'opacity-100'}
                 ${primary
                     ? 'bg-primary text-primary-foreground shadow-primary/20 hover:shadow-primary/40'
@@ -741,8 +934,8 @@ function ActionButton({ icon, label, onClick, variant = 'default', disabled, pri
                 }
             `}
         >
-            {icon}
-            <span>{label}</span>
+            <div className="flex-shrink-0">{icon}</div>
+            <span className="truncate w-full text-center px-1">{label}</span>
         </button>
     );
 }
@@ -773,9 +966,11 @@ interface ConnectionItemProps {
     properties?: Record<string, any>;
     direction: 'incoming' | 'outgoing';
     onClick: () => void;
+    onEdit?: () => void;
+    onDelete?: () => void;
 }
 
-function ConnectionItem({ node, relationship, properties, direction, onClick }: ConnectionItemProps) {
+function ConnectionItem({ node, relationship, properties, direction, onClick, onEdit, onDelete }: ConnectionItemProps) {
     const color = useGraphStore.getState().filters.customNodeTypeColors[node.type] || NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
 
     // Extract identify properties (like herb)
@@ -806,7 +1001,27 @@ function ConnectionItem({ node, relationship, properties, direction, onClick }: 
                     )}
                 </div>
             </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+            <div className="flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-all">
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit?.();
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-primary transition-colors"
+                >
+                    <Edit3 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete?.();
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-destructive transition-colors"
+                >
+                    <Trash2 className="w-3.5 h-3.5" />
+                </button>
+                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-all" />
+            </div>
         </button>
     );
 }
