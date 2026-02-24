@@ -661,7 +661,7 @@ function BrowseData({ folderId }: { folderId: string }) {
                                                     </td>
                                                 )}
                                                 <td
-                                                    className="px-6 py-4 font-semibold text-foreground group-hover:text-emerald-500 transition-colors"
+                                                    className="px-6 py-4 font-semibold text-foreground group-hover:text-emerald-500 group-hover:underline transition-colors"
                                                     onClick={() => router.push(`/graph?folder=${folderId}&node=${node.id}`)}
                                                 >
                                                     <div className="flex items-center gap-2">

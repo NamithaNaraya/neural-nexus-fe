@@ -464,18 +464,17 @@ export function AlgorithmDrawer({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 20, scale: 0.97 }}
                 transition={{ duration: 0.3, ease: 'easeOut' }}
-                className="fixed inset-4 md:inset-8 lg:left-[8%] lg:right-[8%] lg:top-[6%] lg:bottom-[6%] z-[201] flex flex-col overflow-hidden rounded-3xl shadow-2xl border border-slate-200/80"
-                style={{ background: '#ffffff' }}
+                className="fixed inset-4 md:inset-8 lg:left-[8%] lg:right-[8%] lg:top-[6%] lg:bottom-[6%] z-[201] flex flex-col overflow-hidden rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-900"
             >
                 {/* ── Header ── */}
-                <div className="flex items-center justify-between px-8 py-5 border-b border-slate-200 shrink-0 bg-white">
+                <div className="flex items-center justify-between px-8 py-5 border-b border-slate-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-900">
                     <div className="flex items-center gap-4">
-                        <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-100">
-                            <Zap className="w-5 h-5 text-indigo-600" />
+                        <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20">
+                            <Zap className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-slate-800 tracking-tight">Graph Analytics</h2>
-                            <p className="text-[10px] font-semibold uppercase tracking-widest text-indigo-500">
+                            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 tracking-tight">Graph Analytics</h2>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-indigo-500 dark:text-indigo-400">
                                 Neo4j GDS Algorithms
                             </p>
                         </div>
@@ -483,8 +482,8 @@ export function AlgorithmDrawer({
 
                     {/* Stats Pill */}
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-3 px-4 py-2.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                            <span className="flex items-center gap-1.5 border-r border-slate-300/50 pr-3 mr-1">
+                        <div className="flex items-center gap-3 px-4 py-2.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            <span className="flex items-center gap-1.5 border-r border-slate-300/50 dark:border-slate-600/50 pr-3 mr-1">
                                 <span className={`w-2 h-2 rounded-full ${isSelectionMode ? 'animate-pulse bg-emerald-500' : 'bg-indigo-400'}`}
                                 />
                                 {isSelectionMode ? 'Selected' : 'All'}
@@ -492,7 +491,7 @@ export function AlgorithmDrawer({
                             <span className="flex items-center gap-1.5">
                                 {nodeCount} nodes
                             </span>
-                            <span className="text-slate-300">|</span>
+                            <span className="text-slate-300 dark:text-slate-600">|</span>
                             <span className="flex items-center gap-1.5">
                                 <ArrowLeftRight className="w-3 h-3" />
                                 {linkCount} links
@@ -500,7 +499,7 @@ export function AlgorithmDrawer({
                         </div>
                         <button
                             onClick={onClose}
-                            className="p-2 rounded-xl hover:bg-red-50 transition-colors text-slate-400 hover:text-red-400"
+                            className="p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors text-slate-400 dark:text-slate-500 hover:text-red-400"
                         >
                             <X className="w-5 h-5" />
                         </button>
@@ -510,9 +509,9 @@ export function AlgorithmDrawer({
                 {/* ── Body: Sidebar + Main ── */}
                 <div className="flex-1 flex overflow-hidden">
                     {/* ── Sidebar: Categories + Algorithms ── */}
-                    <div className="w-64 flex flex-col border-r border-slate-200 overflow-y-auto bg-slate-50/80">
+                    <div className="w-64 flex flex-col border-r border-slate-200 dark:border-slate-700 overflow-y-auto bg-slate-50/80 dark:bg-slate-800/60">
                         <div className="p-5 space-y-1">
-                            <span className="block text-[9px] font-bold uppercase tracking-widest mb-3 px-1 text-slate-400">
+                            <span className="block text-[9px] font-bold uppercase tracking-widest mb-3 px-1 text-slate-400 dark:text-slate-500">
                                 Algorithm Categories
                             </span>
 
@@ -526,8 +525,8 @@ export function AlgorithmDrawer({
                                         <button
                                             onClick={() => setExpandedCategory(isExpanded ? null : cat.key)}
                                             className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${isExpanded
-                                                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-100'
-                                                    : 'text-slate-500 hover:bg-slate-100 border border-transparent'
+                                                ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20'
+                                                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50 border border-transparent'
                                                 }`}
                                         >
                                             <div className="flex items-center gap-2.5">
@@ -571,8 +570,8 @@ export function AlgorithmDrawer({
                                                                         }
                                                                     }}
                                                                     className={`w-full text-left px-3 py-2 rounded-lg text-[11px] font-semibold transition-all ${isActive
-                                                                            ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
-                                                                            : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 border border-transparent'
+                                                                        ? 'bg-indigo-100 dark:bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30'
+                                                                        : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 border border-transparent'
                                                                         }`}
                                                                 >
                                                                     <div className="flex items-center gap-1.5">
@@ -595,46 +594,46 @@ export function AlgorithmDrawer({
                         </div>
 
                         {/* Info Footer */}
-                        <div className="mt-auto p-5 border-t border-slate-200">
-                            <div className="p-3 rounded-xl text-[10px] leading-relaxed bg-amber-50 text-slate-500 border border-amber-100">
-                                <strong className="block mb-1 text-amber-700">💡 Tip</strong>
+                        <div className="mt-auto p-5 border-t border-slate-200 dark:border-slate-700">
+                            <div className="p-3 rounded-xl text-[10px] leading-relaxed bg-amber-50 dark:bg-amber-500/10 text-slate-500 dark:text-slate-400 border border-amber-100 dark:border-amber-500/20">
+                                <strong className="block mb-1 text-amber-700 dark:text-amber-400">💡 Tip</strong>
                                 Use the graph filters (node types, relationships) to narrow your analysis scope before running algorithms.
                             </div>
                         </div>
                     </div>
 
                     {/* ── Main Content Area ── */}
-                    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-slate-900">
                         {!selectedAlgorithm ? (
                             /* Empty state */
                             <div className="flex-1 flex flex-col items-center justify-center text-center p-12">
-                                <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6 bg-slate-100 border border-slate-200">
-                                    <Network className="w-10 h-10 text-slate-300" />
+                                <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                                    <Network className="w-10 h-10 text-slate-300 dark:text-slate-600" />
                                 </div>
-                                <h3 className="text-xl font-bold text-slate-700 mb-2">Select an Algorithm</h3>
-                                <p className="text-sm text-slate-400 max-w-sm">
+                                <h3 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-2">Select an Algorithm</h3>
+                                <p className="text-sm text-slate-400 dark:text-slate-500 max-w-sm">
                                     Pick a category from the sidebar, then choose an algorithm to run on your
-                                    <strong className="mx-1 text-indigo-600">{nodeCount} {isSelectionMode ? 'selected' : 'visible'} nodes</strong>
+                                    <strong className="mx-1 text-indigo-600 dark:text-indigo-400">{nodeCount} {isSelectionMode ? 'selected' : 'visible'} nodes</strong>
                                     and
-                                    <strong className="mx-1 text-indigo-600">{linkCount} relationships</strong>.
+                                    <strong className="mx-1 text-indigo-600 dark:text-indigo-400">{linkCount} relationships</strong>.
                                 </p>
                             </div>
                         ) : (
                             /* Algorithm detail + results */
                             <div className="flex-1 flex flex-col overflow-hidden">
                                 {/* Algorithm Info Header */}
-                                <div className="px-8 py-6 border-b border-slate-200 shrink-0 bg-slate-50/50">
+                                <div className="px-8 py-6 border-b border-slate-200 dark:border-slate-700 shrink-0 bg-slate-50/50 dark:bg-slate-800/50">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-4">
-                                            <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-100">
+                                            <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20">
                                                 {React.cloneElement(selectedAlgorithm.icon as React.ReactElement, {
                                                     className: 'w-5 h-5',
                                                     style: { color: '#4f46e5' },
                                                 })}
                                             </div>
                                             <div>
-                                                <h3 className="text-lg font-bold text-slate-800">{selectedAlgorithm.name}</h3>
-                                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{selectedAlgorithm.name}</h3>
+                                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                                                     {selectedAlgorithm.category} algorithm
                                                 </p>
                                             </div>
@@ -663,13 +662,13 @@ export function AlgorithmDrawer({
 
                                     {/* Algorithm description — Two-tone cards */}
                                     <div className="mt-4 grid grid-cols-2 gap-4">
-                                        <div className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/50" style={{ borderLeft: '3px solid #818cf8' }}>
+                                        <div className="p-4 rounded-xl border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-500/5" style={{ borderLeft: '3px solid #818cf8' }}>
                                             <span className="text-[9px] font-bold uppercase tracking-wider block mb-1.5 text-indigo-400">What it does</span>
-                                            <p className="text-xs text-slate-700 leading-relaxed">{selectedAlgorithm.simpleInfo}</p>
+                                            <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{selectedAlgorithm.simpleInfo}</p>
                                         </div>
-                                        <div className="p-4 rounded-xl border border-amber-100 bg-amber-50/50" style={{ borderLeft: '3px solid #fbbf24' }}>
-                                            <span className="text-[9px] font-bold uppercase tracking-wider block mb-1.5 text-amber-600">Why it helps</span>
-                                            <p className="text-xs text-slate-700 leading-relaxed">{selectedAlgorithm.benefit}</p>
+                                        <div className="p-4 rounded-xl border border-amber-100 dark:border-amber-500/20 bg-amber-50/50 dark:bg-amber-500/5" style={{ borderLeft: '3px solid #fbbf24' }}>
+                                            <span className="text-[9px] font-bold uppercase tracking-wider block mb-1.5 text-amber-600 dark:text-amber-400">Why it helps</span>
+                                            <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{selectedAlgorithm.benefit}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -677,7 +676,7 @@ export function AlgorithmDrawer({
                                 {/* Results Area */}
                                 <div className="flex-1 overflow-y-auto p-8">
                                     {error && (
-                                        <div className="p-4 mb-6 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-semibold">
+                                        <div className="p-4 mb-6 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold">
                                             ⚠️ {error}
                                         </div>
                                     )}
@@ -700,21 +699,21 @@ export function AlgorithmDrawer({
                                             <motion.div
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
-                                                className="rounded-2xl border border-indigo-200/60 overflow-hidden"
+                                                className="rounded-2xl border border-indigo-200/60 dark:border-indigo-500/20 overflow-hidden"
                                                 style={{ boxShadow: '0 2px 16px rgba(99, 102, 241, 0.08)' }}
                                             >
                                                 {/* Accent bar */}
                                                 <div style={{ height: 3, background: 'linear-gradient(90deg, #6366f1, #8b5cf6, #c084fc)' }} />
-                                                <div className="p-5 bg-gradient-to-br from-indigo-50/80 via-purple-50/40 to-white">
+                                                <div className="p-5 bg-gradient-to-br from-indigo-50/80 via-purple-50/40 to-white dark:from-indigo-500/10 dark:via-purple-500/5 dark:to-slate-900">
                                                     <div className="flex items-start gap-3">
-                                                        <div className="p-2 rounded-lg shrink-0 bg-indigo-100">
-                                                            <Sparkles className="w-4 h-4 text-indigo-600" />
+                                                        <div className="p-2 rounded-lg shrink-0 bg-indigo-100 dark:bg-indigo-500/20">
+                                                            <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                                                         </div>
                                                         <div>
-                                                            <h4 className="text-xs font-bold uppercase tracking-wider mb-2 text-indigo-700">
+                                                            <h4 className="text-xs font-bold uppercase tracking-wider mb-2 text-indigo-700 dark:text-indigo-400">
                                                                 Analysis Summary
                                                             </h4>
-                                                            <p className="text-[13px] text-slate-700 leading-[1.7]">
+                                                            <p className="text-[13px] text-slate-700 dark:text-slate-300 leading-[1.7]">
                                                                 {buildSummary(selectedAlgorithm, result, nodeCount)}
                                                             </p>
                                                         </div>
@@ -726,18 +725,18 @@ export function AlgorithmDrawer({
                                             {result.results && result.results.length > 0 && (
                                                 <div>
                                                     <div className="flex items-center justify-between mb-3">
-                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                                                             Detailed Results ({result.results.length})
                                                         </span>
-                                                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
                                                             <CheckCircle2 className="w-3 h-3" />
                                                             Complete
                                                         </div>
                                                     </div>
 
-                                                    <div className="rounded-xl border border-slate-200 overflow-hidden" style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+                                                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden" style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
                                                         {/* Table Header */}
-                                                        <div className="grid grid-cols-12 gap-2 px-5 py-3 text-[9px] font-bold uppercase tracking-wider border-b border-slate-200 bg-slate-50 text-slate-500">
+                                                        <div className="grid grid-cols-12 gap-2 px-5 py-3 text-[9px] font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                                                             <div className="col-span-1">#</div>
                                                             <div className="col-span-5">Name</div>
                                                             <div className="col-span-3">Type</div>
@@ -755,12 +754,12 @@ export function AlgorithmDrawer({
                                                             // Color-code type badges
                                                             const typeLower = type.toLowerCase();
                                                             const typeBadge = typeLower.includes('property')
-                                                                ? 'bg-violet-50 text-violet-700 border-violet-200'
+                                                                ? 'bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-500/20'
                                                                 : typeLower.includes('quality')
-                                                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                                    ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20'
                                                                     : typeLower.includes('entity')
-                                                                        ? 'bg-sky-50 text-sky-700 border-sky-200'
-                                                                        : 'bg-slate-50 text-slate-600 border-slate-200';
+                                                                        ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-500/20'
+                                                                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700';
 
                                                             return (
                                                                 <motion.div
@@ -768,11 +767,10 @@ export function AlgorithmDrawer({
                                                                     initial={{ opacity: 0 }}
                                                                     animate={{ opacity: 1 }}
                                                                     transition={{ delay: i * 0.02 }}
-                                                                    className="grid grid-cols-12 gap-2 px-5 py-3 items-center border-t border-slate-100 text-xs hover:bg-indigo-50/40 transition-colors"
-                                                                    style={{ background: i % 2 === 0 ? '#ffffff' : '#fafbfc' }}
+                                                                    className={`grid grid-cols-12 gap-2 px-5 py-3 items-center border-t border-slate-100 dark:border-slate-800 text-xs hover:bg-indigo-50/40 dark:hover:bg-indigo-500/5 transition-colors ${i % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-800/30'}`}
                                                                 >
-                                                                    <div className="col-span-1 font-bold text-[10px] text-slate-400">{i + 1}</div>
-                                                                    <div className="col-span-5 font-semibold text-slate-800">
+                                                                    <div className="col-span-1 font-bold text-[10px] text-slate-400 dark:text-slate-500">{i + 1}</div>
+                                                                    <div className="col-span-5 font-semibold text-slate-800 dark:text-slate-200">
                                                                         {secondaryName ? (
                                                                             <div className="flex items-center gap-2 truncate">
                                                                                 <span className="truncate">{name}</span>
@@ -788,12 +786,12 @@ export function AlgorithmDrawer({
                                                                             {type}
                                                                         </span>
                                                                     </div>
-                                                                    <div className="col-span-3 text-right font-mono font-bold text-[11px] text-indigo-600">
+                                                                    <div className="col-span-3 text-right font-mono font-bold text-[11px] text-indigo-600 dark:text-indigo-400">
                                                                         {scoreValue !== undefined ? scoreValue.toFixed(4) :
                                                                             item.hub_score !== undefined ? (
                                                                                 <div className="flex flex-col text-[9px] leading-tight">
                                                                                     <span>A: {item.auth_score?.toFixed(3)}</span>
-                                                                                    <span className="text-slate-400">H: {item.hub_score?.toFixed(3)}</span>
+                                                                                    <span className="text-slate-400 dark:text-slate-500">H: {item.hub_score?.toFixed(3)}</span>
                                                                                 </div>
                                                                             ) :
                                                                                 communityValue !== undefined ? `Group ${communityValue}` : '—'}
@@ -808,9 +806,9 @@ export function AlgorithmDrawer({
                                     ) : (
                                         /* No results yet */
                                         <div className="flex flex-col items-center justify-center py-20 text-center">
-                                            <Search className="w-12 h-12 mb-4 text-slate-200" />
-                                            <p className="text-sm text-slate-400">
-                                                Click <strong className="text-emerald-600">Run Analysis</strong> to start
+                                            <Search className="w-12 h-12 mb-4 text-slate-200 dark:text-slate-700" />
+                                            <p className="text-sm text-slate-400 dark:text-slate-500">
+                                                Click <strong className="text-emerald-600 dark:text-emerald-400">Run Analysis</strong> to start
                                             </p>
                                         </div>
                                     )}
