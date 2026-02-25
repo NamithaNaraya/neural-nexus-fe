@@ -269,6 +269,10 @@ export const endpoints = {
         types: '/browse/types',
         nodes: (type: string) => `/browse/nodes/${type}`,
     },
+    // Analytic Chat
+    analyticsChat: {
+        query: '/analytics-chat/query',
+    },
 };
 
 // Higher-level API methods
@@ -484,6 +488,14 @@ export const docAiApi = {
                 page_size: number;
                 total_pages: number;
             }>(endpoints.browse.nodes(type), options),
+    },
+    // Analytic Chat
+    analyticsChat: {
+        query: (data: {
+            query: string;
+            folder_id?: string;
+            node_ids?: string[];
+        }) => api.post(endpoints.analyticsChat.query, data),
     },
 };
 

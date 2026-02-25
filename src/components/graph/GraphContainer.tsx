@@ -24,6 +24,8 @@ import { DataCanvas } from '../../visualizations/DataCanvas';
 import { FileScopePanel } from './panels/FileScopePanel';
 // ReasoningAssistant handles both discovery and reasoning
 import { ReasoningAssistant } from './panels/ReasoningAssistant';
+import { AnalyticChat } from './panels/AnalyticAssistant/AnalyticChat';
+import { AlgorithmDrawer } from './panels/AlgorithmDrawer';
 import { GraphViewMode } from './types';
 import { useNodeExpansion, useShortestPath } from '@/hooks/useApi';
 import { useDevice, useViewModeLock } from '@/hooks/useDevice';
@@ -893,9 +895,10 @@ export function GraphContainer({
                 )
             }
 
-            {/* Unified AI Assistant Overlay */}
+            {/* Unified AI Assistant Overlays */}
             <div className="z-[150] pointer-events-none fixed inset-0">
                 <ReasoningAssistant />
+                <AnalyticChat />
             </div>
         </div >
 
