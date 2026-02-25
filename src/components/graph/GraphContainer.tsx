@@ -22,9 +22,8 @@ import { GraphStats } from './shared/GraphStats';
 import { NodeDetailPanel } from './panels/NodeDetailPanel';
 import { DataCanvas } from '../../visualizations/DataCanvas';
 import { FileScopePanel } from './panels/FileScopePanel';
-// ReasoningAssistant handles both discovery and reasoning
-import { ReasoningAssistant } from './panels/ReasoningAssistant';
-import { AnalyticChat } from './panels/AnalyticAssistant/AnalyticChat';
+// Unified chat handles reasoning, discovery, and analytics
+import { UnifiedChatPanel } from './panels/UnifiedChatPanel';
 import { AlgorithmDrawer } from './panels/AlgorithmDrawer';
 import { GraphViewMode } from './types';
 import { useNodeExpansion, useShortestPath } from '@/hooks/useApi';
@@ -897,8 +896,7 @@ export function GraphContainer({
 
             {/* Unified AI Assistant Overlays */}
             <div className="z-[150] pointer-events-none fixed inset-0">
-                <ReasoningAssistant />
-                <AnalyticChat />
+                <UnifiedChatPanel />
             </div>
         </div >
 

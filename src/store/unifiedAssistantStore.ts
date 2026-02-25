@@ -105,6 +105,7 @@ export const useUnifiedAssistantStore = create<ReasoningState>()(
         {
             name: "unified-assistant-storage",
             storage: createJSONStorage(() => localStorage),
+            partialize: (state) => ({ currentSessionId: state.currentSessionId, messages: state.messages }),
         }
     )
 );
