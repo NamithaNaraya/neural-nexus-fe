@@ -50,6 +50,7 @@ interface FolderData {
     node_count: number;
     created_at: string;
     updated_at: string;
+    permission: 'owner' | 'write' | 'read';
 }
 
 interface FileData {
@@ -169,6 +170,11 @@ export default function FolderPage() {
 
     if (!folderDetails) return null;
 
+    // Determine permission level
+    const permission = (folderDetails as FolderData).permission || 'owner';
+    const isReadOnly = permission === 'read';
+    const canEdit = permission === 'owner' || permission === 'write';
+
     return (
         <div className="min-h-screen bg-background flex flex-col">
             <Header />
@@ -189,6 +195,15 @@ export default function FolderPage() {
                             <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
                                 <Folder className="w-8 h-8 text-amber-500" />
                                 {folderDetails.name}
+                                {/* Shared badge */}
+                                {permission !== 'owner' && (
+                                    <span className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${permission === 'write'
+                                        ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                                        : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
+                                        }`}>
+                                        {permission === 'write' ? 'Shared · Edit' : 'Shared · View Only'}
+                                    </span>
+                                )}
                             </h1>
                             <p className="mt-2 text-muted-foreground max-w-2xl">
                                 {folderDetails.description || 'No description provided.'}
@@ -210,20 +225,24 @@ export default function FolderPage() {
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => setShowUploadModal(true)}
-                                className="flex items-center gap-2 px-3.5 py-1.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-xl hover:bg-emerald-500/20 transition-all text-sm font-semibold"
-                            >
-                                <Plus className="w-4 h-4" />
-                                <span>Ingest Data</span>
-                            </button>
-                            <button
-                                onClick={() => setShowSettingsModal(true)}
-                                className="p-2 bg-muted/50 rounded-xl hover:bg-muted border border-border transition-all group/settings"
-                                title="Topic Settings"
-                            >
-                                <Settings className="w-4 h-4 text-muted-foreground group-hover/settings:rotate-90 transition-transform duration-500" />
-                            </button>
+                            {canEdit && (
+                                <button
+                                    onClick={() => setShowUploadModal(true)}
+                                    className="flex items-center gap-2 px-3.5 py-1.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-xl hover:bg-emerald-500/20 transition-all text-sm font-semibold"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span>Ingest Data</span>
+                                </button>
+                            )}
+                            {permission === 'owner' && (
+                                <button
+                                    onClick={() => setShowSettingsModal(true)}
+                                    className="p-2 bg-muted/50 rounded-xl hover:bg-muted border border-border transition-all group/settings"
+                                    title="Topic Settings"
+                                >
+                                    <Settings className="w-4 h-4 text-muted-foreground group-hover/settings:rotate-90 transition-transform duration-500" />
+                                </button>
+                            )}
                             <button
                                 onClick={handleOpenGraph}
                                 className="flex items-center gap-2 px-3.5 py-1.5 bg-purple-500/10 text-purple-600 border border-purple-500/20 rounded-xl hover:bg-purple-500/20 transition-all text-sm font-semibold"
@@ -330,17 +349,19 @@ export default function FolderPage() {
                                                         ) : (
                                                             <div className="flex-1 flex items-center group/name min-w-0">
                                                                 <span className="font-medium truncate text-sm">{file.filename}</span>
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setNewName(file.filename);
-                                                                        setRenamingFileId(file.id);
-                                                                    }}
-                                                                    className="ml-2 p-1 opacity-0 group-hover/name:opacity-100 hover:bg-muted rounded transition-all"
-                                                                    title="Rename"
-                                                                >
-                                                                    <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-                                                                </button>
+                                                                {canEdit && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setNewName(file.filename);
+                                                                            setRenamingFileId(file.id);
+                                                                        }}
+                                                                        className="ml-2 p-1 opacity-0 group-hover/name:opacity-100 hover:bg-muted rounded transition-all"
+                                                                        title="Rename"
+                                                                    >
+                                                                        <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         )}
                                                         {expandedFileId === file.id ? (
@@ -368,27 +389,29 @@ export default function FolderPage() {
                                                                 View Graph
                                                             </button>
                                                         )}
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                if (confirm('Are you sure you want to delete this file?')) {
-                                                                    deleteFileMutation.mutate(file.id, {
-                                                                        onSuccess: () => {
-                                                                            refetchFiles(); // Refresh files after deletion
-                                                                        }
-                                                                    });
-                                                                }
-                                                            }}
-                                                            disabled={deleteFileMutation.isPending}
-                                                            className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
-                                                            title="Delete File"
-                                                        >
-                                                            {deleteFileMutation.isPending ? (
-                                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                            ) : (
-                                                                <Trash2 className="w-4 h-4" />
-                                                            )}
-                                                        </button>
+                                                        {canEdit && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (confirm('Are you sure you want to delete this file?')) {
+                                                                        deleteFileMutation.mutate(file.id, {
+                                                                            onSuccess: () => {
+                                                                                refetchFiles(); // Refresh files after deletion
+                                                                            }
+                                                                        });
+                                                                    }
+                                                                }}
+                                                                disabled={deleteFileMutation.isPending}
+                                                                className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                                                                title="Delete File"
+                                                            >
+                                                                {deleteFileMutation.isPending ? (
+                                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                                ) : (
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                )}
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
 
@@ -411,7 +434,7 @@ export default function FolderPage() {
 
                                                                 <FileExtractionDetails
                                                                     fileId={file.id}
-                                                                    isEditable={file.status === 'ready_for_review'}
+                                                                    isEditable={canEdit && file.status === 'ready_for_review'}
                                                                     className="bg-transparent"
                                                                 />
                                                             </div>
@@ -432,7 +455,7 @@ export default function FolderPage() {
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
                             >
-                                <BrowseData folderId={folderId} />
+                                <BrowseData folderId={folderId} isReadOnly={isReadOnly} />
                             </motion.div>
                         )}
 
@@ -484,7 +507,7 @@ export default function FolderPage() {
     );
 }
 
-function BrowseData({ folderId }: { folderId: string }) {
+function BrowseData({ folderId, isReadOnly = false }: { folderId: string; isReadOnly?: boolean }) {
     const router = useRouter();
     const { data: typeData, isLoading: typesLoading } = useBrowseTypes(folderId);
     const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -571,22 +594,24 @@ function BrowseData({ folderId }: { folderId: string }) {
                             />
                         </div>
 
-                        <button
-                            onClick={() => {
-                                setIsMergeMode(!isMergeMode);
-                                setSelectedNodeIds([]);
-                            }}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${isMergeMode
-                                ? "bg-amber-500/10 text-amber-600 border border-amber-500/30 hover:bg-amber-500/20"
-                                : "bg-muted/30 text-muted-foreground border border-border hover:bg-muted hover:text-foreground"
-                                }`}
-                            title={isMergeMode ? "Cancel merge operation" : "Enter merge mode to consolidate entities"}
-                        >
-                            <GitMerge className="w-4 h-4" />
-                            {isMergeMode ? "Cancel Merge" : "Merge Entities"}
-                        </button>
+                        {!isReadOnly && (
+                            <button
+                                onClick={() => {
+                                    setIsMergeMode(!isMergeMode);
+                                    setSelectedNodeIds([]);
+                                }}
+                                className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${isMergeMode
+                                    ? "bg-amber-500/10 text-amber-600 border border-amber-500/30 hover:bg-amber-500/20"
+                                    : "bg-muted/30 text-muted-foreground border border-border hover:bg-muted hover:text-foreground"
+                                    }`}
+                                title={isMergeMode ? "Cancel merge operation" : "Enter merge mode to consolidate entities"}
+                            >
+                                <GitMerge className="w-4 h-4" />
+                                {isMergeMode ? "Cancel Merge" : "Merge Entities"}
+                            </button>
+                        )}
 
-                        {isMergeMode && selectedNodeIds.length >= 2 && (
+                        {!isReadOnly && isMergeMode && selectedNodeIds.length >= 2 && (
                             <button
                                 onClick={() => setShowMergeModal(true)}
                                 className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 animate-in zoom-in-95 duration-200"
@@ -598,8 +623,8 @@ function BrowseData({ folderId }: { folderId: string }) {
                     </div>
 
                     {/* Table */}
-                    <div className="border border-border rounded-xl bg-card overflow-hidden">
-                        <div className="overflow-x-auto">
+                    <div className="border border-border rounded-xl bg-card overflow-hidden flex flex-col" style={{ height: '480px' }}>
+                        <div className="overflow-x-auto flex-shrink-0">
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-muted/50 border-b border-border text-[10px] uppercase tracking-widest text-muted-foreground/60">
@@ -624,9 +649,13 @@ function BrowseData({ folderId }: { folderId: string }) {
                                         ))}
                                     </tr>
                                 </thead>
+                            </table>
+                        </div>
+                        <div className="flex-1 overflow-y-auto overflow-x-auto scrollbar-hide">
+                            <table className="w-full text-left border-collapse">
                                 <tbody className="divide-y divide-border">
                                     {nodesLoading ? (
-                                        Array(5).fill(0).map((_, i) => (
+                                        Array(8).fill(0).map((_, i) => (
                                             <tr key={i} className="animate-pulse">
                                                 <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-2/3" /></td>
                                                 {connectionTypes.map(ct => (
@@ -641,11 +670,12 @@ function BrowseData({ folderId }: { folderId: string }) {
                                             </td>
                                         </tr>
                                     ) : (
-                                        nodes.map((node) => (
+                                        nodes.map((node, idx) => (
                                             <tr
                                                 key={node.id}
                                                 className={`hover:bg-muted/30 transition-colors group cursor-pointer ${selectedNodeIds.includes(node.id) ? "bg-emerald-500/5 border-l-2 border-l-emerald-500" : ""
                                                     }`}
+                                                style={{ animation: `fadeInRow 0.15s ease-out ${idx * 0.03}s both` }}
                                             >
                                                 {isMergeMode && (
                                                     <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>

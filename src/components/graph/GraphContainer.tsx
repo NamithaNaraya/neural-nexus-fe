@@ -61,6 +61,7 @@ interface GraphContainerProps {
     showSidebar?: boolean;
     immersiveMode?: boolean;
     initialShowInbox?: boolean;
+    isReadOnly?: boolean;
 }
 
 // Loading state component
@@ -148,6 +149,7 @@ export function GraphContainer({
     showSidebar = true,
     immersiveMode: initialImmersive = false,
     initialShowInbox = false,
+    isReadOnly = false,
 }: GraphContainerProps) {
     // State
     const [viewMode, setViewMode] = useState<GraphViewMode>(initialMode);
@@ -634,8 +636,8 @@ export function GraphContainer({
                     focusNodeIds={focusData.nodes}
                     focusLinkIds={focusData.links}
                     isSidebarOpen={showNodeDetail}
-                    onCreateNode={handleCreateNode}
-                    onMerge={() => setShowMergeModal(true)}
+                    onCreateNode={isReadOnly ? undefined : handleCreateNode}
+                    onMerge={isReadOnly ? undefined : () => setShowMergeModal(true)}
                 />
             )}
 
@@ -790,11 +792,11 @@ export function GraphContainer({
                             setShowNodeDetail(false);
                             setSelectedNodeForDetail(null);
                         }}
-                        onEdit={() => handleEditNode(selectedNodeForDetail.id)}
-                        onDelete={() => handleDeleteNode(selectedNodeForDetail.id)}
+                        onEdit={isReadOnly ? undefined : () => handleEditNode(selectedNodeForDetail.id)}
+                        onDelete={isReadOnly ? undefined : () => handleDeleteNode(selectedNodeForDetail.id)}
                         onExpand={handleNodeExpand}
                         onFocus={(id) => zoomToNode?.(id)}
-                        onCreateNode={handleCreateNode}
+                        onCreateNode={isReadOnly ? undefined : handleCreateNode}
                         onInitiateAnalysis={(node) => {
                             console.log('Initiating analysis for node:', node.name);
                         }}

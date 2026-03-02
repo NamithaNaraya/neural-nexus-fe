@@ -676,3 +676,18 @@ body {
   max-height: 90vh;
   overflow-y: auto;
 }
+
+/* === Browse Data Row Animation === */
+@keyframes fadeInRow {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Hide scrollbar but keep scrollable */
+.scrollbar-hide {
+  scrollbar-width: none;           /* Firefox */
+  -ms-overflow-style: none;        /* IE/Edge */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;                   /* Chrome, Safari, Opera */
+}

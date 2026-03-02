@@ -57,6 +57,7 @@ interface FolderData {
     node_count: number;
     created_at: string;
     updated_at: string;
+    permission: 'owner' | 'write' | 'read';
 }
 
 interface UploadingFile {
@@ -125,6 +126,7 @@ function LibraryContent() {
     // Share state
     const [shareEmail, setShareEmail] = useState("");
     const [sharePermission, setSharePermission] = useState("read");
+    const [shareSuccess, setShareSuccess] = useState(false);
 
     const [committingFileId, setCommittingFileId] = useState<string | null>(null);
 
@@ -229,6 +231,8 @@ function LibraryContent() {
         setSelectedFolder(folder);
         setShareEmail("");
         setSharePermission("read");
+        setShareSuccess(false);
+        shareFolderMutation.reset();
         setShowShareModal(true);
         setOpenMenuId(null);
     };
@@ -242,9 +246,15 @@ function LibraryContent() {
                 userEmail: shareEmail.trim(),
                 permission: sharePermission,
             });
-            setShowShareModal(false);
-            setSelectedFolder(null);
-            setShareEmail("");
+            // Show success state
+            setShareSuccess(true);
+            // Auto-close after 2 seconds
+            setTimeout(() => {
+                setShowShareModal(false);
+                setSelectedFolder(null);
+                setShareEmail("");
+                setShareSuccess(false);
+            }, 2500);
         } catch (err) {
             console.error("Failed to share folder:", err);
         }
@@ -336,10 +346,28 @@ function LibraryContent() {
                                 onClick={() => handleFolderClick(folder.id)}
                                 className="group cursor-pointer"
                             >
-                                <div className="p-6 rounded-xl border border-border bg-card hover:border-emerald/50 hover:shadow-lg hover:shadow-emerald/5 transition-all duration-300 select-none outline-none">
+                                <div className={`p-6 rounded-xl border bg-card hover:shadow-lg transition-all duration-300 select-none outline-none ${folder.permission !== 'owner'
+                                    ? 'border-purple-500/30 hover:border-purple-500/50 hover:shadow-purple-500/5'
+                                    : 'border-border hover:border-emerald/50 hover:shadow-emerald/5'
+                                    }`}>
                                     <div className="flex items-start justify-between mb-4">
-                                        <div className="p-3 rounded-lg bg-emerald/10 group-hover:bg-emerald/20 transition-colors">
-                                            <Folder className="w-6 h-6 text-emerald" />
+                                        <div className="flex items-center gap-2">
+                                            <div className={`p-3 rounded-lg transition-colors ${folder.permission !== 'owner'
+                                                ? 'bg-purple-500/10 group-hover:bg-purple-500/20'
+                                                : 'bg-emerald/10 group-hover:bg-emerald/20'
+                                                }`}>
+                                                <Folder className={`w-6 h-6 ${folder.permission !== 'owner' ? 'text-purple-500' : 'text-emerald'
+                                                    }`} />
+                                            </div>
+                                            {/* Shared badge */}
+                                            {folder.permission !== 'owner' && (
+                                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${folder.permission === 'write'
+                                                    ? 'bg-emerald/10 text-emerald border border-emerald/20'
+                                                    : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
+                                                    }`}>
+                                                    {folder.permission === 'write' ? 'Can Edit' : 'View Only'}
+                                                </span>
+                                            )}
                                         </div>
 
                                         {/* Dropdown Menu */}
@@ -362,42 +390,57 @@ function LibraryContent() {
                                                         className="absolute right-0 top-full mt-1 w-48 bg-card border border-border rounded-lg shadow-xl z-50 overflow-hidden"
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
-                                                        <button
-                                                            onClick={(e) => handleUploadClick(e, folder)}
-                                                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"
-                                                        >
-                                                            <Upload className="w-4 h-4 text-emerald" />
-                                                            Upload Files
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => handleRenameClick(e, folder)}
-                                                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"
-                                                        >
-                                                            <Edit className="w-4 h-4 text-blue-500" />
-                                                            Rename
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => handleShareClick(e, folder)}
-                                                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"
-                                                        >
-                                                            <Share2 className="w-4 h-4 text-purple-500" />
-                                                            Share
-                                                        </button>
-                                                        <div className="border-t border-border" />
-                                                        <button
-                                                            onClick={(e) => handleDeleteClick(e, folder)}
-                                                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-destructive hover:bg-destructive/10 transition-colors"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                            Delete Topic
-                                                        </button>
+                                                        {/* Only owners and editors can upload */}
+                                                        {(folder.permission === 'owner' || folder.permission === 'write') && (
+                                                            <button
+                                                                onClick={(e) => handleUploadClick(e, folder)}
+                                                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"
+                                                            >
+                                                                <Upload className="w-4 h-4 text-emerald" />
+                                                                Upload Files
+                                                            </button>
+                                                        )}
+                                                        {/* Only owners can rename */}
+                                                        {folder.permission === 'owner' && (
+                                                            <button
+                                                                onClick={(e) => handleRenameClick(e, folder)}
+                                                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"
+                                                            >
+                                                                <Edit className="w-4 h-4 text-blue-500" />
+                                                                Rename
+                                                            </button>
+                                                        )}
+                                                        {/* Only owners can share */}
+                                                        {folder.permission === 'owner' && (
+                                                            <button
+                                                                onClick={(e) => handleShareClick(e, folder)}
+                                                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors"
+                                                            >
+                                                                <Share2 className="w-4 h-4 text-purple-500" />
+                                                                Share
+                                                            </button>
+                                                        )}
+                                                        {/* Only owners can delete */}
+                                                        {folder.permission === 'owner' && (
+                                                            <>
+                                                                <div className="border-t border-border" />
+                                                                <button
+                                                                    onClick={(e) => handleDeleteClick(e, folder)}
+                                                                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                    Delete Topic
+                                                                </button>
+                                                            </>
+                                                        )}
                                                     </motion.div>
                                                 )}
                                             </AnimatePresence>
                                         </div>
                                     </div>
 
-                                    <h3 className="text-lg font-semibold text-foreground mb-2 group-hover:text-emerald transition-colors">
+                                    <h3 className={`text-lg font-semibold text-foreground mb-2 transition-colors ${folder.permission !== 'owner' ? 'group-hover:text-purple-500' : 'group-hover:text-emerald'
+                                        }`}>
                                         {folder.name}
                                     </h3>
 
@@ -537,64 +580,98 @@ function LibraryContent() {
             <AnimatePresence>
                 {showShareModal && selectedFolder && (
                     <Modal onClose={() => setShowShareModal(false)}>
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-semibold text-foreground">Share "{selectedFolder.name}"</h3>
-                            <button onClick={() => setShowShareModal(false)} className="p-1 rounded-lg hover:bg-muted transition-colors">
-                                <X className="w-5 h-5 text-muted-foreground" />
-                            </button>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-foreground mb-2">User Email</label>
-                                <input
-                                    type="email"
-                                    value={shareEmail}
-                                    onChange={(e) => setShareEmail(e.target.value)}
-                                    placeholder="colleague@example.com"
-                                    className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald/50"
-                                    autoFocus
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-foreground mb-2">Permission Level</label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {[
-                                        { value: 'read', label: 'View Only', color: 'text-blue-500' },
-                                        { value: 'write', label: 'Can Edit', color: 'text-emerald' },
-                                        { value: 'admin', label: 'Admin', color: 'text-purple-500' },
-                                    ].map(perm => (
-                                        <button
-                                            key={perm.value}
-                                            onClick={() => setSharePermission(perm.value)}
-                                            className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all ${sharePermission === perm.value
-                                                ? 'border-emerald bg-emerald/10 text-emerald'
-                                                : 'border-border text-muted-foreground hover:bg-muted'
-                                                }`}
-                                        >
-                                            {perm.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        {shareFolderMutation.isError && (
-                            <p className="mt-4 text-sm text-destructive">{(shareFolderMutation.error as Error)?.message || "Failed to share"}</p>
-                        )}
-
-                        <div className="flex gap-3 mt-6">
-                            <button onClick={() => setShowShareModal(false)} className="flex-1 px-4 py-3 border border-border rounded-lg text-foreground hover:bg-muted transition-colors">
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleConfirmShare}
-                                disabled={!shareEmail.trim() || shareFolderMutation.isPending}
-                                className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                        {shareSuccess ? (
+                            /* Success State */
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="flex flex-col items-center text-center py-4"
                             >
-                                {shareFolderMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /><span>Sharing...</span></> : <><Share2 className="w-4 h-4" /><span>Share</span></>}
-                            </button>
-                        </div>
+                                <motion.div
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    transition={{ type: "spring", stiffness: 300, damping: 15, delay: 0.1 }}
+                                    className="w-16 h-16 rounded-full bg-emerald/10 border-2 border-emerald flex items-center justify-center mb-5"
+                                >
+                                    <CheckCircle2 className="w-8 h-8 text-emerald" />
+                                </motion.div>
+                                <h3 className="text-xl font-bold text-foreground mb-2">Folder Shared!</h3>
+                                <p className="text-sm text-muted-foreground mb-4 max-w-xs">
+                                    <span className="font-semibold text-foreground">"{selectedFolder.name}"</span> has been shared with{" "}
+                                    <span className="font-semibold text-foreground">{shareEmail}</span>{" "}
+                                    with <span className={`font-semibold ${sharePermission === 'write' ? 'text-emerald' : 'text-blue-500'}`}>
+                                        {sharePermission === 'write' ? 'Edit' : 'View Only'}
+                                    </span> access.
+                                </p>
+                                <div className="w-full bg-emerald/5 border border-emerald/20 rounded-lg p-3 text-xs text-emerald font-medium">
+                                    They will see this folder in their library next time they log in.
+                                </div>
+                            </motion.div>
+                        ) : (
+                            /* Share Form */
+                            <>
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-xl font-semibold text-foreground">Share "{selectedFolder.name}"</h3>
+                                    <button onClick={() => setShowShareModal(false)} className="p-1 rounded-lg hover:bg-muted transition-colors">
+                                        <X className="w-5 h-5 text-muted-foreground" />
+                                    </button>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-foreground mb-2">User Email</label>
+                                        <input
+                                            type="email"
+                                            value={shareEmail}
+                                            onChange={(e) => setShareEmail(e.target.value)}
+                                            placeholder="colleague@example.com"
+                                            className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald/50"
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-foreground mb-2">Permission Level</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {[
+                                                { value: 'read', label: 'View Only', desc: 'Can view graph & data' },
+                                                { value: 'write', label: 'Can Edit', desc: 'Can add/edit/delete nodes' },
+                                            ].map(perm => (
+                                                <button
+                                                    key={perm.value}
+                                                    onClick={() => setSharePermission(perm.value)}
+                                                    className={`px-3 py-2.5 rounded-lg border text-sm font-medium transition-all text-left ${sharePermission === perm.value
+                                                        ? 'border-emerald bg-emerald/10 text-emerald'
+                                                        : 'border-border text-muted-foreground hover:bg-muted'
+                                                        }`}
+                                                >
+                                                    <div className="font-semibold">{perm.label}</div>
+                                                    <div className="text-[10px] opacity-70 mt-0.5">{perm.desc}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {shareFolderMutation.isError && (
+                                    <p className="mt-4 text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-lg p-3">
+                                        {(shareFolderMutation.error as any)?.detail || (shareFolderMutation.error as Error)?.message || "Failed to share folder"}
+                                    </p>
+                                )}
+
+                                <div className="flex gap-3 mt-6">
+                                    <button onClick={() => setShowShareModal(false)} className="flex-1 px-4 py-3 border border-border rounded-lg text-foreground hover:bg-muted transition-colors">
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleConfirmShare}
+                                        disabled={!shareEmail.trim() || shareFolderMutation.isPending}
+                                        className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                    >
+                                        {shareFolderMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /><span>Sharing...</span></> : <><Share2 className="w-4 h-4" /><span>Share</span></>}
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </Modal>
                 )}
             </AnimatePresence>

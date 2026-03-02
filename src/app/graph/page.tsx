@@ -15,7 +15,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
 import { useGraphStore } from '@/store/graphStore';
-import { useFolderGraph, useFileGraph } from '@/hooks/useApi';
+import { useFolderGraph, useFileGraph, useFolder } from '@/hooks/useApi';
 import { GraphContainer } from '@/components/graph/GraphContainer';
 import { Header } from '@/components/layout/Header';
 import {
@@ -36,6 +36,11 @@ function GraphContent() {
     // Fetch graph data - use folder or file graph
     const { data: folderGraph, isLoading: folderLoading, error: folderError, refetch: refetchFolder } = useFolderGraph(folderId || '');
     const { data: fileGraph, isLoading: fileLoading, error: fileError, refetch: refetchFile } = useFileGraph(fileId || '');
+    const { data: folderDetails } = useFolder(folderId || '');
+
+    // Determine permission level for CRUD restrictions
+    const folderPermission = (folderDetails as any)?.permission || 'owner';
+    const isReadOnly = folderPermission === 'read';
 
     const graphData = fileId ? fileGraph : folderGraph;
     const isLoading = fileId ? fileLoading : folderLoading;
@@ -207,6 +212,7 @@ function GraphContent() {
             showSidebar
             initialShowInbox={searchParams.get('view') === 'inbox'}
             className="flex-1"
+            isReadOnly={isReadOnly}
         />
     );
 }
