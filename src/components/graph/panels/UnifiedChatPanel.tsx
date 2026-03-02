@@ -81,7 +81,7 @@ function SessionHistorySidebar({
     const accent = chatMode === 'general' ? 'emerald' : 'indigo';
 
     return (
-        <div className="w-[260px] flex-shrink-0 bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col h-full">
+        <div className="w-full sm:w-[240px] md:w-[260px] flex-shrink-0 bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col h-full">
             {/* New Chat button */}
             <div className="p-3">
                 <button
@@ -279,7 +279,7 @@ export function UnifiedChatPanel() {
     };
 
     return (
-        <div className={`fixed z-[160] pointer-events-none transition-all duration-500 ${isExpanded && isOpen ? 'inset-0' : 'bottom-6 right-6 flex flex-col items-end'}`}>
+        <div className={`fixed z-[160] pointer-events-none transition-all duration-500 ${isExpanded && isOpen ? 'inset-0' : 'bottom-4 right-4 md:bottom-6 md:right-6 flex flex-col items-end'}`}>
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
@@ -290,75 +290,75 @@ export function UnifiedChatPanel() {
                         className={`pointer-events-auto overflow-hidden flex flex-col transition-all duration-500 ease-in-out
                             ${isExpanded
                                 ? 'fixed inset-0 w-full h-full bg-white dark:bg-slate-900'
-                                : 'w-[500px] h-[750px] rounded-[2rem] mb-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-[0_25px_60px_rgba(0,0,0,0.15)] dark:shadow-[0_25px_60px_rgba(0,0,0,0.5)]'
+                                : 'w-[calc(100vw-2rem)] sm:w-[450px] md:w-[500px] h-[calc(100vh-9rem)] sm:h-[600px] md:h-[650px] max-h-[calc(100vh-8.5rem)] rounded-2xl md:rounded-[2rem] mb-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-[0_25px_60_rgba(0,0,0,0.15)] dark:shadow-[0_25px_60px_rgba(0,0,0,0.5)]'
                             }`}
                     >
                         {/* ═══ HEADER ═══ */}
-                        <div className={`px-5 py-3 flex items-center justify-between border-b flex-shrink-0 ${chatMode === 'general'
+                        <div className={`px-4 md:px-5 py-3 flex items-center justify-between border-b flex-shrink-0 ${chatMode === 'general'
                             ? 'bg-gradient-to-r from-emerald-50 to-white dark:from-emerald-950/40 dark:to-slate-900 border-emerald-100 dark:border-emerald-900/40'
                             : 'bg-gradient-to-r from-indigo-50 to-white dark:from-indigo-950/40 dark:to-slate-900 border-indigo-100 dark:border-indigo-900/40'
                             }`}>
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 md:gap-3 overflow-hidden">
                                 {/* History toggle (only in expanded) */}
                                 {isExpanded && (
                                     <button
                                         onClick={() => setShowHistory(!showHistory)}
-                                        className={`p-2 rounded-lg transition-colors ${showHistory ? 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400'}`}
+                                        className={`p-1.5 md:p-2 rounded-lg transition-colors ${showHistory ? 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400'}`}
                                         title="Toggle session history"
                                     >
-                                        <History size={16} />
+                                        <History size={15} />
                                     </button>
                                 )}
-                                <div className={`p-2 rounded-xl ${chatMode === 'general' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>
-                                    <ThemeIcon size={20} />
+                                <div className={`p-1.5 md:p-2 rounded-xl shrink-0 ${chatMode === 'general' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>
+                                    <ThemeIcon size={18} />
                                 </div>
-                                <div>
-                                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                                <div className="min-w-0">
+                                    <h3 className="text-xs md:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
                                         {chatMode === 'general' ? 'Chat Assistant' : 'Graph Analytics'}
                                     </h3>
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                         <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${chatMode === 'general' ? 'bg-emerald-500' : 'bg-indigo-500'}`} />
-                                        <span className={`text-[9px] uppercase font-bold tracking-widest ${chatMode === 'general' ? 'text-emerald-500/60' : 'text-indigo-500/60'}`}>
+                                        <span className={`text-[8px] md:text-[9px] uppercase font-bold tracking-widest truncate ${chatMode === 'general' ? 'text-emerald-500/60' : 'text-indigo-500/60'}`}>
                                             {chatMode === 'general' ? 'Ask & Discover' : 'Graph Analysis'}
                                         </span>
                                     </div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-0.5">
-                                <button onClick={handleNewSession} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" title="New session">
-                                    <Plus size={16} />
+                                <button onClick={handleNewSession} className="p-1.5 md:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" title="New session">
+                                    <Plus size={15} />
                                 </button>
-                                <button onClick={handleClearMessages} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" title="Clear chat">
-                                    <Trash2 size={15} />
+                                <button onClick={handleClearMessages} className="hidden sm:block p-1.5 md:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" title="Clear chat">
+                                    <Trash2 size={14} />
                                 </button>
-                                <button onClick={() => setIsExpanded(!isExpanded)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-                                    {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                                <button onClick={() => setIsExpanded(!isExpanded)} className="hidden sm:block p-1.5 md:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                                    {isExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
                                 </button>
-                                <button onClick={() => { setIsOpen(false); setIsExpanded(false); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                                <button onClick={() => { setIsOpen(false); setIsExpanded(false); }} className="p-1.5 md:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
                                     <ChevronDown size={18} />
                                 </button>
                             </div>
                         </div>
 
                         {/* ═══ MODE TOGGLE BAR ═══ */}
-                        <div className="px-5 py-2 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0">
+                        <div className="px-4 md:px-5 py-2 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0">
                             <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 relative">
                                 <button
                                     onClick={() => toggleMode('general')}
                                     disabled={isProcessing}
-                                    className={`relative z-10 px-4 py-1.5 flex items-center gap-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-50
+                                    className={`relative z-10 px-3 md:px-4 py-1.5 flex items-center gap-1.5 rounded-md text-[9px] md:text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-50
                                         ${chatMode === 'general' ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-400 hover:text-slate-600'}`}
                                 >
-                                    <MessageSquare size={11} />
+                                    <MessageSquare size={10} />
                                     General
                                 </button>
                                 <button
                                     onClick={() => toggleMode('algorithmic')}
                                     disabled={isProcessing}
-                                    className={`relative z-10 px-4 py-1.5 flex items-center gap-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-50
+                                    className={`relative z-10 px-3 md:px-4 py-1.5 flex items-center gap-1.5 rounded-md text-[9px] md:text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-50
                                         ${chatMode === 'algorithmic' ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-600'}`}
                                 >
-                                    <Network size={11} />
+                                    <Network size={10} />
                                     Algorithms
                                 </button>
                                 <motion.div
@@ -370,7 +370,7 @@ export function UnifiedChatPanel() {
                                     transition={{ type: "spring", stiffness: 500, damping: 35 }}
                                 />
                             </div>
-                            <div className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                            <div className="hidden sm:flex text-[10px] font-semibold text-slate-400 dark:text-slate-500 items-center gap-1">
                                 {activeFolderId ? <><span className="text-emerald-500">●</span> Scoped</> : selectedNodes.length > 0 ? <><span className="text-amber-500">●</span> {selectedNodes.length} nodes</> : <><span className="text-red-400">●</span> Full DB</>}
                             </div>
                         </div>
@@ -382,7 +382,7 @@ export function UnifiedChatPanel() {
                                 {showHistory && isExpanded && (
                                     <motion.div
                                         initial={{ width: 0, opacity: 0 }}
-                                        animate={{ width: 260, opacity: 1 }}
+                                        animate={{ width: typeof window !== 'undefined' && window.innerWidth < 640 ? '100%' : 260, opacity: 1 }}
                                         exit={{ width: 0, opacity: 0 }}
                                         transition={{ duration: 0.25 }}
                                         className="overflow-hidden flex-shrink-0"
@@ -390,7 +390,10 @@ export function UnifiedChatPanel() {
                                         <SessionHistorySidebar
                                             messages={allMessages}
                                             currentSessionId={currentSessionId}
-                                            onSelectSession={handleSelectSession}
+                                            onSelectSession={(id) => {
+                                                handleSelectSession(id);
+                                                if (typeof window !== 'undefined' && window.innerWidth < 640) setShowHistory(false);
+                                            }}
                                             onNewSession={handleNewSession}
                                             chatMode={chatMode}
                                         />

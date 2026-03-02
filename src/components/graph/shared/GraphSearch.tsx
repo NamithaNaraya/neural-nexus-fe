@@ -84,9 +84,9 @@ export function GraphSearch() {
         <div className="relative">
             {/* Search Input */}
             <div className={`
-                relative flex items-center bg-card/80 backdrop-blur-md border rounded-lg
+                relative flex items-center bg-muted/30 rounded-lg
                 transition-all duration-200
-                ${isFocused ? 'border-emerald shadow-lg shadow-emerald/10' : 'border-border'}
+                ${isFocused ? 'ring-1 ring-emerald/30 shadow-sm' : 'border border-border/30'}
             `}>
                 <Search className="absolute left-3 w-4 h-4 text-muted-foreground" />
                 <input

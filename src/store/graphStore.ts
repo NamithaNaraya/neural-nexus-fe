@@ -481,21 +481,22 @@ export const useGraphStore = create<GraphState>()(
 
             // 3. Apply Topological Filters (Orphans, Min Degree) using Dynamic Degree
             return candidateNodes.filter(node => {
-                // DISCOVERY OVERRIDE: Keep discovered nodes visible regardless of topology
+                const degree = dynamicDegrees.get(node.id) || 0;
+
+                // Filter by orphan status (Hide Isolated Nodes)
+                // If "Hide Isolated Nodes" is ON (!showOrphans), remove nodes with 0 visible connections
+                // This takes precedence over discovery to ensure the user's filter is respected
+                if (!filters.showOrphans && degree === 0) {
+                    return false;
+                }
+
+                // DISCOVERY OVERRIDE: Keep discovered nodes visible regardless of minDegree
                 if (discoveredNodeIds.has(node.id)) {
                     return true;
                 }
 
-                const degree = dynamicDegrees.get(node.id) || 0;
-
                 // Filter by minimum degree
                 if (filters.minDegree > 0 && degree < filters.minDegree) {
-                    return false;
-                }
-
-                // Filter by orphan status
-                // If "Hide Isolated Nodes" is ON (!showOrphans), remove nodes with 0 visible connections
-                if (!filters.showOrphans && degree === 0) {
                     return false;
                 }
 

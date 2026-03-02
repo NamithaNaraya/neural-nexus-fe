@@ -642,10 +642,10 @@ export function GraphContainer({
             {/* Prune Focus Mode Indicator */}
             {prePruneNodes && (
                 <motion.div
-                    initial={{ opacity: 0, y: -10 }}
+                    initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-2.5 rounded-full bg-amber-500/90 backdrop-blur-md text-white shadow-lg border border-amber-400/50"
+                    exit={{ opacity: 0, y: -20 }}
+                    className="absolute top-28 inset-x-0 mx-auto w-fit z-50 flex items-center gap-3 px-5 py-2.5 rounded-full bg-amber-500/90 backdrop-blur-md text-white shadow-xl border border-amber-400/50"
                 >
                     <span className="text-xs font-bold uppercase tracking-wider">✄ Focus Prune Active:</span>
                     <span className="text-sm font-semibold">{nodes.length} nodes visible</span>
@@ -770,12 +770,8 @@ export function GraphContainer({
                             initial={{ x: -400, opacity: 0 }}
                             animate={{ x: 0, opacity: 1 }}
                             exit={{ x: -400, opacity: 0 }}
-                            className="absolute left-6 top-24 bottom-6 w-[360px] pointer-events-auto flex flex-col gap-4"
+                            className="absolute left-4 top-20 bottom-4 md:left-6 md:top-28 md:bottom-6 w-full max-w-[320px] lg:max-w-[360px] pointer-events-auto flex flex-col"
                         >
-                            {/* Search Bar - Now inside the filter visibility container */}
-                            <GraphSearch />
-
-                            {/* Filters Panel */}
                             <div className="flex-1 min-h-0">
                                 <GraphFilters onClose={() => setShowFilters(false)} />
                             </div>

@@ -15,6 +15,7 @@ import { motion } from 'framer-motion';
 import { useGraphStore } from '@/store/graphStore';
 import { NODE_TYPE_COLORS, RELATIONSHIP_COLORS } from '../types';
 import { X, Circle, ArrowRight, Filter, RotateCcw, Search, CheckSquare, Square } from 'lucide-react';
+import { GraphSearch } from './GraphSearch';
 
 interface GraphFiltersProps {
     onClose: () => void;
@@ -143,6 +144,11 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
         <div
             className="bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-xl overflow-hidden flex flex-col h-full"
         >
+            {/* Unified Search Section */}
+            <div className="p-4 pb-0">
+                <GraphSearch />
+            </div>
+
             {/* Header */}
             <div className="p-4 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-2">

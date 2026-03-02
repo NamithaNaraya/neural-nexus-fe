@@ -109,7 +109,7 @@ export function GraphToolbar({
 
     return (
         <>
-            <div className="absolute top-6 left-6 right-6 z-40 h-16 px-6 flex items-center glass-strong rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-white/20 transition-all duration-500 hover:shadow-[0_12px_48px_rgba(168,85,247,0.15)] group/toolbar">
+            <div className="absolute top-4 left-4 right-4 md:top-6 md:left-6 md:right-6 z-40 min-h-16 py-3 px-4 md:px-6 flex flex-wrap items-center gap-3 glass-strong rounded-2xl md:rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-white/20 transition-all duration-500 hover:shadow-[0_12px_48px_rgba(168,85,247,0.15)] group/toolbar">
                 {/* Left Section: Back, View Modes & Filters */}
                 <div className="flex items-center gap-1.5">
                     <button
@@ -120,21 +120,14 @@ export function GraphToolbar({
                         <ArrowLeft className="w-5 h-5 transition-transform group-hover/back:-translate-x-1" />
                     </button>
 
-                    {/* View Mode Toggle - Horizontal */}
                     <div className="flex items-center gap-1 bg-muted/20 p-1 rounded-full border border-white/5">
-                        {/* <ViewModeButton
-                            mode="3d"
-                            currentMode={viewMode}
-                            onClick={() => onViewModeChange('3d')}
-                            icon={<Box className="w-5 h-5" />}
-                            label="3D"
-                        /> */}
                         <ViewModeButton
                             mode="2d"
                             currentMode={viewMode}
                             onClick={() => onViewModeChange('2d')}
                             icon={<Grid3X3 className="w-5 h-5" />}
                             label="2D"
+                            showLabel={false}
                         />
                         <ViewModeButton
                             mode="charts"
@@ -142,6 +135,7 @@ export function GraphToolbar({
                             onClick={() => onViewModeChange('charts')}
                             icon={<PieChart className="w-5 h-5" />}
                             label="Charts"
+                            showLabel={false}
                         />
                         <ViewModeButton
                             mode="list"
@@ -149,6 +143,7 @@ export function GraphToolbar({
                             onClick={() => onViewModeChange('list')}
                             icon={<List className="w-5 h-5" />}
                             label="List"
+                            showLabel={false}
                         />
                     </div>
 
@@ -165,8 +160,8 @@ export function GraphToolbar({
                     </div>
                 </div>
 
-                {/* Spacer to push everything else to the right */}
-                <div className="flex-1" />
+                {/* Spacer - hidden on small screens to allow wrapping items to center */}
+                <div className="hidden lg:block lg:flex-1" />
 
                 {/* Right Section: Utilities & Stats */}
                 <div className="flex items-center gap-4">
@@ -234,18 +229,18 @@ export function GraphToolbar({
 
                     <div className="w-px h-8 bg-border/20" />
 
-                    {/* Horizontal Statistics Indicator */}
-                    <div className="flex items-center gap-6 px-4 py-1.5 glass-strong rounded-full border border-white/5 bg-white/5 mx-2">
-                        <div className="flex items-center gap-2.5 group/stats">
+                    {/* Horizontal Statistics Indicator - Collapsible on small screens */}
+                    <div className="hidden sm:flex items-center gap-4 lg:gap-6 px-4 py-1.5 glass-strong rounded-full border border-white/5 bg-white/5 mx-2 overflow-hidden">
+                        <div className="flex items-center gap-2.5 group/stats shrink-0">
                             <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.6)] animate-pulse" />
                             <div className="flex flex-col">
-                                <span className="text-[9px] text-muted-foreground font-semibold uppercase tracking-widest leading-none">Nodes</span>
+                                <span className="hidden xl:inline text-[9px] text-muted-foreground font-semibold uppercase tracking-widest leading-none">Nodes</span>
                                 <div className="flex items-baseline gap-1.5 mt-0.5">
-                                    <span className="text-sm font-bold text-foreground leading-none">
+                                    <span className="text-xs lg:text-sm font-bold text-foreground leading-none">
                                         {selectedCount > 0 && focusNodeIds ? focusNodeIds.size : nodeCount} <span className="text-[10px] text-muted-foreground/60 font-medium">/</span> {totalNodeCount}
                                     </span>
                                     {selectedCount > 0 && (
-                                        <span className="text-[10px] font-bold text-cyan-400/90 leading-none">
+                                        <span className="hidden xl:inline text-[10px] font-bold text-cyan-400/90 leading-none">
                                             (FOCUSED)
                                         </span>
                                     )}
@@ -253,13 +248,12 @@ export function GraphToolbar({
                             </div>
                         </div>
 
-
-                        <div className="flex items-center gap-2.5 group/stats ml-2">
+                        <div className="flex items-center gap-2.5 group/stats shrink-0">
                             <div className="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.6)] animate-pulse" />
                             <div className="flex flex-col">
-                                <span className="text-[9px] text-muted-foreground font-semibold uppercase tracking-widest leading-none">Links</span>
+                                <span className="hidden xl:inline text-[9px] text-muted-foreground font-semibold uppercase tracking-widest leading-none">Links</span>
                                 <div className="flex items-baseline gap-1.5 mt-0.5">
-                                    <span className="text-sm font-bold text-foreground leading-none">
+                                    <span className="text-xs lg:text-sm font-bold text-foreground leading-none">
                                         {selectedCount > 0 && focusLinkIds ? focusLinkIds.size : linkCount} <span className="text-[10px] text-muted-foreground/60 font-medium">/</span> {totalLinkCount}
                                     </span>
                                 </div>
@@ -315,22 +309,24 @@ interface ViewModeButtonProps {
     onClick: () => void;
     icon: React.ReactNode;
     label: string;
+    showLabel?: boolean;
 }
 
-function ViewModeButton({ mode, currentMode, onClick, icon, label }: ViewModeButtonProps) {
+function ViewModeButton({ mode, currentMode, onClick, icon, label, showLabel = true }: ViewModeButtonProps) {
     const isActive = mode === currentMode;
 
     return (
         <button
             onClick={onClick}
             className={`
-                relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold
+                relative flex items-center gap-2 px-3 lg:px-4 py-2 rounded-lg text-sm font-bold
                 transition-all duration-300 ease-out
                 ${isActive
                     ? 'text-primary'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 }
             `}
+            title={label}
         >
             {isActive && (
                 <motion.div
@@ -341,7 +337,7 @@ function ViewModeButton({ mode, currentMode, onClick, icon, label }: ViewModeBut
                 />
             )}
             <span className="relative z-10">{icon}</span>
-            <span className="relative z-10">{label}</span>
+            {showLabel && <span className="relative z-10 hidden sm:inline">{label}</span>}
         </button>
     );
 }

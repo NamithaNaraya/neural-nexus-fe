@@ -350,7 +350,7 @@ export function NodeDetailPanel({ node, onClose, onEdit, onDelete, onExpand, onF
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 400, opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="absolute right-6 top-24 bottom-6 w-[380px] glass-strong z-40 flex flex-col rounded-[2rem] border border-white/10 shadow-[20px_0_60px_rgba(0,0,0,0.3)] overflow-hidden"
+            className="absolute right-4 md:right-6 top-20 md:top-28 bottom-4 md:bottom-6 w-[calc(100%-1rem)] sm:w-[320px] md:w-[400px] glass-strong z-[110] flex flex-col rounded-2xl md:rounded-[2rem] border border-white/10 shadow-[20px_0_60px_rgba(0,0,0,0.3)] overflow-hidden"
         >
             {/* Header */}
             <div className="p-6 border-b border-white/10 bg-white/5">
