@@ -23,6 +23,7 @@ interface AuthState {
 
     // Actions
     login: (email: string, password: string) => Promise<void>;
+    register: (email: string, password: string) => Promise<void>;
     logout: () => void;
     checkAuth: () => void;
     clearError: () => void;
@@ -85,6 +86,58 @@ export const useAuthStore = create<AuthState>()(
                     set({
                         isLoading: false,
                         error: error instanceof Error ? error.message : "Login failed",
+                    });
+                    throw error;
+                }
+            },
+
+            register: async (email: string, password: string) => {
+                set({ isLoading: true, error: null });
+
+                try {
+                    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+                    const cleanUrl = baseUrl.endsWith('/api/v1')
+                        ? `${baseUrl}/auth/register`
+                        : `${baseUrl}/api/v1/auth/register`;
+
+                    const response = await fetch(cleanUrl, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            email: email,
+                            password: password,
+                            role: "user",
+                        }),
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => null);
+                        const message = errorData?.detail || "Registration failed";
+                        throw new Error(message);
+                    }
+
+                    const data = await response.json();
+
+                    // Store token in localStorage for API client
+                    localStorage.setItem('access_token', data.access_token);
+
+                    set({
+                        isAuthenticated: true,
+                        user: {
+                            id: data.user.id,
+                            email: data.user.email,
+                            role: data.user.role,
+                        },
+                        token: data.access_token,
+                        isLoading: false,
+                    });
+                } catch (error) {
+                    set({
+                        isLoading: false,
+                        error: error instanceof Error ? error.message : "Registration failed",
                     });
                     throw error;
                 }
