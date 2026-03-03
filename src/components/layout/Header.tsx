@@ -4,7 +4,9 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/uiStore";
-import { Sun, Moon, LogOut } from "lucide-react";
+import { useGraphStore } from "@/store/graphStore";
+import { docAiApi } from "@/lib/api";
+import { Sun, Moon, LogOut, Folder, FileText } from "lucide-react";
 
 interface HeaderProps {
     showThemeToggle?: boolean;
@@ -30,6 +32,31 @@ export function Header({ showThemeToggle = true, minimal = false }: HeaderProps)
         router.push("/login");
     };
 
+    // Active Context Fetching
+    const { activeFolderId, activeFileId } = useGraphStore();
+    const [activeFolderName, setActiveFolderName] = useState<string | null>(null);
+    const [activeFileName, setActiveFileName] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!activeFolderId) {
+            setActiveFolderName(null);
+            return;
+        }
+        docAiApi.folders.get(activeFolderId).then((res: any) => {
+            setActiveFolderName(res.name);
+        }).catch(err => console.error(err));
+    }, [activeFolderId]);
+
+    useEffect(() => {
+        if (!activeFileId) {
+            setActiveFileName(null);
+            return;
+        }
+        docAiApi.files.get(activeFileId).then((res: any) => {
+            setActiveFileName(res.filename);
+        }).catch(err => console.error(err));
+    }, [activeFileId]);
+
     return (
         <header className="glass-strong sticky top-0 z-50 border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.05)] h-20 flex items-center">
             <div className="w-full mx-auto px-8 flex items-center justify-between">
@@ -50,6 +77,25 @@ export function Header({ showThemeToggle = true, minimal = false }: HeaderProps)
                         </span>
                     </div>
                 </button>
+
+                {/* Active Context - Breadcrumbs */}
+                <div className="hidden lg:flex items-center gap-3">
+                    {activeFolderName && (
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald/5 border border-emerald/10 shadow-sm animate-in fade-in slide-in-from-top-1 duration-500">
+                            <Folder size={14} className="text-emerald" />
+                            <span className="text-xs font-bold text-foreground/80 tracking-tight">{activeFolderName}</span>
+                        </div>
+                    )}
+                    {activeFileName && (
+                        <>
+                            <div className="w-1.5 h-1.5 rounded-full bg-border" />
+                            <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-primary/5 border border-primary/10 shadow-sm animate-in fade-in slide-in-from-top-1 duration-500">
+                                <FileText size={14} className="text-primary" />
+                                <span className="text-xs font-bold text-foreground/80 tracking-tight">{activeFileName}</span>
+                            </div>
+                        </>
+                    )}
+                </div>
 
                 {/* Right Section */}
                 <div className="flex items-center gap-6">

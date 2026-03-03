@@ -5,7 +5,7 @@ import {
     Activity, Brain, ShieldCheck, Search, Database, Stethoscope, MessageSquare,
     Zap, ChevronDown, Send, Loader2, X, ClipboardList,
     Star, User, Bot, Maximize2, Minimize2, Trash2, Network, BarChart3,
-    Plus, Clock, History
+    Plus, Clock, History, Folder as FolderIcon, FileText as FileIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGraphStore } from '@/store/graphStore';
@@ -146,10 +146,35 @@ export function UnifiedChatPanel() {
     const [showHistory, setShowHistory] = useState(false);
     const [showOutcomeForm, setShowOutcomeForm] = useState<string | null>(null);
     const [feedback, setFeedback] = useState({ rating: 5, comment: '' });
+    const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
 
-    const { activeFolderId, selectedNodes } = useGraphStore();
+    const { activeFolderId, activeFileId, selectedNodes, zoomToNode: storeZoomToNode } = useGraphStore();
     const { user } = useAuthStore();
     const scrollRef = useRef<HTMLDivElement>(null);
+
+    // Context Names Fetching
+    const [activeFolderName, setActiveFolderName] = useState<string | null>(null);
+    const [activeFileName, setActiveFileName] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!activeFolderId) {
+            setActiveFolderName(null);
+            return;
+        }
+        docAiApi.folders.get(activeFolderId).then((res: any) => {
+            setActiveFolderName(res.name || 'Unknown Folder');
+        }).catch(err => console.error(err));
+    }, [activeFolderId]);
+
+    useEffect(() => {
+        if (!activeFileId) {
+            setActiveFileName(null);
+            return;
+        }
+        docAiApi.files.get(activeFileId).then((res: any) => {
+            setActiveFileName(res.filename || 'Unknown File');
+        }).catch(err => console.error(err));
+    }, [activeFileId]);
 
     // Stores
     const neuralStore = useUnifiedAssistantStore();
@@ -258,6 +283,15 @@ export function UnifiedChatPanel() {
                 analyticStore.setProcessing(false);
             }
         }
+    };
+
+    const toggleResultExpansion = (msgId: string) => {
+        setExpandedResults(prev => {
+            const next = new Set(prev);
+            if (next.has(msgId)) next.delete(msgId);
+            else next.add(msgId);
+            return next;
+        });
     };
 
     const submitOutcome = async (encounterId: string) => {
@@ -370,8 +404,29 @@ export function UnifiedChatPanel() {
                                     transition={{ type: "spring", stiffness: 500, damping: 35 }}
                                 />
                             </div>
-                            <div className="hidden sm:flex text-[10px] font-semibold text-slate-400 dark:text-slate-500 items-center gap-1">
-                                {activeFolderId ? <><span className="text-emerald-500">●</span> Scoped</> : selectedNodes.length > 0 ? <><span className="text-amber-500">●</span> {selectedNodes.length} nodes</> : <><span className="text-red-400">●</span> Full DB</>}
+                            <div className="hidden sm:flex text-[10px] font-semibold text-slate-400 dark:text-slate-500 items-center gap-1.5">
+                                {activeFolderId && activeFolderName && (
+                                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 cursor-default" title="Active Folder">
+                                        <FolderIcon size={10} className="text-emerald-500" />
+                                        <span className="truncate max-w-[100px] text-slate-600 dark:text-slate-300">{activeFolderName}</span>
+                                    </div>
+                                )}
+                                {activeFileId && activeFileName && (
+                                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 cursor-default" title="Active File">
+                                        <FileIcon size={10} className="text-emerald-500" />
+                                        <span className="truncate max-w-[100px] text-slate-600 dark:text-slate-300">{activeFileName}</span>
+                                    </div>
+                                )}
+                                {!activeFolderId && !activeFileId && selectedNodes.length > 0 && (
+                                    <div className="flex items-center gap-1" title="Selected Nodes">
+                                        <span className="text-amber-500">●</span> {selectedNodes.length} nodes
+                                    </div>
+                                )}
+                                {!activeFolderId && !activeFileId && selectedNodes.length === 0 && (
+                                    <div className="flex items-center gap-1" title="Full Database Scope">
+                                        <span className="text-red-400">●</span> Full DB
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -493,12 +548,33 @@ export function UnifiedChatPanel() {
                                                     {/* Result chips (Algorithmic mode) */}
                                                     {chatMode === 'algorithmic' && msg.results?.length > 0 && (
                                                         <div className="flex flex-wrap gap-1.5 mt-1">
-                                                            {msg.results.slice(0, 8).map((res: any, ri: number) => (
-                                                                <span key={ri} className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 text-[10px] text-indigo-600 dark:text-indigo-400 font-medium truncate max-w-[140px]">
-                                                                    {res.name || res.id}
-                                                                </span>
-                                                            ))}
-                                                            {msg.results.length > 8 && <span className="text-[10px] text-slate-400 py-0.5">+{msg.results.length - 8} more</span>}
+                                                            {(expandedResults.has(msg.id) ? msg.results : msg.results.slice(0, 8)).map((res: any, ri: number) => {
+                                                                const isSimilarity = !!(res.source_name && res.target_name);
+                                                                const displayName = isSimilarity
+                                                                    ? `${res.source_name} ↔ ${res.target_name}`
+                                                                    : (res.name || res.id || "Unknown");
+
+                                                                return (
+                                                                    <button
+                                                                        key={ri}
+                                                                        onClick={() => {
+                                                                            if (res.id) storeZoomToNode(res.id);
+                                                                            else if (res.source_id) storeZoomToNode(res.source_id);
+                                                                        }}
+                                                                        className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 text-[10px] text-indigo-600 dark:text-indigo-400 font-medium truncate max-w-[200px] hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+                                                                    >
+                                                                        {displayName}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                            {msg.results.length > 8 && (
+                                                                <button
+                                                                    onClick={() => toggleResultExpansion(msg.id)}
+                                                                    className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline py-0.5"
+                                                                >
+                                                                    {expandedResults.has(msg.id) ? "Show less" : `+${msg.results.length - 8} more`}
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     )}
 
