@@ -28,6 +28,9 @@ import {
     Sparkles,
     Users,
     ArrowLeftRight,
+    Plus,
+    Check,
+    MousePointer2,
     CheckCircle2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -116,6 +119,13 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/centrality/closeness',
         simpleInfo: 'Finds nodes that are closest to all other nodes in the network.',
         benefit: 'Shows which entities can reach everything most efficiently.',
+    },
+    {
+        key: 'degree', name: 'Degree', description: 'Most connected nodes',
+        icon: <BarChart3 className="w-4 h-4" />, category: 'centrality',
+        endpoint: '/analytics/centrality/degree',
+        simpleInfo: 'Counts how many direct connections each node has.',
+        benefit: 'Instantly shows the most active and connected entities.',
     },
     {
         key: 'louvain', name: 'Louvain', description: 'Detect communities',
@@ -251,7 +261,7 @@ function buildSummary(algo: AlgorithmConfig, result: AlgorithmResult, totalNodes
                 return `Across all ${totalNodes} entities in the graph, HITS analysis identified "${top.name}" as the top authority (score: ${top.auth_score?.toFixed(4) || 'N/A'}), meaning it is the most referenced and trusted source. ${topHub?.name !== top.name ? `Meanwhile, "${topHub?.name}" emerged as the primary hub, actively linking to and aggregating many other entities.` : 'It also acts as a leading hub, both receiving and distributing information.'} ${result.insight || ''}`;
             }
             if (top) {
-                const trait = algo.key === 'pagerank' || algo.key === 'articlerank' ? 'influential' : algo.key === 'betweenness' ? 'critical bridge' : 'centrally located';
+                const trait = algo.key === 'pagerank' || algo.key === 'articlerank' ? 'influential' : algo.key === 'betweenness' ? 'critical bridge' : algo.key === 'degree' ? 'connected' : 'centrally located';
                 const second = result.results?.[1];
                 let summary = `After analyzing all ${totalNodes} entities in the graph, "${top.name}" (${top.type || 'Entity'}) emerged as the most ${trait} node with a score of ${top.score?.toFixed(4) || 'N/A'}.`;
                 if (second) {
@@ -299,9 +309,18 @@ function buildSummary(algo: AlgorithmConfig, result: AlgorithmResult, totalNodes
             if (algo.key === 'shortest-path' && result.results?.length > 0) {
                 const source = result.results[0].name;
                 const target = result.results[result.results.length - 1].name;
-                return `Successfully traced the shortest route from "${source}" to "${target}" through ${resultCount} intermediate entities, with a total traversal cost of ${(result as any).total_cost?.toFixed(2) || 'N/A'}. Each step represents the most efficient hop between related concepts.`;
+                return `Successfully traced the shortest route from "${source}" to "${target}" through ${resultCount} hop(s). Each step represents the most efficient path between these two specific concepts.`;
             }
-            return result.insight || `Exploration complete. Traversed ${resultCount} entities out of the ${totalNodes} in the graph.`;
+            if (algo.key === 'bfs' && top) {
+                return `Starting from "${top.name}", a Breadth-First search discovered ${resultCount} entities by exploring layer by layer. This reveals the immediate neighborhood and close-range context surrounding the starting node.`;
+            }
+            if (algo.key === 'dfs' && top) {
+                return `Starting from "${top.name}", a Depth-First search explored a path ${resultCount} nodes deep before returning. This highlights deep logic chains and long-distance associations originating from the starting entity.`;
+            }
+            if (algo.key === 'random-walk' && top) {
+                return `A simulated random walk starting from "${top.name}" wandered across ${resultCount} distinct entities. This process uncovers serendipitous connections and associations that might not be visible through traditional direct paths.`;
+            }
+            return result.insight || `Exploration complete. Traversed ${resultCount} entities out of the ${totalNodes} in the current view.`;
 
         case 'topology':
             return result.insight || `Topological ordering complete. Arranged ${resultCount} of ${totalNodes} entities into a logical sequence based on their directional dependencies.`;
@@ -335,6 +354,8 @@ export function AlgorithmDrawer({
     const [result, setResult] = useState<AlgorithmResult | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [nodeSearchTerm, setNodeSearchTerm] = useState('');
+    const { selectNode, clearSelection, setSelectedNodes } = useGraphStore();
 
     // ─── Result Cache ───────────────────────────────────────
     // Persists results per algorithm so switching tabs doesn't lose data.
@@ -432,12 +453,15 @@ export function AlgorithmDrawer({
 
             if (isSelectionMode) {
                 // User explicitly selected nodes — always scope to those
-                ids = selectedNodes.length > 0 ? [...selectedNodes] : undefined;
+                const uniqueIds = new Set(selectedNodes);
+
                 // If we also have focus neighbors (BFS highlight), include them
                 // so algorithms can analyze the local subgraph
                 if (focusNodeIds && focusNodeIds.length > 0) {
-                    ids = focusNodeIds;
+                    focusNodeIds.forEach(id => uniqueIds.add(id));
                 }
+
+                ids = uniqueIds.size > 0 ? Array.from(uniqueIds) : undefined;
             } else if (nodeIds.length > 0 && nodeIds.length < nodes.length) {
                 // Filtered view shows a subset of nodes (e.g., type filter, file filter)
                 ids = nodeIds;
@@ -701,11 +725,121 @@ export function AlgorithmDrawer({
                                     </div>
                                 </div>
 
+                                {/* Traversal/Pathfinding Node Selection — Interactive UI */}
+                                {(selectedAlgorithm.category === 'pathfinding' || selectedAlgorithm.key === 'random-walk') && (
+                                    <div className="px-8 pb-4">
+                                        <div className="p-5 rounded-2xl border border-indigo-100 dark:border-indigo-500/20 bg-white dark:bg-slate-900 shadow-sm">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="flex items-center gap-2">
+                                                    <MousePointer2 className="w-4 h-4 text-indigo-500" />
+                                                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                                                        Select {selectedAlgorithm.key === 'shortest-path' ? 'Source & Target' : 'Starting Node'}
+                                                    </h4>
+                                                </div>
+                                                {selectedNodes.length > 0 && (
+                                                    <button
+                                                        onClick={() => clearSelection()}
+                                                        className="text-[10px] font-bold text-indigo-500 hover:text-indigo-600 transition-colors"
+                                                    >
+                                                        Clear Selection
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {/* Search box for nodes */}
+                                            <div className="relative mb-4">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search nodes by name..."
+                                                    value={nodeSearchTerm}
+                                                    onChange={(e) => setNodeSearchTerm(e.target.value)}
+                                                    className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border-none rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 transition-all"
+                                                />
+                                            </div>
+
+                                            {/* Selected Pills */}
+                                            <div className="flex flex-wrap gap-2 mb-4">
+                                                {selectedNodes.length === 0 && (
+                                                    <div className="text-[10px] italic text-slate-400 py-1">
+                                                        No nodes selected yet. Pick from the list below or click on the graph.
+                                                    </div>
+                                                )}
+                                                {selectedNodes.map((id, index) => {
+                                                    const node = nodes.find(n => n.id === id);
+                                                    return (
+                                                        <div key={id} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-sm transition-all ${index === 0 ? 'bg-indigo-50 border-indigo-100 text-indigo-700' : 'bg-amber-50 border-amber-100 text-amber-700'
+                                                            }`}>
+                                                            <span className="text-[9px] font-black uppercase opacity-60">
+                                                                {selectedAlgorithm.key === 'shortest-path' ? (index === 0 ? 'SOURCE' : 'TARGET') : 'START'}
+                                                            </span>
+                                                            <span className="text-xs font-bold truncate max-w-[120px]">{node?.name || id}</span>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); selectNode(id, true); }}
+                                                                className="hover:scale-110 transition-transform"
+                                                            >
+                                                                <X className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            {/* Search Results (Node List) */}
+                                            {nodeSearchTerm && (
+                                                <div className="max-h-[160px] overflow-y-auto overflow-x-hidden pr-2 space-y-1 custom-scrollbar">
+                                                    {nodes
+                                                        .filter(n => n.name.toLowerCase().includes(nodeSearchTerm.toLowerCase()))
+                                                        .slice(0, 10)
+                                                        .map(node => {
+                                                            const isSelected = selectedNodes.includes(node.id);
+                                                            return (
+                                                                <button
+                                                                    key={node.id}
+                                                                    onClick={() => {
+                                                                        if (selectedAlgorithm.key === 'shortest-path') {
+                                                                            if (isSelected) selectNode(node.id, true);
+                                                                            else if (selectedNodes.length < 2) selectNode(node.id, true);
+                                                                        } else {
+                                                                            setSelectedNodes([node.id]);
+                                                                        }
+                                                                        setNodeSearchTerm(''); // Close dropdown after selection
+                                                                    }}
+                                                                    className={`w-full flex items-center justify-between p-2.5 rounded-xl border transition-all ${isSelected
+                                                                        ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-500/10 dark:border-indigo-500/30 text-indigo-700 dark:text-indigo-300 shadow-sm scale-[1.01]'
+                                                                        : 'bg-slate-50 dark:bg-slate-800 border-transparent text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                                                        }`}
+                                                                >
+                                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                                        <div className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-indigo-500' : 'bg-indigo-400 opacity-40'}`} />
+                                                                        <div className="flex flex-col items-start min-w-0">
+                                                                            <span className="text-xs font-bold truncate w-full">{node.name}</span>
+                                                                            <span className={`text-[9px] uppercase font-bold opacity-60 ${isSelected ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`}>
+                                                                                {node.type}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                    {isSelected ? <Check className="w-3.5 h-3.5 text-indigo-500" /> : <Plus className="w-3.5 h-3.5 opacity-40" />}
+                                                                </button>
+                                                            );
+                                                        })
+                                                    }
+                                                </div>
+                                            )}
+                                            {!nodeSearchTerm && (
+                                                <p className="text-[10px] text-center text-slate-400 py-2">
+                                                    Type in the search box to find and select specific nodes.
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Results Area */}
-                                <div className="flex-1 overflow-y-auto p-8">
+                                <div className="flex-1 overflow-y-auto p-8 pt-0">
                                     {error && (
-                                        <div className="p-4 mb-6 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold">
-                                            ⚠️ {error}
+                                        <div className="p-4 mb-6 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-semibold leading-relaxed">
+                                            💡 {error}
                                         </div>
                                     )}
 
