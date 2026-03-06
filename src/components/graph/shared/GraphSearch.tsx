@@ -6,6 +6,7 @@
  * - Real-time search with debounce
  * - Result dropdown with keyboard navigation
  * - Click to select and zoom to node
+ * - "Focus" button to isolate node + neighbors (like double-click expand)
  */
 'use client';
 
@@ -13,7 +14,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGraphStore } from '@/store/graphStore';
 import { NODE_TYPE_COLORS } from '../types';
-import { Search, X, Circle, ArrowRight } from 'lucide-react';
+import { Search, X, Circle, ArrowRight, Crosshair } from 'lucide-react';
 
 export function GraphSearch() {
     const [isFocused, setIsFocused] = useState(false);
@@ -26,6 +27,7 @@ export function GraphSearch() {
         setSearchQuery,
         selectNode,
         addToDiscovery,
+        focusPruneOnNode,
     } = useGraphStore();
 
     // Reset selected index when results change
@@ -44,7 +46,7 @@ export function GraphSearch() {
         inputRef.current?.focus();
     }, [setSearchQuery]);
 
-    // Handle result selection
+    // Handle result selection — just select + zoom
     const handleSelect = useCallback((nodeId: string) => {
         addToDiscovery(nodeId);
         selectNode(nodeId);
@@ -52,6 +54,15 @@ export function GraphSearch() {
         setIsFocused(false);
         inputRef.current?.blur();
     }, [selectNode, setSearchQuery, addToDiscovery]);
+
+    // Handle focus/isolate — prune graph to show node + 1st-layer neighbors
+    const handleFocus = useCallback((nodeId: string) => {
+        focusPruneOnNode(nodeId);
+        selectNode(nodeId);
+        setSearchQuery('');
+        setIsFocused(false);
+        inputRef.current?.blur();
+    }, [focusPruneOnNode, selectNode, setSearchQuery]);
 
     // Handle keyboard navigation
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -95,7 +106,7 @@ export function GraphSearch() {
                     value={searchQuery}
                     onChange={handleChange}
                     onFocus={() => setIsFocused(true)}
-                    onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+                    onBlur={() => setTimeout(() => setIsFocused(false), 250)}
                     onKeyDown={handleKeyDown}
                     placeholder="Search nodes..."
                     className="w-full py-2.5 pl-10 pr-8 bg-transparent text-sm text-foreground placeholder-muted-foreground focus:outline-none"
@@ -126,13 +137,14 @@ export function GraphSearch() {
                                         key={node.id}
                                         node={node}
                                         isSelected={index === selectedIndex}
-                                        onClick={() => handleSelect(node.id)}
+                                        onSelect={() => handleSelect(node.id)}
+                                        onFocus={() => handleFocus(node.id)}
                                     />
                                 ))}
                             </div>
                         ) : (
                             <div className="p-4 text-center text-sm text-muted-foreground">
-                                No nodes found for "{searchQuery}"
+                                No nodes found for &quot;{searchQuery}&quot;
                             </div>
                         )}
                     </motion.div>
@@ -151,36 +163,56 @@ interface SearchResultItemProps {
         description?: string;
     };
     isSelected: boolean;
-    onClick: () => void;
+    onSelect: () => void;
+    onFocus: () => void;
 }
 
-function SearchResultItem({ node, isSelected, onClick }: SearchResultItemProps) {
+function SearchResultItem({ node, isSelected, onSelect, onFocus }: SearchResultItemProps) {
     const color = useGraphStore.getState().filters.customNodeTypeColors[node.type] || NODE_TYPE_COLORS[node.type] || NODE_TYPE_COLORS.default;
 
     return (
-        <button
-            onClick={onClick}
+        <div
             className={`
-                w-full flex items-center gap-3 p-3 text-left transition-colors
+                flex items-center gap-2 p-2 pl-3 transition-colors
                 ${isSelected ? 'bg-emerald/10' : 'hover:bg-muted/50'}
             `}
         >
-            <div
-                className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: `${color}20` }}
+            {/* Clickable result area — selects + zooms */}
+            <button
+                onClick={onSelect}
+                className="flex items-center gap-3 flex-1 min-w-0 text-left"
             >
-                <Circle className="w-3 h-3" fill={color} stroke={color} />
-            </div>
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">
-                    {node.name}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                    {node.type}
-                    {node.description && ` • ${node.description}`}
-                </p>
-            </div>
-            <ArrowRight className={`w-4 h-4 text-muted-foreground transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0'}`} />
-        </button>
+                <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: `${color}20` }}
+                >
+                    <Circle className="w-3 h-3" fill={color} stroke={color} />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                        {node.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                        {node.type}
+                        {node.description && ` • ${node.description}`}
+                    </p>
+                </div>
+            </button>
+
+            {/* Focus button — isolates node + 1st-layer neighbors */}
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onFocus();
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium
+                    bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300
+                    border border-blue-500/20 transition-all flex-shrink-0"
+                title="Focus: Show only this node and its direct connections"
+            >
+                <Crosshair className="w-3.5 h-3.5" />
+                <span>Focus</span>
+            </button>
+        </div>
     );
 }

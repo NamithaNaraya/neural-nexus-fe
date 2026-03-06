@@ -346,17 +346,17 @@ function LibraryContent() {
                                 onClick={() => handleFolderClick(folder.id)}
                                 className="group cursor-pointer"
                             >
-                                <div className={`p-6 rounded-xl border bg-card hover:shadow-lg transition-all duration-300 select-none outline-none ${folder.permission !== 'owner'
+                                <div className={`p-5 rounded-xl border bg-card hover:shadow-lg transition-all duration-300 select-none outline-none h-[170px] flex flex-col ${folder.permission !== 'owner'
                                     ? 'border-purple-500/30 hover:border-purple-500/50 hover:shadow-purple-500/5'
                                     : 'border-border hover:border-emerald/50 hover:shadow-emerald/5'
                                     }`}>
-                                    <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-start justify-between mb-3">
                                         <div className="flex items-center gap-2">
-                                            <div className={`p-3 rounded-lg transition-colors ${folder.permission !== 'owner'
+                                            <div className={`p-2 rounded-lg transition-colors ${folder.permission !== 'owner'
                                                 ? 'bg-purple-500/10 group-hover:bg-purple-500/20'
                                                 : 'bg-emerald/10 group-hover:bg-emerald/20'
                                                 }`}>
-                                                <Folder className={`w-6 h-6 ${folder.permission !== 'owner' ? 'text-purple-500' : 'text-emerald'
+                                                <Folder className={`w-5 h-5 ${folder.permission !== 'owner' ? 'text-purple-500' : 'text-emerald'
                                                     }`} />
                                             </div>
                                             {/* Shared badge */}
@@ -439,27 +439,29 @@ function LibraryContent() {
                                         </div>
                                     </div>
 
-                                    <h3 className={`text-lg font-semibold text-foreground mb-2 transition-colors ${folder.permission !== 'owner' ? 'group-hover:text-purple-500' : 'group-hover:text-emerald'
-                                        }`}>
+                                    <h3 className={`text-base font-semibold text-foreground mb-1 transition-colors truncate ${folder.permission !== 'owner' ? 'group-hover:text-purple-500' : 'group-hover:text-emerald'
+                                        }`} title={folder.name}>
                                         {folder.name}
                                     </h3>
 
                                     {folder.description && (
-                                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{folder.description}</p>
+                                        <p className="text-xs text-muted-foreground mb-1 line-clamp-1" title={folder.description}>{folder.description}</p>
                                     )}
 
-                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                        <div className="flex items-center gap-1">
-                                            <FileText className="w-4 h-4" />
-                                            <span>{folder.file_count} files</span>
+                                    <div className="mt-auto">
+                                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                            <div className="flex items-center gap-1">
+                                                <FileText className="w-3.5 h-3.5" />
+                                                <span>{folder.file_count} files</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <span className="w-2 h-2 rounded-full bg-emerald" />
+                                                <span>{folder.node_count.toLocaleString()} nodes</span>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-1">
-                                            <span className="w-2 h-2 rounded-full bg-emerald" />
-                                            <span>{folder.node_count.toLocaleString()} nodes</span>
-                                        </div>
-                                    </div>
 
-                                    <p className="text-xs text-muted-foreground mt-3 select-none">Updated {formatRelativeTime(folder.updated_at)}</p>
+                                        <p className="text-xs text-muted-foreground mt-1.5 select-none">Updated {formatRelativeTime(folder.updated_at)}</p>
+                                    </div>
                                 </div>
                             </motion.div>
                         ))}

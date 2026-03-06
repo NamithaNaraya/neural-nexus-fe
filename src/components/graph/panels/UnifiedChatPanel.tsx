@@ -5,7 +5,8 @@ import {
     Activity, Brain, ShieldCheck, Search, Database, Stethoscope, MessageSquare,
     Zap, ChevronDown, Send, Loader2, X, ClipboardList,
     Star, User, Bot, Maximize2, Minimize2, Trash2, Network, BarChart3,
-    Plus, Clock, History, Folder as FolderIcon, FileText as FileIcon
+    Plus, Clock, History, Folder as FolderIcon, FileText as FileIcon, Download,
+    FileType, FileText as FileTxtIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGraphStore } from '@/store/graphStore';
@@ -147,6 +148,7 @@ export function UnifiedChatPanel() {
     const [showOutcomeForm, setShowOutcomeForm] = useState<string | null>(null);
     const [feedback, setFeedback] = useState({ rating: 5, comment: '' });
     const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
+    const [showExportMenu, setShowExportMenu] = useState(false);
 
     const { activeFolderId, activeFileId, selectedNodes, zoomToNode: storeZoomToNode } = useGraphStore();
     const { user } = useAuthStore();
@@ -312,6 +314,224 @@ export function UnifiedChatPanel() {
         setChatMode(mode);
     };
 
+    // ─── Export Chat as Text ───
+    const handleExportChat = () => {
+        if (activeMessages.length === 0) {
+            toast.info('No messages to export');
+            return;
+        }
+
+        const modeLabel = chatMode === 'general' ? 'General Chat' : 'Graph Analytics';
+        const folderLabel = activeFolderName ? `Folder: ${activeFolderName}` : '';
+        const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+        let output = '';
+        output += '═'.repeat(60) + '\n';
+        output += `  Neural Nexus — ${modeLabel} Export\n`;
+        output += '═'.repeat(60) + '\n';
+        output += `Date: ${dateStr} at ${timeStr}\n`;
+        if (folderLabel) output += `${folderLabel}\n`;
+        output += `Messages: ${activeMessages.length}\n`;
+        output += '═'.repeat(60) + '\n\n';
+
+        activeMessages.forEach((msg: any, idx: number) => {
+            const ts = msg.timestamp
+                ? new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                : '';
+            const role = msg.role === 'user' ? '👤 YOU' : (chatMode === 'general' ? '🧠 ASSISTANT' : '📊 ANALYTICS');
+
+            output += `─── ${role} ${ts ? `(${ts})` : ''} ───\n`;
+            output += `${msg.content}\n`;
+
+            // Add algorithm info for analytics
+            if (chatMode === 'algorithmic' && msg.algorithm) {
+                output += `\n  ⚡ Algorithm: ${msg.algorithm}`;
+                if (msg.results?.length) output += ` | ${msg.results.length} results`;
+                output += '\n';
+            }
+
+            // Add grounding score for general
+            if (chatMode === 'general' && msg.metadata?.groundingScore > 0) {
+                output += `  ✓ Grounding: ${Math.round(msg.metadata.groundingScore * 100)}%\n`;
+            }
+
+            output += '\n';
+        });
+
+        output += '═'.repeat(60) + '\n';
+        output += '  End of Export\n';
+        output += '═'.repeat(60) + '\n';
+
+        // Download as .txt file
+        const blob = new Blob([output], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const safeFolder = activeFolderName ? `_${activeFolderName.replace(/[^a-zA-Z0-9]/g, '_')}` : '';
+        a.download = `neural-nexus_${chatMode}${safeFolder}_${new Date().toISOString().slice(0, 10)}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success('Chat exported as text!');
+    };
+
+    // ─── Export Chat as PDF ───
+    const handleExportPDF = async () => {
+        if (activeMessages.length === 0) {
+            toast.info('No messages to export');
+            return;
+        }
+
+        try {
+            const { jsPDF } = await import('jspdf');
+            const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 20;
+            const contentWidth = pageWidth - margin * 2;
+            let y = margin;
+
+            const modeLabel = chatMode === 'general' ? 'General Chat' : 'Graph Analytics';
+            const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+            const accentColor: [number, number, number] = chatMode === 'general' ? [16, 185, 129] : [99, 102, 241];
+
+            // Helper: add new page if needed
+            const checkPage = (needed: number) => {
+                if (y + needed > pageHeight - margin) {
+                    doc.addPage();
+                    y = margin;
+                }
+            };
+
+            // Helper: wrap and print text, returns new Y
+            const printWrapped = (text: string, x: number, startY: number, maxW: number, fontSize: number, color: [number, number, number] = [30, 41, 59]) => {
+                doc.setFontSize(fontSize);
+                doc.setTextColor(...color);
+                const lines = doc.splitTextToSize(text, maxW);
+                for (const line of lines) {
+                    checkPage(fontSize * 0.5);
+                    doc.text(line, x, startY);
+                    startY += fontSize * 0.45;
+                }
+                return startY;
+            };
+
+            // ── Header ──
+            doc.setFillColor(...accentColor);
+            doc.rect(0, 0, pageWidth, 28, 'F');
+            doc.setFontSize(18);
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Neural Nexus', margin, 12);
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`${modeLabel} Export`, margin, 19);
+            doc.setFontSize(9);
+            doc.text(dateStr, pageWidth - margin - doc.getTextWidth(dateStr), 19);
+            if (activeFolderName) {
+                doc.text(`Folder: ${activeFolderName}`, margin, 25);
+            }
+            y = 38;
+
+            // ── Messages ──
+            activeMessages.forEach((msg: any) => {
+                const isUser = msg.role === 'user';
+                const roleLabel = isUser ? 'You' : (chatMode === 'general' ? 'Assistant' : 'Analytics');
+                const ts = msg.timestamp
+                    ? new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                    : '';
+
+                checkPage(20);
+
+                // Role + timestamp line
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'bold');
+                const roleColor: [number, number, number] = isUser ? [71, 85, 105] : accentColor;
+                doc.setTextColor(...roleColor);
+                doc.text(`${roleLabel}${ts ? '  •  ' + ts : ''}`, margin, y);
+                y += 5;
+
+                // Message bubble background
+                const cleanContent = (msg.content || '').replace(/\*\*/g, '').replace(/#{1,3}\s/g, '');
+                doc.setFontSize(10);
+                const textLines = doc.splitTextToSize(cleanContent, contentWidth - 8);
+                const blockHeight = textLines.length * 4.5 + 6;
+
+                checkPage(blockHeight + 5);
+
+                if (isUser) {
+                    doc.setFillColor(241, 245, 249);
+                } else {
+                    doc.setFillColor(accentColor[0], accentColor[1], accentColor[2], 0.06);
+                    doc.setFillColor(
+                        Math.min(255, accentColor[0] + 220),
+                        Math.min(255, accentColor[1] + 200),
+                        Math.min(255, accentColor[2] + 200)
+                    );
+                }
+                doc.roundedRect(margin, y - 2, contentWidth, blockHeight, 2, 2, 'F');
+
+                // Message text
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(30, 41, 59);
+                let textY = y + 3;
+                for (const line of textLines) {
+                    checkPage(5);
+                    doc.text(line, margin + 4, textY);
+                    textY += 4.5;
+                }
+                y = textY + 4;
+
+                // Algorithm badge for analytics
+                if (chatMode === 'algorithmic' && msg.algorithm) {
+                    checkPage(8);
+                    doc.setFontSize(8);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(...accentColor);
+                    let badge = `Algorithm: ${msg.algorithm}`;
+                    if (msg.results?.length) badge += ` | ${msg.results.length} results`;
+                    doc.text(badge, margin + 4, y);
+                    y += 5;
+                }
+
+                // Grounding score for general
+                if (chatMode === 'general' && msg.metadata?.groundingScore > 0) {
+                    checkPage(8);
+                    doc.setFontSize(8);
+                    doc.setFont('helvetica', 'bold');
+                    const score = Math.round(msg.metadata.groundingScore * 100);
+                    const scoreColor: [number, number, number] = score >= 70 ? [16, 185, 129] : score >= 40 ? [245, 158, 11] : [239, 68, 68];
+                    doc.setTextColor(...scoreColor);
+                    doc.text(`Grounding: ${score}%`, margin + 4, y);
+                    y += 5;
+                }
+
+                y += 3; // spacing between messages
+            });
+
+            // ── Footer ──
+            checkPage(15);
+            doc.setDrawColor(200, 200, 200);
+            doc.line(margin, y, pageWidth - margin, y);
+            y += 6;
+            doc.setFontSize(8);
+            doc.setTextColor(148, 163, 184);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Neural Nexus • ${activeMessages.length} messages • Exported ${dateStr}`, margin, y);
+
+            // Save
+            const safeFolder = activeFolderName ? `_${activeFolderName.replace(/[^a-zA-Z0-9]/g, '_')}` : '';
+            doc.save(`neural-nexus_${chatMode}${safeFolder}_${new Date().toISOString().slice(0, 10)}.pdf`);
+            toast.success('Chat exported as PDF!');
+        } catch (err) {
+            console.error('PDF export error:', err);
+            toast.error('PDF export failed. Make sure jspdf is installed: npm install jspdf');
+        }
+        setShowExportMenu(false);
+    };
+
     return (
         <div className={`fixed z-[160] pointer-events-none transition-all duration-500 ${isExpanded && isOpen ? 'inset-0' : 'bottom-4 right-4 md:bottom-6 md:right-6 flex flex-col items-end'}`}>
             <AnimatePresence>
@@ -362,6 +582,43 @@ export function UnifiedChatPanel() {
                                 <button onClick={handleNewSession} className="p-1.5 md:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" title="New session">
                                     <Plus size={15} />
                                 </button>
+                                {/* Export dropdown */}
+                                <div className="relative hidden sm:block">
+                                    <button
+                                        onClick={() => setShowExportMenu(!showExportMenu)}
+                                        disabled={activeMessages.length === 0}
+                                        className="p-1.5 md:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 disabled:opacity-30"
+                                        title="Export chat"
+                                    >
+                                        <Download size={14} />
+                                    </button>
+                                    <AnimatePresence>
+                                        {showExportMenu && (
+                                            <motion.div
+                                                initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                                                className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden"
+                                            >
+                                                <button
+                                                    onClick={() => { handleExportChat(); setShowExportMenu(false); }}
+                                                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                                                >
+                                                    <FileTxtIcon size={14} className="text-blue-500" />
+                                                    Export as Text
+                                                </button>
+                                                <div className="border-t border-slate-100 dark:border-slate-700" />
+                                                <button
+                                                    onClick={handleExportPDF}
+                                                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                                                >
+                                                    <FileType size={14} className="text-red-500" />
+                                                    Export as PDF
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
                                 <button onClick={handleClearMessages} className="hidden sm:block p-1.5 md:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" title="Clear chat">
                                     <Trash2 size={14} />
                                 </button>

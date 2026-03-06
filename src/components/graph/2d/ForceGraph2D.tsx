@@ -302,24 +302,34 @@ export function ForceGraph2D({
         // Center the view initially
         svg.call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2).scale(0.6));
 
+        // ── Adaptive force parameters based on graph size ──
+        const nodeCount = d3Nodes.length;
+        const isLargeGraph = nodeCount > 200;
+        const chargeStrength = isLargeGraph ? -400 : -2000;
+        const chargeDistanceMax = isLargeGraph ? 300 : 600;
+        const linkDistance = isLargeGraph ? 80 : 180;
+        const collisionRadius = isLargeGraph ? 15 : 40;
+        const alphaDecay = isLargeGraph ? 0.05 : 0.0228; // faster settling for large graphs
+
         // Create force simulation with proper D3 pattern
         const simulation = d3.forceSimulation<D3Node>(d3Nodes)
             .force('link', d3.forceLink<D3Node, D3Link>(d3Links)
                 .id(d => d.id)
-                .distance(180) // Increased for better spreading
+                .distance(linkDistance)
                 .strength(1)
             )
             .force('charge', d3.forceManyBody()
-                .strength(-2000) // Much stronger repulsion
-                .distanceMax(600)
+                .strength(chargeStrength)
+                .distanceMax(chargeDistanceMax)
             )
             .force('center', d3.forceCenter(0, 0))
             .force('collision', d3.forceCollide()
-                .radius(d => getNodeSize(d as D3Node) + 40) // More buffer for labels
-                .strength(0.9)
+                .radius(d => getNodeSize(d as D3Node) + collisionRadius)
+                .strength(isLargeGraph ? 0.5 : 0.9)
             )
-            .force('x', d3.forceX(0).strength(0.01)) // Subtle pull to center
-            .force('y', d3.forceY(0).strength(0.01));
+            .force('x', d3.forceX(0).strength(0.01))
+            .force('y', d3.forceY(0).strength(0.01))
+            .alphaDecay(alphaDecay);
 
         simulationRef.current = simulation;
 
@@ -368,23 +378,26 @@ export function ForceGraph2D({
             .attr('in2', 'blur')
             .attr('operator', 'over');
 
-        // Create link labels group (relationship names)
+        // Create link labels group (relationship names) — skip for large graphs for performance
         const linkLabelsGroup = container.append('g').attr('class', 'link-labels');
-        const linkLabels = linkLabelsGroup.selectAll<SVGTextElement, D3Link>('text')
-            .data(d3Links)
-            .join('text')
-            .attr('class', 'link-label')
-            .attr('text-anchor', 'middle')
-            .attr('fill', isDark ? '#94A3B8' : '#64748B')
-            .attr('font-size', '10px')
-            .attr('font-weight', '600')
-            .attr('pointer-events', 'none')
-            .attr('dy', -8)
-            .attr('paint-order', 'stroke')
-            .attr('stroke', isDark ? '#0A0C10' : '#F8FAFC')
-            .attr('stroke-width', 4)
-            .attr('opacity', 0)
-            .text(d => d.type ? (d.type.length > 20 ? d.type.slice(0, 17) + '...' : d.type) : '');
+        let linkLabels: d3.Selection<SVGTextElement, D3Link, SVGGElement, unknown>;
+        if (!isLargeGraph) {
+            linkLabels = linkLabelsGroup.selectAll<SVGTextElement, D3Link>('text')
+                .data(d3Links)
+                .join('text')
+                .attr('class', 'link-label')
+                .attr('text-anchor', 'middle')
+                .attr('fill', isDark ? '#94A3B8' : '#64748B')
+                .attr('font-size', '10px')
+                .attr('font-weight', '600')
+                .attr('pointer-events', 'none')
+                .attr('dy', -8)
+                .attr('paint-order', 'stroke')
+                .attr('stroke', isDark ? '#0A0C10' : '#F8FAFC')
+                .attr('stroke-width', 4)
+                .attr('opacity', 0)
+                .text(d => d.type ? (d.type.length > 20 ? d.type.slice(0, 17) + '...' : d.type) : '');
+        }
 
         // Create node groups
         const nodeGroups = nodesGroup.selectAll<SVGGElement, D3Node>('g')
@@ -592,28 +605,30 @@ export function ForceGraph2D({
             });
 
             // Update link labels - positioned at midpoint or above self-loops
-            linkLabels.attr('transform', d => {
-                const source = d.source as D3Node;
-                const target = d.target as D3Node;
-                if (source.x == null || source.y == null || target.x == null || target.y == null) {
-                    return 'translate(0,0)';
-                }
+            if (linkLabels) {
+                linkLabels.attr('transform', d => {
+                    const source = d.source as D3Node;
+                    const target = d.target as D3Node;
+                    if (source.x == null || source.y == null || target.x == null || target.y == null) {
+                        return 'translate(0,0)';
+                    }
 
-                if (source.id === target.id) {
-                    // Position label above self-loop
-                    const r = getNodeSize(source) * 1.5;
-                    return `translate(${source.x}, ${source.y - r - 10})`;
-                }
+                    if (source.id === target.id) {
+                        // Position label above self-loop
+                        const r = getNodeSize(source) * 1.5;
+                        return `translate(${source.x}, ${source.y - r - 10})`;
+                    }
 
-                const midX = (source.x + target.x) / 2;
-                const midY = (source.y + target.y) / 2;
-                const dx = target.x - source.x;
-                const dy = target.y - source.y;
-                const len = Math.sqrt(dx * dx + dy * dy) || 1;
-                const offsetX = -dy / len * 15;
-                const offsetY = dx / len * 15;
-                return `translate(${midX + offsetX}, ${midY + offsetY})`;
-            });
+                    const midX = (source.x + target.x) / 2;
+                    const midY = (source.y + target.y) / 2;
+                    const dx = target.x - source.x;
+                    const dy = target.y - source.y;
+                    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                    const offsetX = -dy / len * 15;
+                    const offsetY = dx / len * 15;
+                    return `translate(${midX + offsetX}, ${midY + offsetY})`;
+                });
+            }
 
             // Update node positions
             nodeGroups.attr('transform', d => `translate(${d.x ?? 0}, ${d.y ?? 0})`);

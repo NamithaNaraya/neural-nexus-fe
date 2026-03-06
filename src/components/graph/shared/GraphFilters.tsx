@@ -10,7 +10,7 @@
  */
 'use client';
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useGraphStore } from '@/store/graphStore';
 import { NODE_TYPE_COLORS, RELATIONSHIP_COLORS } from '../types';
@@ -25,6 +25,8 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
     const {
         nodeTypes,
         linkTypes,
+        nodes,
+        links,
         filters,
         setFilters,
         resetFilters,
@@ -33,6 +35,26 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
     } = useGraphStore();
     const [nodeSearch, setNodeSearch] = React.useState('');
     const [linkSearch, setLinkSearch] = React.useState('');
+
+    // Count nodes per type
+    const nodeTypeCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        for (const n of nodes) {
+            const t = n.type || 'Unknown';
+            counts[t] = (counts[t] || 0) + 1;
+        }
+        return counts;
+    }, [nodes]);
+
+    // Count links per type
+    const linkTypeCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        for (const l of links) {
+            const t = l.type || 'UNKNOWN';
+            counts[t] = (counts[t] || 0) + 1;
+        }
+        return counts;
+    }, [links]);
 
     // Toggle node type filter
     const toggleNodeType = useCallback((type: string) => {
@@ -177,8 +199,11 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
                 {/* Node Types */}
                 <div className="pt-2">
                     <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                             Node Types
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald/10 text-emerald">
+                                {nodeTypes.length}
+                            </span>
                         </h4>
                         <div className="flex items-center gap-3">
                             <button
@@ -218,6 +243,7 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
                                     onChange={() => toggleNodeType(type)}
                                     color={filters.customNodeTypeColors[type] || NODE_TYPE_COLORS[type] || NODE_TYPE_COLORS.default}
                                     onColorChange={(newColor) => setNodeTypeColor(type, newColor)}
+                                    count={nodeTypeCounts[type] || 0}
                                 />
                             ))
                         ) : (
@@ -229,8 +255,11 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
                 {/* Relationship Types */}
                 <div>
                     <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                             Relationship Types
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500">
+                                {linkTypes.length}
+                            </span>
                         </h4>
                         <div className="flex items-center gap-3">
                             <button
@@ -271,6 +300,7 @@ export function GraphFilters({ onClose }: GraphFiltersProps) {
                                     color={filters.customRelationshipColors[type] || RELATIONSHIP_COLORS[type] || RELATIONSHIP_COLORS.default}
                                     onColorChange={(newColor) => setRelationshipTypeColor(type, newColor)}
                                     icon={<ArrowRight className="w-3 h-3" />}
+                                    count={linkTypeCounts[type] || 0}
                                 />
                             ))
                         ) : (
@@ -327,9 +357,10 @@ interface FilterCheckboxProps {
     color: string;
     onColorChange?: (color: string) => void;
     icon?: React.ReactNode;
+    count?: number;
 }
 
-function FilterCheckbox({ label, checked, onChange, color, onColorChange, icon }: FilterCheckboxProps) {
+function FilterCheckbox({ label, checked, onChange, color, onColorChange, icon, count }: FilterCheckboxProps) {
     return (
         <div className="flex items-center gap-3 group py-0.5">
             {/* The Checkbox/Visibility Toggle Area */}
@@ -385,6 +416,12 @@ function FilterCheckbox({ label, checked, onChange, color, onColorChange, icon }
                     <span className={`text-sm transition-colors ${checked ? 'text-foreground font-medium' : 'text-muted-foreground group-hover:text-foreground/80'}`}>
                         {label}
                     </span>
+                    {count !== undefined && count > 0 && (
+                        <span className={`ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full transition-colors ${checked ? 'bg-foreground/10 text-foreground/60' : 'bg-muted text-muted-foreground/50'
+                            }`}>
+                            {count}
+                        </span>
+                    )}
                 </div>
             </label>
 

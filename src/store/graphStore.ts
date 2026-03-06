@@ -175,6 +175,12 @@ interface GraphState {
     getNodeColor: (type: string) => string;
     getRelationshipColor: (type: string) => string;
 
+    // Smart loading for large graphs
+    loadAllNodes: boolean;
+    setLoadAllNodes: (loadAll: boolean) => void;
+    totalNodesOnServer: number;
+    totalLinksOnServer: number;
+
     fetchGraph: (folderId?: string | null, fileId?: string | null) => Promise<void>;
 }
 
@@ -729,21 +735,33 @@ export const useGraphStore = create<GraphState>()(
         },
 
         // Async Actions
+        // Smart loading: Initially load top 200 nodes by degree for large graphs
+        loadAllNodes: false,
+        setLoadAllNodes: (loadAll: boolean) => set({ loadAllNodes: loadAll }),
+        totalNodesOnServer: 0,
+        totalLinksOnServer: 0,
         fetchGraph: async (folderId, fileId) => {
-            const { setGraphLoading, setGraphData } = get();
+            const { setGraphLoading, setGraphData, loadAllNodes } = get();
             setGraphLoading(true);
             try {
                 let response;
                 if (fileId) {
                     response = await graphApi.getFile(fileId);
                 } else if (folderId) {
-                    response = await graphApi.getFolder(folderId);
+                    // Smart limit: load top 200 most-connected nodes initially
+                    // to prevent browser freezing with large datasets (900+ nodes)
+                    const initialLimit = loadAllNodes ? 10000 : 200;
+                    response = await graphApi.getFolder(folderId, initialLimit);
                 } else {
-                    response = await graphApi.getAll();
+                    response = await graphApi.getAll(500);
                 }
 
                 if (response && response.nodes) {
                     setGraphData(response.nodes, response.links || []);
+                    set({
+                        totalNodesOnServer: response.total_nodes ?? response.nodes.length,
+                        totalLinksOnServer: response.total_links ?? response.links?.length ?? 0,
+                    });
                 }
             } catch (error) {
                 console.error('Failed to fetch graph:', error);
