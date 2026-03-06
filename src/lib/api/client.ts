@@ -54,7 +54,19 @@ async function fetchWithAuth<T>(
 
 // HTTP Methods
 export const api = {
-    get: <T>(endpoint: string) => fetchWithAuth<T>(endpoint, { method: 'GET' }),
+    get: <T>(endpoint: string, params?: Record<string, any>) => {
+        let url = endpoint;
+        if (params) {
+            const query = Object.entries(params)
+                .filter(([, v]) => v !== undefined && v !== null)
+                .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+                .join('&');
+            if (query) {
+                url += (url.includes('?') ? '&' : '?') + query;
+            }
+        }
+        return fetchWithAuth<T>(url, { method: 'GET' });
+    },
 
     post: <T>(endpoint: string, data?: unknown) => fetchWithAuth<T>(endpoint, {
         method: 'POST',

@@ -32,9 +32,12 @@ import {
     Check,
     MousePointer2,
     CheckCircle2,
+    Scale,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useGraphStore } from '@/store/graphStore';
+import { WeightConfigPanel } from './WeightConfigPanel';
+import { useWeightConfigStore } from '@/store/weightConfigStore';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -85,14 +88,16 @@ interface AlgorithmConfig {
     endpoint: string;
     simpleInfo: string;
     benefit: string;
+    usesWeights: boolean;
 }
 
 // ─── API Helper ─────────────────────────────────────────────
 
-async function fetchAlgorithm(endpoint: string, folderId?: string, nodeIds?: string[], extraParams?: Record<string, any>): Promise<AlgorithmResult> {
+async function fetchAlgorithm(endpoint: string, folderId?: string, nodeIds?: string[], extraParams?: Record<string, any>, weightFormula?: Record<string, any> | null): Promise<AlgorithmResult> {
     const params: Record<string, any> = { ...extraParams };
     if (folderId) params.folder_id = folderId;
     if (nodeIds && nodeIds.length > 0) params.node_ids = nodeIds;
+    if (weightFormula) params.weight_formula = JSON.stringify(weightFormula);
     return api.get<AlgorithmResult>(endpoint, params);
 }
 
@@ -105,6 +110,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/centrality/pagerank',
         simpleInfo: 'Finds the most important nodes based on how many quality connections they have.',
         benefit: 'Reveals the key players and authority hubs in your data.',
+        usesWeights: true,
     },
     {
         key: 'betweenness', name: 'Betweenness', description: 'Bridge & connector nodes',
@@ -112,6 +118,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/centrality/betweenness',
         simpleInfo: 'Finds nodes that act as bridges connecting different groups.',
         benefit: 'Identifies bottleneck entities that control information flow.',
+        usesWeights: true,
     },
     {
         key: 'closeness', name: 'Closeness', description: 'Centrally located nodes',
@@ -119,6 +126,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/centrality/closeness',
         simpleInfo: 'Finds nodes that are closest to all other nodes in the network.',
         benefit: 'Shows which entities can reach everything most efficiently.',
+        usesWeights: true,
     },
     {
         key: 'degree', name: 'Degree', description: 'Most connected nodes',
@@ -126,6 +134,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/centrality/degree',
         simpleInfo: 'Counts how many direct connections each node has.',
         benefit: 'Instantly shows the most active and connected entities.',
+        usesWeights: true,
     },
     {
         key: 'louvain', name: 'Louvain', description: 'Detect communities',
@@ -133,6 +142,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/community/louvain',
         simpleInfo: 'Groups nodes into communities or clusters based on dense connections.',
         benefit: 'Shows natural groupings and hidden structure in your data.',
+        usesWeights: false,
     },
     {
         key: 'leiden', name: 'Leiden', description: 'Precise communities',
@@ -140,6 +150,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/community/leiden',
         simpleInfo: 'An improved community detection that finds very precise groups.',
         benefit: 'Gives you the most accurate clustering of your data.',
+        usesWeights: false,
     },
     {
         key: 'node-similarity', name: 'Similarity', description: 'Find similar pairs',
@@ -147,6 +158,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/similarity/nodes',
         simpleInfo: 'Compares nodes to find those with similar connection patterns.',
         benefit: 'Great for finding duplicates or related entities.',
+        usesWeights: false,
     },
     {
         key: 'link-prediction', name: 'Common Neighbors', description: 'Basic link prediction',
@@ -154,6 +166,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/link-prediction?method=common_neighbors',
         simpleInfo: 'Predicts connections based on the number of shared neighbors.',
         benefit: 'Best for finding logical connections between related entities.',
+        usesWeights: false,
     },
     {
         key: 'adamic-adar', name: 'Adamic Adar', description: 'Advanced prediction',
@@ -161,6 +174,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/link-prediction?method=adamic_adar',
         simpleInfo: 'A weighted predictor that prioritizes rare shared connections.',
         benefit: 'Highlights unique, non-obvious relationships.',
+        usesWeights: false,
     },
     {
         key: 'resource-allocation', name: 'Resource Distribution', description: 'Flow-based prediction',
@@ -168,6 +182,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/link-prediction?method=resource_allocation',
         simpleInfo: 'Predicts links by simulating how information "flows" between nodes.',
         benefit: 'Excellent for finding high-probability hidden links.',
+        usesWeights: false,
     },
     {
         key: 'hits', name: 'HITS', description: 'Hubs & Authorities',
@@ -175,6 +190,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/centrality/hits',
         simpleInfo: 'Identifies authority sources and hub aggregators of information.',
         benefit: 'Great for finding the most expert/reliable sources in data.',
+        usesWeights: true,
     },
     {
         key: 'wcc', name: 'Connected Islands', description: 'Find isolated groups',
@@ -182,6 +198,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/community/wcc',
         simpleInfo: 'Finds groups of nodes that are completely disconnected from the rest.',
         benefit: 'Helps identify silos or fragmented parts of your knowledge graph.',
+        usesWeights: false,
     },
     {
         key: 'k-core', name: 'Core Analysis', description: 'Find the graph center',
@@ -189,6 +206,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/community/kcore',
         simpleInfo: 'Finds the "inner sanctum" of your graph where everything is densly connected.',
         benefit: 'Identifies the most robust and stable heart of your data.',
+        usesWeights: false,
     },
     {
         key: 'shortest-path', name: 'Shortest Path', description: 'Find Dijkstra path',
@@ -196,6 +214,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/path/shortest',
         simpleInfo: 'Finds the most efficient route between two specific nodes.',
         benefit: 'Crucial for logic-chain analysis and connection deep-dives.',
+        usesWeights: false,
     },
     {
         key: 'articlerank', name: 'ArticleRank', description: 'Diverse influence',
@@ -203,6 +222,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/centrality/articlerank',
         simpleInfo: 'A variant of PageRank that handles heterogenous graphs better.',
         benefit: 'Great for ranking entities with varying connection types.',
+        usesWeights: true,
     },
     {
         key: 'bfs', name: 'BFS Traversal', description: 'Breadth-first search',
@@ -210,6 +230,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/path/traversal?method=bfs',
         simpleInfo: 'Explores nodes layer by layer from a starting point.',
         benefit: 'Finds the closest "neighbors" within a specific distance.',
+        usesWeights: false,
     },
     {
         key: 'dfs', name: 'DFS Traversal', description: 'Depth-first search',
@@ -217,6 +238,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/path/traversal?method=dfs',
         simpleInfo: 'Follows a path as far as possible before backtracking.',
         benefit: 'Useful for exploring deep hierarchies or long sequences.',
+        usesWeights: false,
     },
     {
         key: 'random-walk', name: 'Random Walk', description: 'Simulated exploration',
@@ -224,6 +246,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/path/random-walk',
         simpleInfo: 'Simulates a user "wandering" through the graph randomly.',
         benefit: 'Uncovers non-obvious paths and associative links.',
+        usesWeights: false,
     },
     {
         key: 'topological-sort', name: 'Logical Sequence', description: 'Topo-Sort (DAG)',
@@ -231,6 +254,7 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/topology/topological-sort',
         simpleInfo: 'Orders nodes in a logical linear sequence (for DAGs).',
         benefit: 'Perfect for understanding process flows or timelines.',
+        usesWeights: false,
     },
     {
         key: 'triangles', name: 'Triangle Count', description: 'Local density',
@@ -238,8 +262,33 @@ const algorithms: AlgorithmConfig[] = [
         endpoint: '/analytics/community/triangles',
         simpleInfo: 'Counts local triangles to measure how tight-knit groups are.',
         benefit: 'Reveals which parts of the graph have the strongest collaboration.',
+        usesWeights: false,
     },
 ];
+
+// ─── Helpers ────────────────────────────────────────────────
+const getDisplayName = (item: any) => {
+    // If it has a primary name and it's not a UUID, use it
+    if (item.name && !/^[0-9a-f-]{30,}$/i.test(item.name)) return item.name;
+    if (item.source_name && !/^[0-9a-f-]{30,}$/i.test(item.source_name)) return item.source_name;
+
+    // Search through all properties for something name-like
+    const priorityKeys = ['title', 'content', 'question_text', 'questionId', 'studentId', 'label', 'val', 'value', 'text', 'code'];
+    for (const key of priorityKeys) {
+        if (item[key] && typeof item[key] === 'string' && item[key].length > 0) {
+            return item[key];
+        }
+    }
+
+    // Fallback to name or ID if nothing else found
+    return item.name || item.source_name || item.id || 'Unnamed';
+};
+
+const formatTypeName = (type: string | undefined): string => {
+    if (!type) return 'Entity';
+    // Rip out the internal F_... suffixes (e.g., Question_F_123 -> Question)
+    return type.split('_F_')[0].split('_')[0] || type;
+};
 
 const CATEGORIES: { key: AlgorithmCategory; label: string; icon: React.ReactNode; color: string }[] = [
     { key: 'centrality', label: 'Centrality', icon: <TrendingUp className="w-4 h-4" />, color: '#4ade80' },
@@ -254,23 +303,43 @@ function buildSummary(algo: AlgorithmConfig, result: AlgorithmResult, totalNodes
     const resultCount = result.results?.length || 0;
     const top = result.results?.[0];
 
+    // ── Weight context suffix ──
+    const weightsEnabled = useWeightConfigStore.getState().weightsEnabled;
+    const activeConfig = useWeightConfigStore.getState().activeConfig;
+    let weightSuffix = '';
+    if (algo.usesWeights && weightsEnabled && activeConfig) {
+        weightSuffix = ` ⚖️ These results were influenced by your quantitative weight "${activeConfig.name}" — connections with higher weight values contributed more to the scores.`;
+    } else if (algo.usesWeights && !weightsEnabled) {
+        weightSuffix = ` ℹ️ This algorithm supports quantitative weights. Enable the weight toggle to factor in numeric properties (e.g., marks, scores) for more meaningful results.`;
+    } else if (!algo.usesWeights && weightsEnabled) {
+        weightSuffix = ` ℹ️ Note: Your weight toggle is on, but this algorithm analyzes purely structural patterns (connections) and does not use quantitative weights.`;
+    }
+
+    let baseSummary = '';
+
     switch (algo.category) {
         case 'centrality':
             if (algo.key === 'hits' && top) {
                 const topHub = result.results?.reduce((a, b) => (a.hub_score || 0) > (b.hub_score || 0) ? a : b);
-                return `Across all ${totalNodes} entities in the graph, HITS analysis identified "${top.name}" as the top authority (score: ${top.auth_score?.toFixed(4) || 'N/A'}), meaning it is the most referenced and trusted source. ${topHub?.name !== top.name ? `Meanwhile, "${topHub?.name}" emerged as the primary hub, actively linking to and aggregating many other entities.` : 'It also acts as a leading hub, both receiving and distributing information.'} ${result.insight || ''}`;
+                const authName = getDisplayName(top);
+                const hubName = getDisplayName(topHub);
+                baseSummary = `Across all ${totalNodes} entities in the graph, HITS analysis identified "${authName}" as the top authority (score: ${top.auth_score?.toFixed(4) || 'N/A'}), meaning it is the most referenced and trusted source. ${topHub?.id !== top.id ? `Meanwhile, "${hubName}" emerged as the primary hub, actively linking to and aggregating many other entities.` : 'It also acts as a leading hub, both receiving and distributing information.'} ${result.insight || ''}`;
+                return baseSummary + weightSuffix;
             }
             if (top) {
                 const trait = algo.key === 'pagerank' || algo.key === 'articlerank' ? 'influential' : algo.key === 'betweenness' ? 'critical bridge' : algo.key === 'degree' ? 'connected' : 'centrally located';
                 const second = result.results?.[1];
-                let summary = `After analyzing all ${totalNodes} entities in the graph, "${top.name}" (${top.type || 'Entity'}) emerged as the most ${trait} node with a score of ${top.score?.toFixed(4) || 'N/A'}.`;
+                const topName = getDisplayName(top);
+                const topType = formatTypeName(top.type);
+                baseSummary = `After analyzing all ${totalNodes} entities in the graph, "${topName}" (${topType}) emerged as the most ${trait} node with a score of ${top.score?.toFixed(4) || 'N/A'}.`;
                 if (second) {
-                    summary += ` It is followed closely by "${second.name}" (score: ${second.score?.toFixed(4)}). The top ${resultCount} results are shown below, ranked by significance.`;
+                    const secondName = getDisplayName(second);
+                    baseSummary += ` It is followed closely by "${secondName}" (score: ${second.score?.toFixed(4)}). The top ${resultCount} results are shown below, ranked by significance.`;
                 }
-                if (result.insight) summary += ` ${result.insight}`;
-                return summary;
+                if (result.insight) baseSummary += ` ${result.insight}`;
+                return baseSummary + weightSuffix;
             }
-            return result.insight || `Analysis complete across ${totalNodes} entities. ${resultCount} results ranked.`;
+            return (result.insight || `Analysis complete across ${totalNodes} entities. ${resultCount} results ranked.`) + weightSuffix;
 
         case 'community': {
             const communities = new Set(result.results?.map(r => r.community ?? r.community_id ?? r.score));
@@ -279,54 +348,58 @@ function buildSummary(algo: AlgorithmConfig, result: AlgorithmResult, totalNodes
             );
             const largest = Math.max(...commSizes, 0);
             const smallest = Math.min(...commSizes, 0);
-            let summary = `Analysis of ${totalNodes} entities revealed ${communities.size} distinct communities.`;
+            baseSummary = `Analysis of ${totalNodes} entities revealed ${communities.size} distinct communities.`;
             if (communities.size > 1) {
-                summary += ` The largest community contains ${largest} members, while the smallest has ${smallest}. Entities within the same community share significantly denser connections with each other than with the rest of the graph.`;
+                baseSummary += ` The largest community contains ${largest} members, while the smallest has ${smallest}. Entities within the same community share significantly denser connections with each other than with the rest of the graph.`;
             } else if (communities.size === 1) {
-                summary += ` All analyzed entities belong to a single, tightly-knit cluster, indicating a highly cohesive dataset.`;
+                baseSummary += ` All analyzed entities belong to a single, tightly-knit cluster, indicating a highly cohesive dataset.`;
             }
-            if (result.insight) summary += ` ${result.insight}`;
-            return summary;
+            if (result.insight) baseSummary += ` ${result.insight}`;
+            return baseSummary + weightSuffix;
         }
 
         case 'prediction':
             if (algo.key === 'node-similarity' && top) {
-                return `Compared ${totalNodes} active nodes and found ${resultCount} significantly similar pairs. The strongest match is "${top.source_name || top.name}" ↔ "${top.target_name}" with ${((top.score || top.similarity || 0) * 100).toFixed(1)}% Jaccard similarity, meaning they share nearly identical connection patterns. ${result.insight || ''}`;
+                const sourceName = getDisplayName(top);
+                const targetName = top.target_name || 'N/A';
+                return `Compared ${totalNodes} active nodes and found ${resultCount} significantly similar pairs. The strongest match is "${sourceName}" ↔ "${targetName}" with ${((top.score || top.similarity || 0) * 100).toFixed(1)}% Jaccard similarity, meaning they share nearly identical connection patterns. ${result.insight || ''}` + weightSuffix;
             }
             if (['link-prediction', 'adamic-adar', 'resource-allocation'].includes(algo.key)) {
-                return `Analyzed ${totalNodes} active nodes to find hidden connections and predicted ${resultCount} new potential links. ${top ? `The strongest prediction is "${top.source_name}" ↔ "${top.target_name}" (score: ${top.score?.toFixed(4) || 'N/A'}), suggesting these entities are likely related but not yet connected in the graph.` : ''} ${result.insight || ''}`;
+                const sourceName = top ? getDisplayName(top) : '';
+                const targetName = top?.target_name || '';
+                return `Analyzed ${totalNodes} active nodes to find hidden connections and predicted ${resultCount} new potential links. ${top ? `The strongest prediction is "${sourceName}" ↔ "${targetName}" (score: ${top.score?.toFixed(4) || 'N/A'}), suggesting these entities are likely related but not yet connected in the graph.` : ''} ${result.insight || ''}` + weightSuffix;
             }
-            return result.insight || `${resultCount} results found across ${totalNodes} entities.`;
+            return (result.insight || `${resultCount} results found across ${totalNodes} entities.`) + weightSuffix;
 
         case 'decomposition':
             if (top && result.results) {
                 const maxCore = Math.max(...result.results.map(r => r.score || 0));
-                return `K-Core decomposition of ${totalNodes} entities identified ${resultCount} nodes in the stable core (k ≥ ${(result.parameters as any)?.k || 3}). The densest core level reached is ${maxCore}, occupied by the most interconnected entities. ${result.insight || ''}`;
+                return `K-Core decomposition of ${totalNodes} entities identified ${resultCount} nodes in the stable core (k ≥ ${(result.parameters as any)?.k || 3}). The densest core level reached is ${maxCore}, occupied by the most interconnected entities. ${result.insight || ''}` + weightSuffix;
             }
-            return result.insight || `Decomposition complete. Grouped ${resultCount} of ${totalNodes} entities into structural layers.`;
+            return (result.insight || `Decomposition complete. Grouped ${resultCount} of ${totalNodes} entities into structural layers.`) + weightSuffix;
 
         case 'pathfinding':
             if (algo.key === 'shortest-path' && result.results?.length > 0) {
                 const source = result.results[0].name;
                 const target = result.results[result.results.length - 1].name;
-                return `Successfully traced the shortest route from "${source}" to "${target}" through ${resultCount} hop(s). Each step represents the most efficient path between these two specific concepts.`;
+                return `Successfully traced the shortest route from "${source}" to "${target}" through ${resultCount} hop(s). Each step represents the most efficient path between these two specific concepts.` + weightSuffix;
             }
             if (algo.key === 'bfs' && top) {
-                return `Starting from "${top.name}", a Breadth-First search discovered ${resultCount} entities by exploring layer by layer. This reveals the immediate neighborhood and close-range context surrounding the starting node.`;
+                return `Starting from "${top.name}", a Breadth-First search discovered ${resultCount} entities by exploring layer by layer. This reveals the immediate neighborhood and close-range context surrounding the starting node.` + weightSuffix;
             }
             if (algo.key === 'dfs' && top) {
-                return `Starting from "${top.name}", a Depth-First search explored a path ${resultCount} nodes deep before returning. This highlights deep logic chains and long-distance associations originating from the starting entity.`;
+                return `Starting from "${top.name}", a Depth-First search explored a path ${resultCount} nodes deep before returning. This highlights deep logic chains and long-distance associations originating from the starting entity.` + weightSuffix;
             }
             if (algo.key === 'random-walk' && top) {
-                return `A simulated random walk starting from "${top.name}" wandered across ${resultCount} distinct entities. This process uncovers serendipitous connections and associations that might not be visible through traditional direct paths.`;
+                return `A simulated random walk starting from "${top.name}" wandered across ${resultCount} distinct entities. This process uncovers serendipitous connections and associations that might not be visible through traditional direct paths.` + weightSuffix;
             }
-            return result.insight || `Exploration complete. Traversed ${resultCount} entities out of the ${totalNodes} in the current view.`;
+            return (result.insight || `Exploration complete. Traversed ${resultCount} entities out of the ${totalNodes} in the current view.`) + weightSuffix;
 
         case 'topology':
-            return result.insight || `Topological ordering complete. Arranged ${resultCount} of ${totalNodes} entities into a logical sequence based on their directional dependencies.`;
+            return (result.insight || `Topological ordering complete. Arranged ${resultCount} of ${totalNodes} entities into a logical sequence based on their directional dependencies.`) + weightSuffix;
 
         default:
-            return result.insight || `Processed ${resultCount} results across ${totalNodes} entities.`;
+            return (result.insight || `Processed ${resultCount} results across ${totalNodes} entities.`) + weightSuffix;
     }
 }
 
@@ -347,6 +420,7 @@ export function AlgorithmDrawer({
     focusLinkIds,
 }: AlgorithmDrawerProps) {
     const { filteredNodes, filteredLinks, nodes, links, filters, selectedNodes } = useGraphStore();
+    const { weightsEnabled, activeConfig } = useWeightConfigStore();
 
     // State
     const [expandedCategory, setExpandedCategory] = useState<AlgorithmCategory | null>(null);
@@ -477,7 +551,10 @@ export function AlgorithmDrawer({
                 }
             }
 
-            const data = await fetchAlgorithm(selectedAlgorithm.endpoint, folderId, ids, extra);
+            // Get active weight formula from weight config store
+            const activeFormula = useWeightConfigStore.getState().getActiveFormula();
+
+            const data = await fetchAlgorithm(selectedAlgorithm.endpoint, folderId, ids, extra, activeFormula);
             setResult(data);
 
             // Cache the result with the current dataset fingerprint
@@ -627,6 +704,11 @@ export function AlgorithmDrawer({
                                                                 >
                                                                     <div className="flex items-center gap-1.5">
                                                                         <span className="font-bold">{algo.name}</span>
+                                                                        {algo.usesWeights && (
+                                                                            <span title="Affected by quantitative weights">
+                                                                                <Scale className="w-2.5 h-2.5 shrink-0 text-amber-500 dark:text-amber-400" />
+                                                                            </span>
+                                                                        )}
                                                                         {hasCachedResult && (
                                                                             <CheckCircle2 className="w-3 h-3 shrink-0 text-emerald-500" />
                                                                         )}
@@ -643,6 +725,13 @@ export function AlgorithmDrawer({
                                 );
                             })}
                         </div>
+
+                        {/* Weight Configuration Panel */}
+                        {folderId && (
+                            <div className="px-5 pt-2 pb-1">
+                                <WeightConfigPanel folderId={folderId} />
+                            </div>
+                        )}
 
                         {/* Info Footer */}
                         <div className="mt-auto p-5 border-t border-slate-200 dark:border-slate-700">
@@ -723,6 +812,54 @@ export function AlgorithmDrawer({
                                             <p className="text-[11px] md:text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{selectedAlgorithm.benefit}</p>
                                         </div>
                                     </div>
+
+                                    {/* Weight Context Card */}
+                                    {(() => {
+                                        const usesW = selectedAlgorithm.usesWeights;
+
+                                        if (usesW && weightsEnabled && activeConfig) {
+                                            // Algorithm USES weights and toggle is ON
+                                            return (
+                                                <div className="mt-3 p-3 rounded-xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/5 flex items-start gap-2.5">
+                                                    <Scale className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
+                                                    <div>
+                                                        <span className="text-[9px] font-bold uppercase tracking-wider block mb-0.5 text-emerald-700 dark:text-emerald-400">Weighted Mode Active</span>
+                                                        <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                                                            This algorithm <strong className="text-emerald-700 dark:text-emerald-300">uses your quantitative weights</strong> ({activeConfig.name}) to influence the ranking. Connections with higher weight values will have more impact on the results.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        } else if (usesW && !weightsEnabled) {
+                                            // Algorithm USES weights but toggle is OFF
+                                            return (
+                                                <div className="mt-3 p-3 rounded-xl border border-slate-200 dark:border-slate-600/40 bg-slate-50/80 dark:bg-slate-800/50 flex items-start gap-2.5">
+                                                    <Scale className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 mt-0.5 shrink-0" />
+                                                    <div>
+                                                        <span className="text-[9px] font-bold uppercase tracking-wider block mb-0.5 text-slate-500 dark:text-slate-400">Supports Weights</span>
+                                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                                            This algorithm <strong>can use quantitative weights</strong> (e.g., marks, scores) to influence rankings. Turn on the weight toggle below to activate.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        } else if (!usesW && weightsEnabled) {
+                                            // Algorithm does NOT use weights but toggle is ON
+                                            return (
+                                                <div className="mt-3 p-3 rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50/40 dark:bg-amber-500/5 flex items-start gap-2.5">
+                                                    <Scale className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 mt-0.5 shrink-0" />
+                                                    <div>
+                                                        <span className="text-[9px] font-bold uppercase tracking-wider block mb-0.5 text-amber-600 dark:text-amber-400">Weights Not Applicable</span>
+                                                        <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                                                            This algorithm <strong>does not use quantitative weights</strong>. It purely analyzes structural patterns (connections), so the weight toggle has no effect on these results.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                        // !usesW && !weightsEnabled — no need to show anything
+                                        return null;
+                                    })()}
                                 </div>
 
                                 {/* Traversal/Pathfinding Node Selection — Interactive UI */}
@@ -890,9 +1027,17 @@ export function AlgorithmDrawer({
                                                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                                                             Detailed Results ({result.results.length})
                                                         </span>
-                                                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
-                                                            <CheckCircle2 className="w-3 h-3" />
-                                                            Complete
+                                                        <div className="flex items-center gap-2">
+                                                            {useWeightConfigStore.getState().weightsEnabled && useWeightConfigStore.getState().activeConfig && (
+                                                                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20 shadow-sm animate-pulse">
+                                                                    <Zap className="w-3 h-3" />
+                                                                    Weighted: {useWeightConfigStore.getState().activeConfig?.name}
+                                                                </div>
+                                                            )}
+                                                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
+                                                                <CheckCircle2 className="w-3 h-3" />
+                                                                Complete
+                                                            </div>
                                                         </div>
                                                     </div>
 
@@ -907,9 +1052,9 @@ export function AlgorithmDrawer({
 
                                                         {/* Table Rows */}
                                                         {result.results.slice(0, 50).map((item, i) => {
-                                                            const name = item.name || item.source_name || 'Unnamed';
+                                                            const name = getDisplayName(item);
                                                             const secondaryName = item.target_name || null;
-                                                            const type = item.type || item.source_type || 'Entity';
+                                                            const type = formatTypeName(item.type || item.source_type);
                                                             const scoreValue = typeof item.score === 'number' ? item.score : typeof item.similarity === 'number' ? item.similarity : undefined;
                                                             const communityValue = item.community ?? item.community_id;
 

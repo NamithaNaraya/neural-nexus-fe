@@ -70,6 +70,7 @@ export function KnowledgeIngestModal({ folderId, folderName, onClose, onSuccess 
 
     const uploadFileMutation = useUploadFile();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const cypherFileInputRef = useRef<HTMLInputElement>(null);
 
     // Fetch existing files
     useEffect(() => {
@@ -217,6 +218,26 @@ export function KnowledgeIngestModal({ folderId, folderName, onClose, onSuccess 
         }
     };
 
+    const [cypherPreview, setCypherPreview] = useState<any>(null);
+    const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+    const handleCypherPreview = async () => {
+        if (!pastedCypher.trim()) return;
+        setIsPreviewLoading(true);
+        setCypherPreview(null);
+        try {
+            const preview = await api.post('/upload/cypher/preview', {
+                query: pastedCypher,
+                folder_id: folderId
+            }) as any;
+            setCypherPreview(preview);
+        } catch (err) {
+            setCypherPreview({ error: 'Preview failed', message: (err as any).detail || 'Could not preview query' });
+        } finally {
+            setIsPreviewLoading(false);
+        }
+    };
+
     const handleCypherIngest = async () => {
         if (!pastedCypher.trim()) return;
 
@@ -233,6 +254,7 @@ export function KnowledgeIngestModal({ folderId, folderName, onClose, onSuccess 
         };
 
         setUploadingFiles(prev => [...prev, newFile]);
+        setCypherPreview(null);
 
         try {
             const data = await api.post('/upload/cypher', {
@@ -252,6 +274,15 @@ export function KnowledgeIngestModal({ folderId, folderName, onClose, onSuccess 
                 f.id === effectiveFileId ? { ...f, status: 'failed', error: (err as any).detail || 'Ingestion failed' } : f
             ));
         }
+    };
+
+    const handleCypherFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Directly upload the file using the file upload logic
+        handleFileSelect([file]);
+        setUploadType('file'); // Switch to file tab to show progress
     };
 
     return (
@@ -295,7 +326,7 @@ export function KnowledgeIngestModal({ folderId, folderName, onClose, onSuccess 
                                     id="file-upload"
                                     className="hidden"
                                     multiple
-                                    accept=".pdf,.txt,.docx,.doc,.md,.csv,.xlsx"
+                                    accept=".pdf,.txt,.docx,.doc,.md,.csv,.xlsx,.cypher"
                                     onChange={(e) => {
                                         if (e.target.files) handleFileSelect(Array.from(e.target.files));
                                     }}
@@ -305,7 +336,7 @@ export function KnowledgeIngestModal({ folderId, folderName, onClose, onSuccess 
                                         <Upload className="w-8 h-8" />
                                     </div>
                                     <p className="text-foreground font-semibold text-lg">Click to upload or drag & drop</p>
-                                    <p className="text-muted-foreground text-xs mt-2">Support for PDF, CSV, TXT, Excel, MD</p>
+                                    <p className="text-muted-foreground text-xs mt-2">Support for PDF, CSV, TXT, Excel, MD, Cypher</p>
                                 </label>
                             </div>
                         ) : uploadType === 'text' ? (
@@ -366,22 +397,68 @@ export function KnowledgeIngestModal({ folderId, folderName, onClose, onSuccess 
                                     )}
                                 </div>
                                 <div className="flex-1 min-h-0">
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Query</label>
                                     <textarea
                                         placeholder="CREATE (n:Entity {id: randomUUID(), ...})"
-                                        className="w-full h-[calc(100%-25px)] px-4 py-3 bg-muted/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all resize-none font-mono text-xs leading-relaxed"
+                                        className="w-full h-[calc(100%-60px)] px-4 py-3 bg-muted/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all resize-none font-mono text-xs leading-relaxed"
                                         value={pastedCypher}
                                         onChange={(e) => setPastedCypher(e.target.value)}
                                     />
+                                    <div className="mt-2 text-center">
+                                        <input
+                                            type="file"
+                                            id="cypher-file-import"
+                                            className="hidden"
+                                            accept=".cypher"
+                                            onChange={handleCypherFileSelect}
+                                            ref={cypherFileInputRef}
+                                        />
+                                        <button
+                                            onClick={() => cypherFileInputRef.current?.click()}
+                                            className="text-[10px] font-bold text-amber-600 hover:text-amber-700 hover:underline flex items-center justify-center gap-1 mx-auto"
+                                        >
+                                            <Upload className="w-3 h-3" />
+                                            Or Upload .cypher file instead
+                                        </button>
+                                    </div>
                                 </div>
-                                <button
-                                    onClick={handleCypherIngest}
-                                    disabled={!pastedCypher.trim()}
-                                    className={`w-full py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-sm font-bold shadow-lg ${selectedFileId ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' : 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'} text-white`}
-                                >
-                                    <Database className="w-4 h-4" />
-                                    <span>Run {selectedFileId ? 'Merge' : 'Ingestion'}</span>
-                                </button>
+
+                                {/* Preview Results */}
+                                {cypherPreview && !cypherPreview.error && (
+                                    <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3 space-y-1.5">
+                                        <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Preview</p>
+                                        <p className="text-xs text-foreground">{cypherPreview.message}</p>
+                                        <div className="flex gap-3 text-[10px] text-muted-foreground">
+                                            <span>📊 Data: <strong>{cypherPreview.data_statements}</strong></span>
+                                            <span>🚫 Skipped: <strong>{cypherPreview.schema_skipped}</strong></span>
+                                            {cypherPreview.is_pre_formatted && <span className="text-emerald-600 font-bold">✅ Pre-formatted</span>}
+                                        </div>
+                                    </div>
+                                )}
+                                {cypherPreview?.error && (
+                                    <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                                        <p className="text-xs text-destructive font-medium">{cypherPreview.message}</p>
+                                    </div>
+                                )}
+
+                                {/* Two-step buttons: Preview → Confirm */}
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleCypherPreview}
+                                        disabled={!pastedCypher.trim() || isPreviewLoading}
+                                        className="flex-1 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-sm font-bold border border-amber-500/40 text-amber-600 hover:bg-amber-500/10"
+                                    >
+                                        {isPreviewLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                        <span>Preview</span>
+                                    </button>
+                                    <button
+                                        onClick={handleCypherIngest}
+                                        disabled={!pastedCypher.trim() || !cypherPreview || cypherPreview.error}
+                                        className={`flex-1 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-sm font-bold shadow-lg ${selectedFileId ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' : 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'} text-white`}
+                                    >
+                                        <Database className="w-4 h-4" />
+                                        <span>Confirm & Run</span>
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
