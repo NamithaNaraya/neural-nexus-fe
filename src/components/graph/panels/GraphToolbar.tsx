@@ -33,6 +33,7 @@ import {
     Plus,
     GitMerge,
     GitBranch,
+    Waypoints,
 } from 'lucide-react';
 import { GlobalRenameModal } from './GlobalRenameModal';
 import { AlgorithmDrawer } from './AlgorithmDrawer';
@@ -101,7 +102,9 @@ export function GraphToolbar({
         clearDiscovery,
         analyticSelectionActive,
         setAnalyticSelectionActive,
-        clearSelection
+        clearSelection,
+        traversalModeActive,
+        setTraversalModeActive
     } = useGraphStore();
 
     // Calculate if filtering is active
@@ -195,13 +198,20 @@ export function GraphToolbar({
                             onClick={() => setShowAlgorithmDrawer(true)}
                             icon={<Zap className="w-4 h-4" />}
                             title="Graph Analytics"
-                            className="text-amber-500 hover:bg-amber-500/10"
+                            className="text-amber-500 hover:bg-amber-500/10 border-amber-500/20"
                         />
                         <ToolbarButton
                             onClick={() => setShowMlDrawer(true)}
                             icon={<Box className="w-4 h-4" />}
                             title="Machine Learning"
                             className="text-pink-500 hover:bg-pink-500/10 border-pink-500/20"
+                        />
+                        <ToolbarButton
+                            onClick={() => setTraversalModeActive(!traversalModeActive)}
+                            icon={<Waypoints className="w-4 h-4" />}
+                            isActive={traversalModeActive}
+                            title={traversalModeActive ? "Path Traversal (Active)" : "Path Traversal"}
+                            className="text-blue-400 hover:bg-blue-400/10 border-blue-400/20"
                         />
                         {onResetCamera && (
                             <ToolbarButton

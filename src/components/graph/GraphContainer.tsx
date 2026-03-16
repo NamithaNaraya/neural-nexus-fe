@@ -208,10 +208,11 @@ export function GraphContainer({
         analyticSelectionActive,
         analyticIncludeNeighbors,
         nodeTypes,
+        discoveredNodeIds,
+        traversalModeActive,
     } = useGraphStore();
 
     // Get filtered data
-    // 1. Create a stable filtered key for topology-affecting filters
     const filterTopologyKey = useMemo(() => {
         return JSON.stringify({
             nodeTypes: filters.nodeTypes,
@@ -219,7 +220,9 @@ export function GraphContainer({
             fileIds: filters.fileIds,
             searchQuery: filters.searchQuery,
             minDegree: filters.minDegree,
-            showOrphans: filters.showOrphans
+            showOrphans: filters.showOrphans,
+            traversalModeActive,
+            discoveredNodeIds: Array.from(discoveredNodeIds),
         });
     }, [
         filters.nodeTypes,
@@ -227,7 +230,9 @@ export function GraphContainer({
         filters.fileIds,
         filters.searchQuery,
         filters.minDegree,
-        filters.showOrphans
+        filters.showOrphans,
+        traversalModeActive,
+        discoveredNodeIds
     ]);
 
     // 2. Memoize visible nodes/links based on topology key
@@ -363,8 +368,14 @@ export function GraphContainer({
             setSelectedNodeForDetail(node);
             setShowNodeDetail(true);
 
-            // Discovery: Always mark this node as discovered so it stays visible
-            addToDiscovery(nodeId);
+            // Path Traversal Mode OR default single-node discovery
+            const storeState = useGraphStore.getState();
+            if (storeState.traversalModeActive) {
+                storeState.traverseToNode(nodeId);
+            } else {
+                // Discovery: Always mark this node as discovered so it stays visible
+                addToDiscovery(nodeId);
+            }
         }
     }, [selectNode, nodes, addToDiscovery, analyticSelectionActive, selectedNodes, links]);
 

@@ -169,6 +169,12 @@ interface GraphState {
     analyticIncludeNeighbors: boolean;
     setAnalyticIncludeNeighbors: (include: boolean) => void;
 
+    // Traversal (Path) Mode
+    traversalModeActive: boolean;
+    setTraversalModeActive: (active: boolean) => void;
+    traversalPath: string[];
+    traverseToNode: (nodeId: string) => void;
+
     // Custom Coloring
     setNodeTypeColor: (type: string, color: string) => void;
     setRelationshipTypeColor: (type: string, color: string) => void;
@@ -237,6 +243,8 @@ export const useGraphStore = create<GraphState>()(
             expandedNodes: new Set(),
             expandedChildren: new Map(),
             targetNode: null,
+            traversalModeActive: false,
+            traversalPath: [],
         }),
 
         // Selection
@@ -489,10 +497,19 @@ export const useGraphStore = create<GraphState>()(
             return candidateNodes.filter(node => {
                 const degree = dynamicDegrees.get(node.id) || 0;
 
+                // --- TRAVERSAL MODE LOGIC ---
+                // If Traversal Mode is active and we have started traversing (discoveredNodeIds > 0),
+                // THEN ONLY show nodes that have been discovered/traversed.
+                if (get().traversalModeActive && discoveredNodeIds.size > 0) {
+                    if (!discoveredNodeIds.has(node.id)) {
+                        return false;
+                    }
+                }
+
                 // Filter by orphan status (Hide Isolated Nodes)
                 // If "Hide Isolated Nodes" is ON (!showOrphans), remove nodes with 0 visible connections
                 // This takes precedence over discovery to ensure the user's filter is respected
-                if (!filters.showOrphans && degree === 0) {
+                if (!filters.showOrphans && degree === 0 && !get().traversalModeActive) { // don't hide orphans in traversal mode if they are discovered
                     return false;
                 }
 
@@ -694,6 +711,66 @@ export const useGraphStore = create<GraphState>()(
             return { discoveredNodeIds: newDiscovered };
         }),
         clearDiscovery: () => set({ discoveredNodeIds: new Set() }),
+
+        // Navigation / Path Traversal Mode
+        traversalModeActive: false,
+        traversalPath: [],
+        setTraversalModeActive: (active) => set({ 
+            traversalModeActive: active,
+            // When toggling on, reset discovery so next click sets the root path
+            traversalPath: [],
+            discoveredNodeIds: active ? new Set() : get().discoveredNodeIds
+        }),
+        traverseToNode: (nodeId) => set((state) => {
+            let newPath = [...state.traversalPath];
+            const pathIndex = newPath.indexOf(nodeId);
+
+            if (pathIndex !== -1) {
+                // Scenario 1: Reverse traversal - truncate path
+                newPath = newPath.slice(0, pathIndex + 1);
+            } else {
+                // Scenario 2: Forward traversal or New Root
+                const lastNode = newPath.length > 0 ? newPath[newPath.length - 1] : null;
+                
+                // Is it a neighbor of the last node?
+                let isNeighbor = false;
+                if (lastNode) {
+                    state.links.forEach((link: any) => {
+                        const s = typeof link.source === 'object' ? link.source.id : link.source;
+                        const t = typeof link.target === 'object' ? link.target.id : link.target;
+                        if ((s === lastNode && t === nodeId) || (t === lastNode && s === nodeId)) {
+                            isNeighbor = true;
+                        }
+                    });
+                }
+
+                if (isNeighbor) {
+                    newPath.push(nodeId);
+                } else {
+                    // Start a new path
+                    newPath = [nodeId];
+                }
+            }
+
+            // Now compute discovered nodes: all nodes in path + neighbors of the active node
+            const newDiscovered = new Set<string>(newPath);
+            const activeNode = newPath[newPath.length - 1];
+
+            if (activeNode) {
+                state.links.forEach((link: any) => {
+                    const s = typeof link.source === 'object' ? link.source.id : link.source;
+                    const t = typeof link.target === 'object' ? link.target.id : link.target;
+                    
+                    if (s === activeNode) newDiscovered.add(t);
+                    if (t === activeNode) newDiscovered.add(s);
+                });
+            }
+
+            return {
+                traversalPath: newPath,
+                discoveredNodeIds: newDiscovered,
+            };
+        }),
 
         // Analytics Selection Flow
         analyticSelectionActive: false,
