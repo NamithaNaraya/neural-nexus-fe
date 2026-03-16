@@ -8,7 +8,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { GraphViewMode } from '../types';
 import {
     Box,
@@ -34,6 +34,7 @@ import {
     GitMerge,
     GitBranch,
     Waypoints,
+    Network,
 } from 'lucide-react';
 import { GlobalRenameModal } from './GlobalRenameModal';
 import { AlgorithmDrawer } from './AlgorithmDrawer';
@@ -96,6 +97,7 @@ export function GraphToolbar({
     const [showAlgorithmDrawer, setShowAlgorithmDrawer] = useState(false);
     const [showMlDrawer, setShowMlDrawer] = useState(false);
     const [showGlobalRenameModal, setShowGlobalRenameModal] = useState(false);
+    const [showHierarchyMenu, setShowHierarchyMenu] = useState(false);
 
     const {
         setFilters,
@@ -112,7 +114,7 @@ export function GraphToolbar({
 
     return (
         <>
-            <div className="absolute top-4 left-4 right-4 md:top-6 md:left-6 md:right-6 z-40 min-h-16 py-3 px-4 md:px-6 flex flex-wrap items-center gap-3 glass-strong rounded-2xl md:rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-white/20 transition-all duration-500 hover:shadow-[0_12px_48px_rgba(168,85,247,0.15)] group/toolbar">
+            <div className="absolute top-4 left-4 right-4 md:top-6 md:left-6 md:right-6 z-[60] min-h-16 py-3 px-4 md:px-6 flex flex-wrap items-center gap-3 glass-strong rounded-2xl md:rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-white/20 transition-all duration-500 hover:shadow-[0_12px_48px_rgba(168,85,247,0.15)] group/toolbar">
                 {/* Left Section: Back, View Modes & Filters */}
                 <div className="flex items-center gap-1.5">
                     <button
@@ -146,6 +148,23 @@ export function GraphToolbar({
                             onClick={() => onViewModeChange('list')}
                             icon={<List className="w-5 h-5" />}
                             label="List"
+                            showLabel={false}
+                        />
+
+                        {/* <ViewModeButton
+                            mode="tree"
+                            currentMode={viewMode}
+                            onClick={() => onViewModeChange('tree')}
+                            icon={<GitBranch className="w-5 h-5" />}
+                            label="Tree Map"
+                            showLabel={false}
+                        /> */}
+                        <ViewModeButton
+                            mode="sunburst"
+                            currentMode={viewMode}
+                            onClick={() => onViewModeChange('sunburst')}
+                            icon={<Circle className="w-5 h-5" />}
+                            label="Sunburst"
                             showLabel={false}
                         />
                     </div>

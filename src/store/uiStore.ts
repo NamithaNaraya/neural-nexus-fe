@@ -12,7 +12,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 export type Theme = 'dark' | 'light';
-export type ViewMode = '3d' | '2d' | 'charts';
+export type ViewMode = '3d' | '2d' | 'charts' | 'tree' | 'sunburst';
 export type LODLevel = 'full' | 'balanced' | 'performance' | 'data';
 
 interface Notification {

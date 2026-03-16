@@ -51,6 +51,16 @@ const NodeListView = dynamic(() => import('./list/NodeListView').then(m => ({ de
     loading: () => <GraphLoadingState message="Initializing Registry..." />,
 });
 
+const TreeGraphView = dynamic(() => import('./TreeGraphView').then(m => ({ default: m.TreeGraphView })), {
+    ssr: false,
+    loading: () => <GraphLoadingState message="Initializing Tree..." />,
+});
+
+const SunburstView = dynamic(() => import('./SunburstView').then(m => ({ default: m.SunburstView })), {
+    ssr: false,
+    loading: () => <GraphLoadingState message="Initializing Sunburst..." />,
+});
+
 // Props
 interface GraphContainerProps {
     folderId?: string;
@@ -746,6 +756,38 @@ export function GraphContainer({
                                     className="flex-1 min-h-0 w-full bg-background flex flex-col"
                                 >
                                     <DataCanvas />
+                                </motion.div>
+                            ) : viewMode === 'tree' ? (
+                                <motion.div
+                                    key="tree"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1, paddingLeft: showFilters ? 400 : 0 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="flex-1 min-h-0 w-full bg-background flex flex-col items-center justify-center p-4 relative"
+                                >
+                                    <TreeGraphView 
+                                        nodes={visibleNodes} 
+                                        links={visibleLinks} 
+                                        onNodeClick={handleNodeClick}
+                                        onNodeDoubleClick={handleNodeDoubleClick}
+                                    />
+                                </motion.div>
+                            ) : viewMode === 'sunburst' ? (
+                                <motion.div
+                                    key="sunburst"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1, paddingLeft: showFilters ? 400 : 0 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="flex-1 min-h-0 w-full bg-background flex flex-col items-center justify-center p-4 relative"
+                                >
+                                    <SunburstView 
+                                        nodes={visibleNodes} 
+                                        links={visibleLinks} 
+                                        onNodeClick={handleNodeClick}
+                                        onNodeDoubleClick={handleNodeDoubleClick}
+                                    />
                                 </motion.div>
                             ) : (
                                 <motion.div

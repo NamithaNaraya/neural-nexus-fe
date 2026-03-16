@@ -5,7 +5,7 @@
  */
 
 // View modes
-export type GraphViewMode = '3d' | '2d' | 'charts' | 'hybrid' | 'list';
+export type GraphViewMode = '3d' | '2d' | 'charts' | 'hybrid' | 'list' | 'tree' | 'sunburst';
 
 // Node interaction states
 export interface NodeInteraction {
