@@ -8,6 +8,8 @@ export interface Message {
     timestamp: number;
     intent?: any;
     context_summary?: string;
+    algorithm?: string;
+    results?: any[];
 }
 
 interface CombinedChatState {
@@ -16,9 +18,12 @@ interface CombinedChatState {
     // Map of sessionId -> folderId
     sessionFolders: Record<string, string>;
     isProcessing: boolean;
+    currentStep: number;
 
     setProcessing: (processing: boolean) => void;
+    setCurrentStep: (step: number) => void;
     addMessage: (sessionId: string, message: Omit<Message, "id" | "timestamp">, folderId?: string) => string;
+    updateLastMessage: (sessionId: string, content: string, intent?: any, algorithm?: string, results?: any[]) => void;
     clearMessages: (sessionId: string) => void;
     setSessionId: (id: string | null, folderId?: string) => void;
 }
@@ -37,8 +42,10 @@ export const useCombinedChatStore = create<CombinedChatState>()(
             messages: {},
             sessionFolders: {},
             isProcessing: false,
+            currentStep: 0,
 
             setProcessing: (processing) => set({ isProcessing: processing }),
+            setCurrentStep: (step) => set({ currentStep: step }),
 
             setSessionId: (id, folderId) => {
                 const newId = id || generateUUID();
@@ -69,6 +76,28 @@ export const useCombinedChatStore = create<CombinedChatState>()(
                 }));
 
                 return id;
+            },
+
+            updateLastMessage: (sessionId, content, intent, algorithm, results) => {
+                set((state) => {
+                    const sessionMessages = [...(state.messages[sessionId] || [])];
+                    if (sessionMessages.length === 0) return state;
+                    
+                    const lastMsg = { ...sessionMessages[sessionMessages.length - 1] };
+                    if (content) lastMsg.content += content;
+                    if (intent) lastMsg.intent = intent;
+                    if (algorithm) lastMsg.algorithm = algorithm;
+                    if (results) lastMsg.results = results;
+                    
+                    sessionMessages[sessionMessages.length - 1] = lastMsg;
+                    
+                    return {
+                        messages: {
+                            ...state.messages,
+                            [sessionId]: sessionMessages
+                        }
+                    };
+                });
             },
 
             clearMessages: (sessionId) => {

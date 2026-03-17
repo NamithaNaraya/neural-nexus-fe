@@ -338,31 +338,70 @@ export function UnifiedChatPanel() {
                 analyticStore.setProcessing(false);
             }
         } else {
-            // Combined mode
+            // Combined mode (STREAMING)
             combinedStore.addMessage(currentSessionId, { role: "user", content: userQuery }, activeFolderId || undefined);
+            const assistantMsgId = combinedStore.addMessage(currentSessionId, { role: "assistant", content: "" }, activeFolderId || undefined);
+            
             combinedStore.setProcessing(true);
+            combinedStore.setCurrentStep(1); // Starting: Reading History
 
             try {
-                const response = await docAiApi.combinedChat.answer({
-                    question: userQuery,
-                    folder_id: activeFolderId || undefined,
-                    history: combinedMessages.map(m => ({ role: m.role, content: m.content }))
-                }) as any;
-
-                combinedStore.addMessage(currentSessionId, {
-                    role: "assistant",
-                    content: response.answer,
-                    intent: response.intent,
-                    context_summary: response.context_summary
-                } as any, activeFolderId || undefined);
-            } catch (err: any) {
-                const errorMsg = err?.detail || err?.message || "Something went wrong in the combined pipeline. Please try again.";
-                combinedStore.addMessage(currentSessionId, {
-                    role: "assistant",
-                    content: `Error: ${errorMsg}`
+                const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+                const cleanUrl = baseUrl.endsWith('/api/v1') ? `${baseUrl}/combined-chat/stream-answer` : `${baseUrl}/api/v1/combined-chat/stream-answer`;
+                
+                const response = await fetch(cleanUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                    },
+                    body: JSON.stringify({
+                        question: userQuery,
+                        folder_id: activeFolderId || undefined,
+                        history: combinedMessages.map(m => ({ role: m.role, content: m.content }))
+                    })
                 });
+
+                if (!response.ok) throw new Error("Connection failed");
+
+                const reader = response.body?.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
+
+                if (reader) {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || "";
+
+                        for (const line of lines) {
+                            if (!line.trim()) continue;
+                            try {
+                                const payload = JSON.parse(line);
+                                if (payload.type === "step") {
+                                    combinedStore.setCurrentStep(payload.id);
+                                } else if (payload.type === "content") {
+                                    combinedStore.updateLastMessage(currentSessionId, payload.data);
+                                } else if (payload.type === "intent") {
+                                    combinedStore.updateLastMessage(currentSessionId, "", payload.data);
+                                } else if (payload.type === "gds_results") {
+                                    combinedStore.updateLastMessage(currentSessionId, "", undefined, payload.data.algorithm, payload.data.results);
+                                }
+                            } catch (e) {
+                                console.warn("Payload Parse Error", e);
+                            }
+                        }
+                    }
+                }
+            } catch (err: any) {
+                const errorMsg = err?.message || "Something went wrong in the combined pipeline.";
+                combinedStore.updateLastMessage(currentSessionId, `Error: ${errorMsg}`);
             } finally {
                 combinedStore.setProcessing(false);
+                combinedStore.setCurrentStep(0);
             }
         }
     };
@@ -712,20 +751,53 @@ export function UnifiedChatPanel() {
                         </div>
 
                         <div className="px-4 md:px-5 py-2 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0">
-                            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 relative">
+                            <div className="flex items-center w-full bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 relative">
                                 <button
                                     onClick={() => toggleMode('combined')}
                                     disabled={isProcessing}
-                                    className={`relative z-10 px-4 md:px-6 py-1.5 flex items-center gap-1.5 rounded-md text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all disabled:opacity-50
-                                        ${chatMode === 'combined' ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-400 hover:text-slate-600'}`}
+                                    className={`relative flex-1 z-10 px-3 md:px-4 py-1.5 flex items-center justify-center gap-1.5 rounded-md text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-colors disabled:opacity-50
+                                        ${chatMode === 'combined' ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-600'}`}
                                 >
-                                    <Zap size={12} className="text-amber-500" />
-                                    Research Chat
+                                    <Zap size={12} className={chatMode === 'combined' ? "text-amber-500" : "text-slate-400"} />
+                                    Research
+                                    {chatMode === 'combined' && (
+                                        <motion.div
+                                            layoutId="modeBackground"
+                                            className="absolute inset-0 bg-white dark:bg-slate-700 rounded-md shadow-sm -z-10"
+                                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                        />
+                                    )}
                                 </button>
-                                <motion.div
-                                    className={`absolute inset-0.5 rounded-md shadow-sm bg-white dark:bg-slate-700`}
-                                    layoutId="chatModeBackground"
-                                />
+                                <button
+                                    onClick={() => toggleMode('general')}
+                                    disabled={isProcessing}
+                                    className={`relative flex-1 z-10 px-3 md:px-4 py-1.5 flex items-center justify-center gap-1.5 rounded-md text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-colors disabled:opacity-50
+                                        ${chatMode === 'general' ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    General
+                                    {chatMode === 'general' && (
+                                        <motion.div
+                                            layoutId="modeBackground"
+                                            className="absolute inset-0 bg-white dark:bg-slate-700 rounded-md shadow-sm -z-10"
+                                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                        />
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => toggleMode('algorithmic')}
+                                    disabled={isProcessing}
+                                    className={`relative flex-1 z-10 px-3 md:px-4 py-1.5 flex items-center justify-center gap-1.5 rounded-md text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-colors disabled:opacity-50
+                                        ${chatMode === 'algorithmic' ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    Algo
+                                    {chatMode === 'algorithmic' && (
+                                        <motion.div
+                                            layoutId="modeBackground"
+                                            className="absolute inset-0 bg-white dark:bg-slate-700 rounded-md shadow-sm -z-10"
+                                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                        />
+                                    )}
+                                </button>
                             </div>
                             <div className="hidden sm:flex text-[10px] font-semibold text-slate-400 dark:text-slate-500 items-center gap-1.5">
                                 {activeFolderId && activeFolderName && (
@@ -878,11 +950,11 @@ export function UnifiedChatPanel() {
                                                         </div>
                                                     )}
 
-                                                    {/* Algorithm badge (Algorithmic mode) */}
-                                                    {chatMode === 'algorithmic' && msg.role === 'assistant' && msg.algorithm && (
+                                                    {/* Algorithm badge (Combined or Algorithmic mode) */}
+                                                    {msg.role === 'assistant' && (msg.algorithm || msg.intent?.use_gds) && (
                                                         <div className="flex flex-wrap items-center gap-1.5">
                                                             <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800 flex items-center gap-1">
-                                                                <Zap size={9} /> {msg.algorithm}
+                                                                <Zap size={9} /> {msg.algorithm || msg.intent?.gds_algo || 'Graph Analysis'}
                                                             </span>
                                                             {msg.results?.length > 0 && (
                                                                 <span className="text-[9px] text-slate-400">{msg.results.length} results</span>
@@ -890,8 +962,8 @@ export function UnifiedChatPanel() {
                                                         </div>
                                                     )}
 
-                                                    {/* Result chips (Algorithmic mode) */}
-                                                    {chatMode === 'algorithmic' && msg.results?.length > 0 && (
+                                                    {/* Result chips (Combined or Algorithmic mode) */}
+                                                    {msg.results?.length > 0 && (
                                                         <div className="flex flex-wrap gap-1.5 mt-1">
                                                             {(expandedResults.has(msg.id) ? msg.results : msg.results.slice(0, 8)).map((res: any, ri: number) => {
                                                                 const isSimilarity = !!(res.source_name && res.target_name);
@@ -960,17 +1032,20 @@ export function UnifiedChatPanel() {
                                                 </div>
                                                 <div className="space-y-3">
                                                     <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
-                                                        <span className={`text-[11px] font-bold uppercase tracking-widest ${chatMode === 'general' ? 'text-emerald-500' : 'text-indigo-500'}`}>
-                                                            {chatMode === 'general' ? 'Thinking...' : 'Analyzing...'}
+                                                        <span className={`text-[11px] font-bold uppercase tracking-widest ${chatMode === 'general' ? 'text-emerald-500' : (chatMode === 'combined' ? 'text-amber-500' : 'text-indigo-500')}`}>
+                                                            {chatMode === 'general' ? 'Thinking...' : (chatMode === 'combined' ? 'Researching Pipeline...' : 'Analyzing...')}
                                                         </span>
                                                     </div>
-                                                    {chatMode === 'general' && neuralStore.currentStep > 0 && (
+                                                    {((chatMode === 'general' ? neuralStore.currentStep : (chatMode === 'combined' ? combinedStore.currentStep : 0)) > 0) && (
                                                         <div className="flex flex-wrap gap-1.5 pl-1">
-                                                            {REASONING_STEPS.slice(0, neuralStore.currentStep).map((step, idx) => (
-                                                                <span key={idx} className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${idx === neuralStore.currentStep - 1 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'text-slate-300 dark:text-slate-600'}`}>
-                                                                    {step.name}
-                                                                </span>
-                                                            ))}
+                                                            {REASONING_STEPS.slice(0, chatMode === 'general' ? neuralStore.currentStep : combinedStore.currentStep).map((step, idx) => {
+                                                                const currentStep = chatMode === 'general' ? neuralStore.currentStep : combinedStore.currentStep;
+                                                                return (
+                                                                    <span key={idx} className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${idx === currentStep - 1 ? (chatMode === 'general' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400') : 'text-slate-300 dark:text-slate-600'}`}>
+                                                                        {step.name}
+                                                                    </span>
+                                                                );
+                                                            })}
                                                         </div>
                                                     )}
                                                 </div>
