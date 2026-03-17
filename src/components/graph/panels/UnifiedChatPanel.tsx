@@ -13,6 +13,7 @@ import { useGraphStore } from '@/store/graphStore';
 import { useAuthStore } from '@/store/authStore';
 import { useUnifiedAssistantStore, type Citation, type Outcome } from '@/store/unifiedAssistantStore';
 import { useAnalyticAssistantStore } from '@/store/analyticAssistantStore';
+import { useCombinedChatStore } from '@/store/combinedChatStore';
 import { docAiApi } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -32,7 +33,7 @@ const REASONING_STEPS = [
     { id: 13, name: "Done", icon: Star }
 ];
 
-type ChatMode = 'general' | 'algorithmic';
+type ChatMode = 'general' | 'algorithmic' | 'combined';
 
 /* ─── Helper: format timestamp ─── */
 function formatTime(ts: number): string {
@@ -52,12 +53,16 @@ function formatTime(ts: number): string {
 /* ─── Session History Sidebar ─── */
 function SessionHistorySidebar({
     messages,
+    sessionFolders,
+    currentFolderId,
     currentSessionId,
     onSelectSession,
     onNewSession,
     chatMode,
 }: {
     messages: Record<string, any[]>;
+    sessionFolders: Record<string, string>;
+    currentFolderId: string | null;
     currentSessionId: string | null;
     onSelectSession: (id: string) => void;
     onNewSession: () => void;
@@ -65,7 +70,11 @@ function SessionHistorySidebar({
 }) {
     const sessions = useMemo(() => {
         return Object.entries(messages)
-            .filter(([_, msgs]) => msgs.length > 0)
+            .filter(([id, msgs]) => {
+                // Filter by folder if currentFolderId exists
+                if (currentFolderId && sessionFolders[id] && sessionFolders[id] !== currentFolderId) return false;
+                return msgs.length > 0;
+            })
             .map(([id, msgs]) => {
                 const firstUserMsg = msgs.find((m: any) => m.role === 'user');
                 const lastMsg = msgs[msgs.length - 1];
@@ -143,7 +152,7 @@ export function UnifiedChatPanel() {
     const [isOpen, setIsOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
     const [input, setInput] = useState('');
-    const [chatMode, setChatMode] = useState<ChatMode>('general');
+    const [chatMode, setChatMode] = useState<ChatMode>('combined');
     const [showHistory, setShowHistory] = useState(false);
     const [showOutcomeForm, setShowOutcomeForm] = useState<string | null>(null);
     const [feedback, setFeedback] = useState({ rating: 5, comment: '' });
@@ -181,17 +190,38 @@ export function UnifiedChatPanel() {
     // Stores
     const neuralStore = useUnifiedAssistantStore();
     const analyticStore = useAnalyticAssistantStore();
+    const combinedStore = useCombinedChatStore();
 
     // Dynamically derive current state
-    const isProcessing = chatMode === 'general' ? neuralStore.isProcessing : analyticStore.isProcessing;
-    const currentSessionId = chatMode === 'general' ? neuralStore.currentSessionId : analyticStore.currentSessionId;
-    const allMessages = chatMode === 'general' ? neuralStore.messages : analyticStore.messages;
+    const isProcessing = chatMode === 'general' 
+        ? neuralStore.isProcessing 
+        : chatMode === 'algorithmic' 
+            ? analyticStore.isProcessing 
+            : combinedStore.isProcessing;
+
+    const currentSessionId = chatMode === 'general' 
+        ? neuralStore.currentSessionId 
+        : chatMode === 'algorithmic' 
+            ? analyticStore.currentSessionId 
+            : combinedStore.currentSessionId;
+
+    const allMessages = chatMode === 'general' 
+        ? neuralStore.messages 
+        : chatMode === 'algorithmic' 
+            ? analyticStore.messages 
+            : combinedStore.messages;
 
     const neuralMessages = neuralStore.currentSessionId ? (neuralStore.messages[neuralStore.currentSessionId] || []) : [];
     const analyticMessages = analyticStore.currentSessionId ? (analyticStore.messages[analyticStore.currentSessionId] || []) : [];
-    const activeMessages = chatMode === 'general' ? neuralMessages : analyticMessages;
+    const combinedMessages = combinedStore.currentSessionId ? (combinedStore.messages[combinedStore.currentSessionId] || []) : [];
 
-    const ThemeIcon = chatMode === 'general' ? Brain : Network;
+    const activeMessages = chatMode === 'general' 
+        ? neuralMessages 
+        : chatMode === 'algorithmic' 
+            ? analyticMessages 
+            : combinedMessages;
+
+    const ThemeIcon = chatMode === 'general' ? Brain : (chatMode === 'algorithmic' ? Network : Zap);
 
     // Auto-scroll
     useEffect(() => {
@@ -199,6 +229,26 @@ export function UnifiedChatPanel() {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [activeMessages, isProcessing, chatMode, neuralStore.currentStep]);
+
+    // Clear session when folder changes to ensure strict isolation
+    useEffect(() => {
+        if (activeFolderId) {
+            // Combined isolation
+            const combFolder = combinedStore.sessionFolders[combinedStore.currentSessionId || ''];
+            if (combFolder && combFolder !== activeFolderId) combinedStore.setSessionId(null, activeFolderId);
+            else if (!combFolder) combinedStore.setSessionId(combinedStore.currentSessionId, activeFolderId);
+
+            // Neural isolation
+            const neuralFolder = neuralStore.sessionFolders[neuralStore.currentSessionId || ''];
+            if (neuralFolder && neuralFolder !== activeFolderId) neuralStore.setSessionId(null, activeFolderId);
+            else if (!neuralFolder) neuralStore.setSessionId(neuralStore.currentSessionId, activeFolderId);
+
+            // Analytic isolation
+            const analyticFolder = analyticStore.sessionFolders[analyticStore.currentSessionId || ''];
+            if (analyticFolder && analyticFolder !== activeFolderId) analyticStore.setSessionId(null, activeFolderId);
+            else if (!analyticFolder) analyticStore.setSessionId(analyticStore.currentSessionId, activeFolderId);
+        }
+    }, [activeFolderId]);
 
     // Show history in expanded mode
     useEffect(() => {
@@ -209,17 +259,20 @@ export function UnifiedChatPanel() {
     const handleClearMessages = () => {
         if (!currentSessionId) return;
         if (chatMode === 'general') neuralStore.clearMessages(currentSessionId);
-        else analyticStore.clearMessages(currentSessionId);
+        else if (chatMode === 'algorithmic') analyticStore.clearMessages(currentSessionId);
+        else combinedStore.clearMessages(currentSessionId);
     };
 
     const handleNewSession = () => {
         if (chatMode === 'general') neuralStore.setSessionId(null);
-        else analyticStore.setSessionId(null);
+        else if (chatMode === 'algorithmic') analyticStore.setSessionId(null);
+        else combinedStore.setSessionId(null, activeFolderId || undefined);
     };
 
     const handleSelectSession = (id: string) => {
         if (chatMode === 'general') neuralStore.setSessionId(id);
-        else analyticStore.setSessionId(id);
+        else if (chatMode === 'algorithmic') analyticStore.setSessionId(id);
+        else combinedStore.setSessionId(id, activeFolderId || undefined);
     };
 
     const handleSend = async (e?: React.FormEvent) => {
@@ -230,7 +283,7 @@ export function UnifiedChatPanel() {
         setInput('');
 
         if (chatMode === 'general') {
-            neuralStore.addMessage(currentSessionId, { role: "user", content: userQuery });
+            neuralStore.addMessage(currentSessionId, { role: "user", content: userQuery }, activeFolderId || undefined);
             neuralStore.setProcessing(true);
 
             try {
@@ -248,7 +301,7 @@ export function UnifiedChatPanel() {
                         mlInsights: response.ml_insights_count ?? 0,
                         predictions: response.predictions_count ?? 0,
                     }
-                });
+                }, activeFolderId || undefined);
             } catch (err: any) {
                 const errorMsg = err?.detail || err?.message || "Something went wrong. Please try again.";
                 neuralStore.addMessage(currentSessionId, {
@@ -258,8 +311,8 @@ export function UnifiedChatPanel() {
                 neuralStore.setProcessing(false);
                 neuralStore.setCurrentStep(0);
             }
-        } else {
-            analyticStore.addMessage(currentSessionId, { role: "user", content: userQuery } as any);
+        } else if (chatMode === 'algorithmic') {
+            analyticStore.addMessage(currentSessionId, { role: "user", content: userQuery } as any, activeFolderId || undefined);
             analyticStore.setProcessing(true);
 
             try {
@@ -273,7 +326,7 @@ export function UnifiedChatPanel() {
                     role: "assistant", content: response.answer,
                     algorithm: response.algorithm, results: response.results,
                     resolved_entities: response.resolved_entities
-                } as any);
+                } as any, activeFolderId || undefined);
             } catch (err: any) {
                 const errorMsg = err?.detail || err?.message || "Something went wrong while analyzing. Please try again.";
                 toast.error("Something went wrong");
@@ -283,6 +336,33 @@ export function UnifiedChatPanel() {
                 } as any);
             } finally {
                 analyticStore.setProcessing(false);
+            }
+        } else {
+            // Combined mode
+            combinedStore.addMessage(currentSessionId, { role: "user", content: userQuery }, activeFolderId || undefined);
+            combinedStore.setProcessing(true);
+
+            try {
+                const response = await docAiApi.combinedChat.answer({
+                    question: userQuery,
+                    folder_id: activeFolderId || undefined,
+                    history: combinedMessages.map(m => ({ role: m.role, content: m.content }))
+                }) as any;
+
+                combinedStore.addMessage(currentSessionId, {
+                    role: "assistant",
+                    content: response.answer,
+                    intent: response.intent,
+                    context_summary: response.context_summary
+                } as any, activeFolderId || undefined);
+            } catch (err: any) {
+                const errorMsg = err?.detail || err?.message || "Something went wrong in the combined pipeline. Please try again.";
+                combinedStore.addMessage(currentSessionId, {
+                    role: "assistant",
+                    content: `Error: ${errorMsg}`
+                });
+            } finally {
+                combinedStore.setProcessing(false);
             }
         }
     };
@@ -568,12 +648,12 @@ export function UnifiedChatPanel() {
                                 </div>
                                 <div className="min-w-0">
                                     <h3 className="text-xs md:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
-                                        {chatMode === 'general' ? 'Chat Assistant' : 'Graph Analytics'}
+                                        {chatMode === 'general' ? 'Chat Assistant' : chatMode === 'algorithmic' ? 'Graph Analytics' : 'Combined Research'}
                                     </h3>
                                     <div className="flex items-center gap-1.5 mt-0.5">
-                                        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${chatMode === 'general' ? 'bg-emerald-500' : 'bg-indigo-500'}`} />
-                                        <span className={`text-[8px] md:text-[9px] uppercase font-bold tracking-widest truncate ${chatMode === 'general' ? 'text-emerald-500/60' : 'text-indigo-500/60'}`}>
-                                            {chatMode === 'general' ? 'Ask & Discover' : 'Graph Analysis'}
+                                        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${chatMode === 'general' ? 'bg-emerald-500' : chatMode === 'algorithmic' ? 'bg-indigo-500' : 'bg-amber-500'}`} />
+                                        <span className={`text-[8px] md:text-[9px] uppercase font-bold tracking-widest truncate ${chatMode === 'general' ? 'text-emerald-500/60' : chatMode === 'algorithmic' ? 'text-indigo-500/60' : 'text-amber-500/60'}`}>
+                                            {chatMode === 'general' ? 'Ask & Discover' : chatMode === 'algorithmic' ? 'Graph Analysis' : 'Pipeline Intelligence'}
                                         </span>
                                     </div>
                                 </div>
@@ -631,34 +711,20 @@ export function UnifiedChatPanel() {
                             </div>
                         </div>
 
-                        {/* ═══ MODE TOGGLE BAR ═══ */}
                         <div className="px-4 md:px-5 py-2 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0">
                             <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 relative">
                                 <button
-                                    onClick={() => toggleMode('general')}
+                                    onClick={() => toggleMode('combined')}
                                     disabled={isProcessing}
-                                    className={`relative z-10 px-3 md:px-4 py-1.5 flex items-center gap-1.5 rounded-md text-[9px] md:text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-50
-                                        ${chatMode === 'general' ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-400 hover:text-slate-600'}`}
+                                    className={`relative z-10 px-4 md:px-6 py-1.5 flex items-center gap-1.5 rounded-md text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all disabled:opacity-50
+                                        ${chatMode === 'combined' ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-400 hover:text-slate-600'}`}
                                 >
-                                    <MessageSquare size={10} />
-                                    General
-                                </button>
-                                <button
-                                    onClick={() => toggleMode('algorithmic')}
-                                    disabled={isProcessing}
-                                    className={`relative z-10 px-3 md:px-4 py-1.5 flex items-center gap-1.5 rounded-md text-[9px] md:text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-50
-                                        ${chatMode === 'algorithmic' ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-600'}`}
-                                >
-                                    <Network size={10} />
-                                    Algorithms
+                                    <Zap size={12} className="text-amber-500" />
+                                    Research Chat
                                 </button>
                                 <motion.div
-                                    className={`absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] rounded-md shadow-sm ${chatMode === 'general'
-                                        ? 'bg-white dark:bg-slate-700 left-0.5'
-                                        : 'bg-white dark:bg-slate-700 left-[calc(50%+1px)]'
-                                        }`}
-                                    layoutId="chatTab"
-                                    transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                                    className={`absolute inset-0.5 rounded-md shadow-sm bg-white dark:bg-slate-700`}
+                                    layoutId="chatModeBackground"
                                 />
                             </div>
                             <div className="hidden sm:flex text-[10px] font-semibold text-slate-400 dark:text-slate-500 items-center gap-1.5">
@@ -701,6 +767,12 @@ export function UnifiedChatPanel() {
                                     >
                                         <SessionHistorySidebar
                                             messages={allMessages}
+                                            sessionFolders={
+                                                chatMode === 'general' ? neuralStore.sessionFolders :
+                                                chatMode === 'algorithmic' ? analyticStore.sessionFolders :
+                                                combinedStore.sessionFolders
+                                            }
+                                            currentFolderId={activeFolderId}
                                             currentSessionId={currentSessionId}
                                             onSelectSession={(id) => {
                                                 handleSelectSession(id);
@@ -725,12 +797,14 @@ export function UnifiedChatPanel() {
                                                     <ThemeIcon className={`w-8 h-8 ${chatMode === 'general' ? 'text-emerald-500' : 'text-indigo-500'}`} />
                                                 </div>
                                                 <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
-                                                    {chatMode === 'general' ? 'Ready to Help' : 'Ready to Analyze'}
+                                                    {chatMode === 'general' ? 'Ready to Help' : chatMode === 'algorithmic' ? 'Ready to Analyze' : 'Research Pipeline Active'}
                                                 </h4>
                                                 <p className="text-sm text-slate-400 dark:text-slate-500 leading-relaxed max-w-sm">
                                                     {chatMode === 'general'
                                                         ? 'Ask questions about your data. I\'ll search your knowledge graph and give you answers.'
-                                                        : 'Ask things like "What are the most important items?" or "Find groups in my data".'}
+                                                        : chatMode === 'algorithmic'
+                                                            ? 'Ask things like "What are the most important items?" or "Find groups in my data".'
+                                                            : 'A 5-stage research pipeline: Schema -> Intent -> Parallel Retrieval -> Context Fusion -> Synthesis.'}
                                                 </p>
                                             </div>
                                         )}
@@ -756,14 +830,28 @@ export function UnifiedChatPanel() {
                                                                 remarkPlugins={[remarkGfm]}
                                                                 components={{
                                                                     p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
-                                                                    ul: ({ node, ...props }) => <ul className="list-disc ml-4 mb-2 space-y-0.5" {...props} />,
-                                                                    ol: ({ node, ...props }) => <ol className="list-decimal ml-4 mb-2 space-y-0.5" {...props} />,
-                                                                    li: ({ node, ...props }) => <li className="mb-0.5" {...props} />,
+                                                                    ul: ({ node, ...props }) => <ul className="list-none ml-2 mb-3 space-y-1.5" {...props} />,
+                                                                    ol: ({ node, ...props }) => <ol className="list-decimal ml-5 mb-3 space-y-1.5" {...props} />,
+                                                                    li: ({ node, ...props }) => (
+                                                                        <li className="flex items-start gap-2 text-slate-700 dark:text-slate-300">
+                                                                            <span className={`mt-1.5 h-1.5 w-1.5 rounded-full flex-shrink-0 ${chatMode === 'general' ? 'bg-emerald-400' : 'bg-indigo-400'}`} />
+                                                                            <span className="flex-1">{props.children}</span>
+                                                                        </li>
+                                                                    ),
                                                                     strong: ({ node, ...props }) => <strong className={`font-semibold ${chatMode === 'general' ? 'text-emerald-700 dark:text-emerald-400' : 'text-indigo-700 dark:text-indigo-400'}`} {...props} />,
                                                                     code: ({ node, ...props }) => <code className="bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-xs font-mono" {...props} />,
                                                                     h1: ({ node, ...props }) => <h1 className="text-base font-bold mb-2 mt-3" {...props} />,
                                                                     h2: ({ node, ...props }) => <h2 className="text-sm font-bold mb-1.5 mt-2" {...props} />,
                                                                     h3: ({ node, ...props }) => <h3 className="text-xs font-bold mb-1 mt-2" {...props} />,
+                                                                    table: ({ node, ...props }) => (
+                                                                        <div className="overflow-x-auto my-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                                                                            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700" {...props} />
+                                                                        </div>
+                                                                    ),
+                                                                    thead: ({ node, ...props }) => <thead className="bg-slate-50 dark:bg-slate-900/50" {...props} />,
+                                                                    th: ({ node, ...props }) => <th className="px-3 py-2 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider" {...props} />,
+                                                                    td: ({ node, ...props }) => <td className="px-3 py-2 text-[11px] text-slate-600 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800" {...props} />,
+                                                                    tr: ({ node, ...props }) => <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors" {...props} />,
                                                                 }}
                                                             >
                                                                 {msg.content}

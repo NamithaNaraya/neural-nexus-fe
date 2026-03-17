@@ -1,52 +1,23 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-export interface Citation {
-    nodeId: string;
-    nodeName: string;
-    chunkText: string;
-}
-
-export interface Outcome {
-    encounter_id: string;
-    final_response: string;
-    extracted_indicators: string[];
-    inferred_states: string[];
-    recommendation: string;
-    graph_analytics?: any;
-    graph_interventions?: any;
-}
-
-export interface RAGMetadata {
-    groundingScore: number;      // Feature 10: 0-1 confidence
-    mlInsights: number;          // Feature 3+6: structurally similar nodes found
-    predictions: number;         // Feature 4+5: ML predictions injected
-}
-
 export interface Message {
     id: string;
     role: "user" | "assistant";
     content: string;
     timestamp: number;
-    citations?: Citation[];
-    isReasoning?: boolean;
-    reasoningOutcome?: Outcome;
-    metadata?: RAGMetadata;      // Enhanced RAG intelligence indicators
+    intent?: any;
+    context_summary?: string;
 }
 
-interface ReasoningState {
-    // Session management
+interface CombinedChatState {
     currentSessionId: string | null;
-    messages: Record<string, Message[]>; // sessionId -> messages
-    sessionFolders: Record<string, string>; // sessionId -> folderId
-    
-    // Status
+    messages: Record<string, Message[]>;
+    // Map of sessionId -> folderId
+    sessionFolders: Record<string, string>;
     isProcessing: boolean;
-    currentStep: number;
 
-    // Actions
     setProcessing: (processing: boolean) => void;
-    setCurrentStep: (step: number) => void;
     addMessage: (sessionId: string, message: Omit<Message, "id" | "timestamp">, folderId?: string) => string;
     clearMessages: (sessionId: string) => void;
     setSessionId: (id: string | null, folderId?: string) => void;
@@ -56,25 +27,18 @@ const generateUUID = () => {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
         return crypto.randomUUID();
     }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = (Math.random() * 16) | 0;
-        const v = c === 'x' ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-    });
+    return Math.random().toString(36).substring(2, 11);
 };
 
-export const useUnifiedAssistantStore = create<ReasoningState>()(
+export const useCombinedChatStore = create<CombinedChatState>()(
     persist(
         (set, get) => ({
             currentSessionId: generateUUID(),
             messages: {},
             sessionFolders: {},
             isProcessing: false,
-            currentStep: 0,
 
             setProcessing: (processing) => set({ isProcessing: processing }),
-
-            setCurrentStep: (step) => set({ currentStep: step }),
 
             setSessionId: (id, folderId) => {
                 const newId = id || generateUUID();
@@ -118,12 +82,12 @@ export const useUnifiedAssistantStore = create<ReasoningState>()(
             },
         }),
         {
-            name: "unified-assistant-storage",
+            name: "combined-chat-storage",
             storage: createJSONStorage(() => localStorage),
             partialize: (state) => ({ 
                 currentSessionId: state.currentSessionId, 
                 messages: state.messages,
-                sessionFolders: state.sessionFolders
+                sessionFolders: state.sessionFolders 
             }),
         }
     )

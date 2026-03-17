@@ -57,32 +57,32 @@ export interface LinkVisualConfig {
     curvature: number;
 }
 
-// Extended Color Palette — maximally distinct hues (no two adjacent hues are close)
+// Extended Pastel Color Palette — visually pleasing soft hues
 const COLOR_PALETTE = [
-    '#6366F1', // Indigo
-    '#F43F5E', // Rose
-    '#10B981', // Emerald
-    '#F59E0B', // Amber
-    '#8B5CF6', // Violet
-    '#0EA5E9', // Sky
-    '#F97316', // Orange
-    '#EC4899', // Pink
-    '#14B8A6', // Teal
-    '#3B82F6', // Blue
-    '#84CC16', // Lime
-    '#EF4444', // Red
-    '#06B6D4', // Cyan
-    '#7C3AED', // Deep Purple
-    '#2DD4BF', // Mint
-    '#64748B', // Slate
-    '#D946EF', // Fuchsia
-    '#EA580C', // Deep Orange
-    '#0D9488', // Dark Teal
-    '#A855F7', // Purple
-    '#E11D48', // Crimson
-    '#059669', // Green
-    '#CA8A04', // Dark Amber
-    '#4F46E5', // Deep Indigo
+    '#A78BFA', // Soft Violet
+    '#F472B6', // Soft Pink
+    '#FB923C', // Soft Orange
+    '#FCD34D', // Soft Amber
+    '#6EE7B7', // Soft Emerald
+    '#7DD3FC', // Soft Sky
+    '#FCA5A5', // Soft Red
+    '#86EFAC', // Soft Green
+    '#C084FC', // Soft Purple
+    '#5EEAD4', // Soft Teal
+    '#818CF8', // Soft Indigo
+    '#BEF264', // Soft Lime
+    '#FDA4AF', // Soft Rose
+    '#67E8F9', // Soft Cyan
+    '#FDE047', // Soft Yellow
+    '#93C5FD', // Soft Blue
+    '#D8B4FE', // Soft Fuchsia
+    '#FDBA74', // Soft Peach
+    '#99F6E4', // Soft Mint
+    '#E9D5FF', // Light Violet
+    '#FECDD3', // Light Rose
+    '#BBF7D0', // Light Green
+    '#BFDBFE', // Light Blue
+    '#FED7AA', // Light Orange
 ];
 
 // Helper to deterministically map a string to a color index
@@ -139,7 +139,7 @@ export const NODE_TYPE_COLORS: Record<string, string> = new Proxy(
 
             // Palette exhausted — generate a unique HSL color based on the assignment count
             const hue = (assignedTypeColors.size * 137.508) % 360; // Golden angle for max spread
-            const color = `hsl(${Math.round(hue)}, 65%, 55%)`;
+            const color = `hsl(${Math.round(hue)}, 70%, 75%)`;
             assignedTypeColors.set(prop, color);
             return color;
         }

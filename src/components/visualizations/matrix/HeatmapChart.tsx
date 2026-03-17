@@ -84,7 +84,7 @@ export function HeatmapChart({
 
         // Color scale
         const colorScale = (() => {
-            const colors = COLOR_PALETTES[colorScheme];
+            const colors = COLOR_PALETTES[colorScheme] as any;
             if (colorScheme === 'diverging') {
                 return d3.scaleDiverging<string>()
                     .domain([minVal, (minVal + maxVal) / 2, maxVal])

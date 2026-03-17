@@ -9,7 +9,8 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import { motion } from 'framer-motion';
-import type { HierarchyNode, ChartConfig, ChartInteraction, ColorPalette, COLOR_PALETTES } from '../types';
+import type { HierarchyNode, ChartConfig, ChartInteraction, ColorPalette } from '../types';
+import { COLOR_PALETTES } from '../types';
 
 interface SunburstChartProps {
     data: HierarchyNode;
@@ -32,7 +33,7 @@ export function SunburstChart({
     const [dimensions, setDimensions] = useState({ width: 500, height: 500 });
 
     // Get color from palette
-    const colors = (await import('../types')).COLOR_PALETTES[colorPalette] || (await import('../types')).COLOR_PALETTES.neural;
+    const colors = COLOR_PALETTES[colorPalette] || COLOR_PALETTES.neural;
 
     // Resize observer
     useEffect(() => {
@@ -106,10 +107,10 @@ export function SunburstChart({
         // Draw arcs
         const paths = svg
             .selectAll('path')
-            .data(root.descendants().filter((d) => d.depth))
+            .data(root.descendants().filter((d) => d.depth) as d3.HierarchyRectangularNode<HierarchyNode>[])
             .enter()
             .append('path')
-            .attr('fill', (d) => {
+            .attr('fill', (d: d3.HierarchyRectangularNode<HierarchyNode>) => {
                 const baseColor = getColor(d);
                 // Lighten for deeper levels
                 const lighten = d.depth * 0.1;
@@ -154,10 +155,10 @@ export function SunburstChart({
         if (config.showLabels !== false) {
             svg
                 .selectAll('text')
-                .data(root.descendants().filter((d) => d.depth && (d.x1 - d.x0) > 0.1))
+                .data((root.descendants() as d3.HierarchyRectangularNode<HierarchyNode>[]).filter((d) => d.depth && (d.x1 - d.x0) > 0.1))
                 .enter()
                 .append('text')
-                .attr('transform', (d) => {
+                .attr('transform', (d: d3.HierarchyRectangularNode<HierarchyNode>) => {
                     const x = (d.x0 + d.x1) / 2;
                     const y = (d.y0 + d.y1) / 2;
                     const angle = (x * 180) / Math.PI - 90;

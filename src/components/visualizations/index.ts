@@ -13,7 +13,7 @@ export { SunburstChart } from './hierarchical/SunburstChart';
 export { TreemapChart } from './hierarchical/TreemapChart';
 
 // Flow Visualizations
-export { SankeyDiagram } from './flow/SankeyDiagram';
+// export { SankeyDiagram } from './flow/SankeyDiagram';
 export { ChordDiagram } from './flow/ChordDiagram';
 export { FunnelChart } from './flow/FunnelChart';
 

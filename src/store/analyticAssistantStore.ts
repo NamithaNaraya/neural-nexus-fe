@@ -24,11 +24,12 @@ export interface AnalyticMessage {
 interface AnalyticAssistantState {
     currentSessionId: string | null;
     messages: Record<string, AnalyticMessage[]>;
+    sessionFolders: Record<string, string>;
     isProcessing: boolean;
 
     // Actions
-    setSessionId: (id: string | null) => void;
-    addMessage: (sessionId: string, message: Omit<AnalyticMessage, 'id' | 'timestamp'>) => void;
+    setSessionId: (id: string | null, folderId?: string) => void;
+    addMessage: (sessionId: string, message: Omit<AnalyticMessage, 'id' | 'timestamp'>, folderId?: string) => void;
     setProcessing: (processing: boolean) => void;
     clearMessages: (sessionId: string) => void;
 }
@@ -38,11 +39,20 @@ export const useAnalyticAssistantStore = create<AnalyticAssistantState>()(
         (set) => ({
             currentSessionId: generateId(),
             messages: {},
+            sessionFolders: {},
             isProcessing: false,
 
-            setSessionId: (id) => set({ currentSessionId: id || generateId() }),
+            setSessionId: (id, folderId) => {
+                const newId = id || generateId();
+                set((state) => ({ 
+                    currentSessionId: newId,
+                    sessionFolders: folderId 
+                        ? { ...state.sessionFolders, [newId]: folderId }
+                        : state.sessionFolders
+                }));
+            },
 
-            addMessage: (sessionId, message) => set((state) => {
+            addMessage: (sessionId, message, folderId) => set((state) => {
                 const sessionMessages = state.messages[sessionId] || [];
                 const newMessage: AnalyticMessage = {
                     ...message,
@@ -55,21 +65,32 @@ export const useAnalyticAssistantStore = create<AnalyticAssistantState>()(
                         ...state.messages,
                         [sessionId]: [...sessionMessages, newMessage],
                     },
+                    sessionFolders: folderId 
+                        ? { ...state.sessionFolders, [sessionId]: folderId }
+                        : state.sessionFolders
                 };
             }),
 
             setProcessing: (processing) => set({ isProcessing: processing }),
 
-            clearMessages: (sessionId) => set((state) => ({
-                messages: {
-                    ...state.messages,
-                    [sessionId]: [],
-                },
-            })),
+            clearMessages: (sessionId) => set((state) => {
+                const newMessages = { ...state.messages };
+                const newFolders = { ...state.sessionFolders };
+                delete newMessages[sessionId];
+                delete newFolders[sessionId];
+                return {
+                    messages: newMessages,
+                    sessionFolders: newFolders
+                };
+            }),
         }),
         {
             name: 'analytic-assistant-storage',
-            partialize: (state) => ({ currentSessionId: state.currentSessionId, messages: state.messages }),
+            partialize: (state) => ({ 
+                currentSessionId: state.currentSessionId, 
+                messages: state.messages,
+                sessionFolders: state.sessionFolders
+            }),
             onRehydrateStorage: () => (state) => {
                 // Clean up any stale non-UUID session IDs from older versions
                 if (state && state.currentSessionId) {

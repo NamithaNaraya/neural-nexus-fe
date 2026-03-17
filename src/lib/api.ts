@@ -273,6 +273,9 @@ export const endpoints = {
     analyticsChat: {
         query: '/analytics-chat/query',
     },
+    combinedChat: {
+        answer: '/combined-chat/answer',
+    },
 };
 
 // Higher-level API methods
@@ -390,6 +393,9 @@ export const docAiApi = {
         // List pending files for review
         listPending: () => api.get(endpoints.files.pending),
 
+        // Get file details
+        get: (fileId: string) => api.get(endpoints.files.get(fileId)),
+
         // Get extraction preview for a file
         getExtractionPreview: (fileId: string) => api.get(endpoints.files.preview(fileId)),
 
@@ -496,6 +502,13 @@ export const docAiApi = {
             folder_id?: string;
             node_ids?: string[];
         }) => api.post(endpoints.analyticsChat.query, data),
+    },
+    combinedChat: {
+        answer: (data: {
+            question: string;
+            folder_id?: string;
+            history?: any[];
+        }) => api.post(endpoints.combinedChat.answer, data),
     },
 };
 
