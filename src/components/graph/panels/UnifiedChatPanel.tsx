@@ -18,19 +18,10 @@ import { docAiApi } from '@/lib/api';
 import { toast } from 'sonner';
 
 const REASONING_STEPS = [
-    { id: 1, name: "Reading", icon: MessageSquare },
-    { id: 2, name: "Identifying", icon: Activity },
-    { id: 3, name: "Checking", icon: ShieldCheck },
-    { id: 4, name: "Loading Data", icon: Database },
-    { id: 5, name: "Analyzing", icon: Brain },
-    { id: 6, name: "Computing", icon: Zap },
-    { id: 7, name: "Connecting", icon: Zap },
-    { id: 8, name: "Mapping", icon: ClipboardList },
-    { id: 9, name: "Searching", icon: Search },
-    { id: 10, name: "Reviewing", icon: Stethoscope },
-    { id: 11, name: "Writing", icon: MessageSquare },
-    { id: 12, name: "Verifying", icon: ShieldCheck },
-    { id: 13, name: "Done", icon: Star }
+    { id: 1, name: "Analyzing", icon: Brain },
+    { id: 2, name: "Searching", icon: Search },
+    { id: 3, name: "Synthesizing", icon: MessageSquare },
+    { id: 4, name: "Done", icon: Star }
 ];
 
 type ChatMode = 'general' | 'algorithmic' | 'combined';

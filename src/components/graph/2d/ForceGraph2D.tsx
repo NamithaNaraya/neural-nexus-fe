@@ -110,6 +110,10 @@ export function ForceGraph2D({
     const [isDark, setIsDark] = useState(false);
     const customNodeTypeColors = useGraphStore(state => state.filters.customNodeTypeColors);
     const customRelationshipColors = useGraphStore(state => state.filters.customRelationshipColors);
+    const { traversalPath, traversalModeActive } = useGraphStore(state => ({
+        traversalPath: state.traversalPath,
+        traversalModeActive: state.traversalModeActive
+    }));
 
     // Zoom behavior ref to allow programmatic reset
     const zoomRef = useRef<any>(null);
@@ -695,19 +699,19 @@ export function ForceGraph2D({
             }
 
             if (originHerbName) {
+                // If in traversal mode, prioritize the actual first node of the path as context if it's a herb
+                if (traversalModeActive && traversalPath.length > 0) {
+                    const rootNode = d3Nodes.find(n => n.id === traversalPath[0]);
+                    if (rootNode && getNodeType(rootNode) === 'Herb') {
+                        originHerbName = rootNode.name;
+                    }
+                }
+
                 console.log(`[BFS] Focus: ${focusD3Node?.name} (${focusType}) Origin Herb: ${originHerbName}`);
-                // DIAGNOSTIC: Dump all HAS_QUALITY links and their properties
-                const qualityLinks = d3Links.filter(l => {
-                    const lt = (l.type || '').toUpperCase().replace(/[\s-]/g, '_');
-                    return lt === 'HAS_QUALITY';
-                });
-                console.log(`[BFS DIAG] Found ${qualityLinks.length} HAS_QUALITY links. Details:`, qualityLinks.map(l => ({
-                    source: typeof l.source === 'string' ? l.source : (l.source as D3Node).id,
-                    target: typeof l.target === 'string' ? l.target : (l.target as D3Node).id,
-                    type: l.type,
-                    properties: l.properties,
-                    hasHerbProp: !!(l.properties?.herb),
-                })));
+                // DIAGNOSTIC: Dump filtered links to reveal why they might be dimmed
+                const contextualTypes = ['HAS_QUALITY', 'HAS_USE', 'CONTAINS'];
+                const sampleLinks = d3Links.filter(l => contextualTypes.includes((l.type || '').toUpperCase().replace(/[\s-]/g, '_')));
+                console.log(`[BFS DIAG] Found ${sampleLinks.length} contextual links. Sample Properties:`, sampleLinks.slice(0, 3).map(l => l.properties));
             }
 
             let currentLevel = [...seeds];
@@ -724,23 +728,25 @@ export function ForceGraph2D({
                     const linkType = (link.type || '').toUpperCase().replace(/[\s-]/g, '_');
 
                     // In Herb context mode:
-                    // Hop 0: Follow HAS_PROPERTY from Herb → PropertyType (forward only)
-                    // Hop 1+: Follow only HAS_QUALITY links that match our herb
-                    //         Block HAS_PROPERTY (would leak to sibling Herbs)
+                    // Hop 0: Follow HAS_PROPERTY/CONTAINS from Herb → Child (forward only)
+                    // Hop 1+: Follow contextual links that match our herb
                     if (originHerbName) {
-                        if (hop > 0 && linkType === 'HAS_PROPERTY') {
-                            return; // Don't follow HAS_PROPERTY back to other herbs
+                        const linkProperties = link.properties || {};
+                        const herbPropRaw = (linkProperties.herb || linkProperties.herb_name || linkProperties.source_herb || '') as string;
+                        const herbProp = herbPropRaw.trim().toLowerCase();
+                        const originLower = originHerbName.toLowerCase();
+                        const isMatch = herbProp && (herbProp === originLower || originLower.includes(herbProp) || herbProp.includes(originLower));
+
+                        // 1. Block cross-talk for domain-specific links that have an herb property
+                        const contextualTypes = ['HAS_QUALITY', 'HAS_USE', 'CONTAINS'];
+                        if (contextualTypes.includes(linkType)) {
+                            // If link has herb context, it MUST match the origin
+                            if (herbProp && !isMatch) return;
                         }
 
-                        if (linkType === 'HAS_QUALITY') {
-                            const herbProp = (link.properties?.herb as string || '').trim();
-                            if (!herbProp) return;
-
-                            const v = herbProp.toLowerCase();
-                            const o = originHerbName.toLowerCase();
-                            const matchesOrigin = v === o || o.includes(v) || v.includes(o);
-
-                            if (!matchesOrigin) return;
+                        // 2. Stop traversal at sibling herb properties
+                        if (hop > 0 && linkType === 'HAS_PROPERTY') {
+                            return;
                         }
                     }
 
@@ -859,7 +865,7 @@ export function ForceGraph2D({
                 return (isLinkFocused || isPathLink) ? 1 : 0;
             });
 
-    }, [selectedNodes, hoveredNode, strokeColor, d3Links, d3Nodes, analyticSelectionActive, customNodeTypeColors, customRelationshipColors, isDark]);
+    }, [selectedNodes, hoveredNode, strokeColor, d3Links, d3Nodes, analyticSelectionActive, customNodeTypeColors, customRelationshipColors, isDark, traversalPath, traversalModeActive]);
 
     return (
         <div

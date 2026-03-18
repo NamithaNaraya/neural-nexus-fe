@@ -752,17 +752,42 @@ export const useGraphStore = create<GraphState>()(
                 }
             }
 
-            // Now compute discovered nodes: all nodes in path + neighbors of the active node
+            // Now compute discovered nodes: all nodes in path + contextual neighbors of the active node
             const newDiscovered = new Set<string>(newPath);
             const activeNode = newPath[newPath.length - 1];
 
             if (activeNode) {
+                const rootNode = state.nodes.find(n => n.id === newPath[0]);
+                const originHerbName = (rootNode && (rootNode.type === 'Herb' || rootNode.type?.toLowerCase() === 'herb')) ? rootNode.name : null;
+
                 state.links.forEach((link: any) => {
                     const s = typeof link.source === 'object' ? link.source.id : link.source;
                     const t = typeof link.target === 'object' ? link.target.id : link.target;
                     
-                    if (s === activeNode) newDiscovered.add(t);
-                    if (t === activeNode) newDiscovered.add(s);
+                    const isNeighbor = s === activeNode || t === activeNode;
+                    if (!isNeighbor) return;
+
+                    const neighborId = s === activeNode ? t : s;
+
+                    // If we have a herb context, apply filtering to specific relationship types
+                    if (originHerbName) {
+                        const lt = (link.type || '').toUpperCase().replace(/[\s-]/g, '_');
+                        const contextualTypes = ['HAS_QUALITY', 'HAS_USE', 'CONTAINS'];
+                        
+                        if (contextualTypes.includes(lt)) {
+                            const props = link.properties || {};
+                            const herbPropRaw = (props.herb || props.herb_name || props.source_herb || '') as string;
+                            if (herbPropRaw) {
+                                const h = herbPropRaw.trim().toLowerCase();
+                                const o = originHerbName.toLowerCase();
+                                if (!(h === o || o.includes(h) || h.includes(o))) {
+                                    return; // Skip non-contextual neighbors
+                                }
+                            }
+                        }
+                    }
+
+                    newDiscovered.add(neighborId);
                 });
             }
 
