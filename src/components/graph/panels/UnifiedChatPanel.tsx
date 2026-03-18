@@ -214,10 +214,15 @@ export function UnifiedChatPanel() {
 
     const ThemeIcon = chatMode === 'general' ? Brain : (chatMode === 'algorithmic' ? Network : Zap);
 
-    // Auto-scroll
+    // Auto-scroll (smooth)
     useEffect(() => {
         if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            requestAnimationFrame(() => {
+                scrollRef.current?.scrollTo({
+                    top: scrollRef.current.scrollHeight,
+                    behavior: 'smooth'
+                });
+            });
         }
     }, [activeMessages, isProcessing, chatMode, neuralStore.currentStep]);
 
@@ -329,12 +334,12 @@ export function UnifiedChatPanel() {
                 analyticStore.setProcessing(false);
             }
         } else {
-            // Combined mode (STREAMING)
+            // Combined mode (STREAMING with batched UI updates)
             combinedStore.addMessage(currentSessionId, { role: "user", content: userQuery }, activeFolderId || undefined);
             const assistantMsgId = combinedStore.addMessage(currentSessionId, { role: "assistant", content: "" }, activeFolderId || undefined);
             
             combinedStore.setProcessing(true);
-            combinedStore.setCurrentStep(1); // Starting: Reading History
+            combinedStore.setCurrentStep(1, 'Analyzing research intent...');
 
             try {
                 const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -349,7 +354,7 @@ export function UnifiedChatPanel() {
                     body: JSON.stringify({
                         question: userQuery,
                         folder_id: activeFolderId || undefined,
-                        history: combinedMessages.map(m => ({ role: m.role, content: m.content }))
+                        history: combinedMessages.slice(-10).map(m => ({ role: m.role, content: m.content }))
                     })
                 });
 
@@ -358,6 +363,18 @@ export function UnifiedChatPanel() {
                 const reader = response.body?.getReader();
                 const decoder = new TextDecoder();
                 let buffer = "";
+
+                // Batched content flushing via requestAnimationFrame
+                let contentBuffer = "";
+                let rafPending = false;
+
+                const flushContent = () => {
+                    if (contentBuffer && currentSessionId) {
+                        combinedStore.appendToLastMessage(currentSessionId, contentBuffer);
+                        contentBuffer = "";
+                    }
+                    rafPending = false;
+                };
 
                 if (reader) {
                     while (true) {
@@ -373,26 +390,33 @@ export function UnifiedChatPanel() {
                             try {
                                 const payload = JSON.parse(line);
                                 if (payload.type === "step") {
-                                    combinedStore.setCurrentStep(payload.id);
+                                    combinedStore.setCurrentStep(payload.id, payload.status || '');
                                 } else if (payload.type === "content") {
-                                    combinedStore.updateLastMessage(currentSessionId, payload.data);
+                                    // Batch content updates — flush via RAF
+                                    contentBuffer += payload.data;
+                                    if (!rafPending) {
+                                        rafPending = true;
+                                        requestAnimationFrame(flushContent);
+                                    }
                                 } else if (payload.type === "intent") {
                                     combinedStore.updateLastMessage(currentSessionId, "", payload.data);
                                 } else if (payload.type === "gds_results") {
                                     combinedStore.updateLastMessage(currentSessionId, "", undefined, payload.data.algorithm, payload.data.results);
                                 }
                             } catch (e) {
-                                console.warn("Payload Parse Error", e);
+                                // Silently skip malformed chunks
                             }
                         }
                     }
+                    // Final flush
+                    flushContent();
                 }
             } catch (err: any) {
                 const errorMsg = err?.message || "Something went wrong in the combined pipeline.";
                 combinedStore.updateLastMessage(currentSessionId, `Error: ${errorMsg}`);
             } finally {
                 combinedStore.setProcessing(false);
-                combinedStore.setCurrentStep(0);
+                combinedStore.setCurrentStep(0, '');
             }
         }
     };
@@ -1015,24 +1039,41 @@ export function UnifiedChatPanel() {
                                             </div>
                                         ))}
 
-                                        {/* Processing */}
+                                        {/* Processing indicator */}
                                         {isProcessing && (
                                             <div className="flex gap-3">
                                                 <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white ${chatMode === 'general' ? 'bg-emerald-500' : 'bg-indigo-500'}`}>
                                                     <Loader2 size={14} className="animate-spin" />
                                                 </div>
-                                                <div className="space-y-3">
+                                                <div className="space-y-2 max-w-[85%]">
+                                                    {/* Typing bubble */}
                                                     <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
-                                                        <span className={`text-[11px] font-bold uppercase tracking-widest ${chatMode === 'general' ? 'text-emerald-500' : (chatMode === 'combined' ? 'text-amber-500' : 'text-indigo-500')}`}>
-                                                            {chatMode === 'general' ? 'Thinking...' : (chatMode === 'combined' ? 'Researching Pipeline...' : 'Analyzing...')}
-                                                        </span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-[11px] font-bold uppercase tracking-widest ${chatMode === 'general' ? 'text-emerald-500' : (chatMode === 'combined' ? 'text-amber-500' : 'text-indigo-500')}`}>
+                                                                {chatMode === 'combined' && combinedStore.stepLabel
+                                                                    ? combinedStore.stepLabel
+                                                                    : chatMode === 'general' ? 'Thinking...' : (chatMode === 'combined' ? 'Researching...' : 'Analyzing...')}
+                                                            </span>
+                                                            {/* Typing cursor animation */}
+                                                            <span className="inline-flex gap-[3px]">
+                                                                <span className={`w-1.5 h-1.5 rounded-full animate-bounce ${chatMode === 'general' ? 'bg-emerald-400' : 'bg-indigo-400'}`} style={{ animationDelay: '0ms' }} />
+                                                                <span className={`w-1.5 h-1.5 rounded-full animate-bounce ${chatMode === 'general' ? 'bg-emerald-400' : 'bg-indigo-400'}`} style={{ animationDelay: '150ms' }} />
+                                                                <span className={`w-1.5 h-1.5 rounded-full animate-bounce ${chatMode === 'general' ? 'bg-emerald-400' : 'bg-indigo-400'}`} style={{ animationDelay: '300ms' }} />
+                                                            </span>
+                                                        </div>
                                                     </div>
+                                                    {/* Step progress pills */}
                                                     {((chatMode === 'general' ? neuralStore.currentStep : (chatMode === 'combined' ? combinedStore.currentStep : 0)) > 0) && (
                                                         <div className="flex flex-wrap gap-1.5 pl-1">
                                                             {REASONING_STEPS.slice(0, chatMode === 'general' ? neuralStore.currentStep : combinedStore.currentStep).map((step, idx) => {
                                                                 const currentStep = chatMode === 'general' ? neuralStore.currentStep : combinedStore.currentStep;
+                                                                const isActive = idx === currentStep - 1;
+                                                                const StepIcon = step.icon;
                                                                 return (
-                                                                    <span key={idx} className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${idx === currentStep - 1 ? (chatMode === 'general' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400') : 'text-slate-300 dark:text-slate-600'}`}>
+                                                                    <span key={idx} className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full transition-all duration-300 ${isActive
+                                                                        ? (chatMode === 'general' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 shadow-sm')
+                                                                        : 'text-slate-400 dark:text-slate-600 bg-slate-100/50 dark:bg-slate-800/50'}`}>
+                                                                        <StepIcon size={9} />
                                                                         {step.name}
                                                                     </span>
                                                                 );

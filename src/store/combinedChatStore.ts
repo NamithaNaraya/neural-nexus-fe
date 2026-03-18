@@ -19,11 +19,13 @@ interface CombinedChatState {
     sessionFolders: Record<string, string>;
     isProcessing: boolean;
     currentStep: number;
+    stepLabel: string;
 
     setProcessing: (processing: boolean) => void;
-    setCurrentStep: (step: number) => void;
+    setCurrentStep: (step: number, label?: string) => void;
     addMessage: (sessionId: string, message: Omit<Message, "id" | "timestamp">, folderId?: string) => string;
     updateLastMessage: (sessionId: string, content: string, intent?: any, algorithm?: string, results?: any[]) => void;
+    appendToLastMessage: (sessionId: string, chunk: string) => void;
     clearMessages: (sessionId: string) => void;
     setSessionId: (id: string | null, folderId?: string) => void;
 }
@@ -43,9 +45,10 @@ export const useCombinedChatStore = create<CombinedChatState>()(
             sessionFolders: {},
             isProcessing: false,
             currentStep: 0,
+            stepLabel: '',
 
             setProcessing: (processing) => set({ isProcessing: processing }),
-            setCurrentStep: (step) => set({ currentStep: step }),
+            setCurrentStep: (step, label) => set({ currentStep: step, stepLabel: label || '' }),
 
             setSessionId: (id, folderId) => {
                 const newId = id || generateUUID();
@@ -80,21 +83,41 @@ export const useCombinedChatStore = create<CombinedChatState>()(
 
             updateLastMessage: (sessionId, content, intent, algorithm, results) => {
                 set((state) => {
-                    const sessionMessages = [...(state.messages[sessionId] || [])];
-                    if (sessionMessages.length === 0) return state;
+                    const sessionMessages = state.messages[sessionId];
+                    if (!sessionMessages || sessionMessages.length === 0) return state;
                     
-                    const lastMsg = { ...sessionMessages[sessionMessages.length - 1] };
+                    const updated = [...sessionMessages];
+                    const lastMsg = { ...updated[updated.length - 1] };
                     if (content) lastMsg.content += content;
                     if (intent) lastMsg.intent = intent;
                     if (algorithm) lastMsg.algorithm = algorithm;
                     if (results) lastMsg.results = results;
-                    
-                    sessionMessages[sessionMessages.length - 1] = lastMsg;
+                    updated[updated.length - 1] = lastMsg;
                     
                     return {
                         messages: {
                             ...state.messages,
-                            [sessionId]: sessionMessages
+                            [sessionId]: updated
+                        }
+                    };
+                });
+            },
+
+            // Optimized: batched content-only append (avoids full state spread)
+            appendToLastMessage: (sessionId, chunk) => {
+                set((state) => {
+                    const sessionMessages = state.messages[sessionId];
+                    if (!sessionMessages || sessionMessages.length === 0) return state;
+                    
+                    const updated = [...sessionMessages];
+                    const lastMsg = { ...updated[updated.length - 1] };
+                    lastMsg.content += chunk;
+                    updated[updated.length - 1] = lastMsg;
+                    
+                    return {
+                        messages: {
+                            ...state.messages,
+                            [sessionId]: updated
                         }
                     };
                 });
