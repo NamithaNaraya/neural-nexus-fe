@@ -702,12 +702,12 @@ export function UnifiedChatPanel() {
                                 </div>
                                 <div className="min-w-0">
                                     <h3 className="text-xs md:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
-                                        {chatMode === 'general' ? 'Chat Assistant' : chatMode === 'algorithmic' ? 'Graph Analytics' : 'Combined Research'}
+                                        {chatMode === 'general' ? 'Chat Assistant' : chatMode === 'algorithmic' ? 'Graph Analytics' : 'Ask'}
                                     </h3>
                                     <div className="flex items-center gap-1.5 mt-0.5">
-                                        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${chatMode === 'general' ? 'bg-emerald-500' : chatMode === 'algorithmic' ? 'bg-indigo-500' : 'bg-amber-500'}`} />
-                                        <span className={`text-[8px] md:text-[9px] uppercase font-bold tracking-widest truncate ${chatMode === 'general' ? 'text-emerald-500/60' : chatMode === 'algorithmic' ? 'text-indigo-500/60' : 'text-amber-500/60'}`}>
-                                            {chatMode === 'general' ? 'Ask & Discover' : chatMode === 'algorithmic' ? 'Graph Analysis' : 'Pipeline Intelligence'}
+                                        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${chatMode === 'general' ? 'bg-emerald-500' : chatMode === 'algorithmic' ? 'bg-indigo-500' : 'bg-indigo-500'}`} />
+                                        <span className={`text-[8px] md:text-[9px] uppercase font-bold tracking-widest truncate ${chatMode === 'general' ? 'text-emerald-500/60' : chatMode === 'algorithmic' ? 'text-indigo-500/60' : 'text-indigo-500/60'}`}>
+                                            {chatMode === 'general' ? 'Ask & Discover' : chatMode === 'algorithmic' ? 'Graph Analysis' : 'Assistant Active'}
                                         </span>
                                     </div>
                                 </div>
@@ -774,7 +774,7 @@ export function UnifiedChatPanel() {
                                         ${chatMode === 'combined' ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-600'}`}
                                 >
                                     <Zap size={12} className={chatMode === 'combined' ? "text-amber-500" : "text-slate-400"} />
-                                    Research
+                                    Chat
                                     {chatMode === 'combined' && (
                                         <motion.div
                                             layoutId="modeBackground"
@@ -783,6 +783,7 @@ export function UnifiedChatPanel() {
                                         />
                                     )}
                                 </button>
+                                {/* 
                                 <button
                                     onClick={() => toggleMode('general')}
                                     disabled={isProcessing}
@@ -813,6 +814,7 @@ export function UnifiedChatPanel() {
                                         />
                                     )}
                                 </button>
+                                */}
                             </div>
                             <div className="hidden sm:flex text-[10px] font-semibold text-slate-400 dark:text-slate-500 items-center gap-1.5">
                                 {activeFolderId && activeFolderName && (
@@ -884,20 +886,24 @@ export function UnifiedChatPanel() {
                                                     <ThemeIcon className={`w-8 h-8 ${chatMode === 'general' ? 'text-emerald-500' : 'text-indigo-500'}`} />
                                                 </div>
                                                 <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
-                                                    {chatMode === 'general' ? 'Ready to Help' : chatMode === 'algorithmic' ? 'Ready to Analyze' : 'Research Pipeline Active'}
+                                                    {chatMode === 'general' ? 'Ready to Help' : chatMode === 'algorithmic' ? 'Ready to Analyze' : 'Ready to Chat'}
                                                 </h4>
                                                 <p className="text-sm text-slate-400 dark:text-slate-500 leading-relaxed max-w-sm">
                                                     {chatMode === 'general'
                                                         ? 'Ask questions about your data. I\'ll search your knowledge graph and give you answers.'
                                                         : chatMode === 'algorithmic'
                                                             ? 'Ask things like "What are the most important items?" or "Find groups in my data".'
-                                                            : 'A 5-stage research pipeline: Schema -> Intent -> Parallel Retrieval -> Context Fusion -> Synthesis.'}
+                                                            : 'Ask questions, explore your knowledge graph, and get intelligent real-time answers.'}
                                                 </p>
                                             </div>
                                         )}
 
-                                        {activeMessages.map((msg: any, i: number) => (
-                                            <div key={msg.id || i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                                        {activeMessages.map((msg: any, i: number) => {
+                                            if (msg.role === 'assistant' && !msg.content && !msg.algorithm && (!msg.results || msg.results.length === 0) && isProcessing) {
+                                                return null;
+                                            }
+                                            return (
+                                                <div key={msg.id || i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                                                 <div className={`mt-0.5 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold
                                                     ${msg.role === 'user'
                                                         ? 'bg-slate-600 dark:bg-slate-500'
@@ -1037,7 +1043,7 @@ export function UnifiedChatPanel() {
                                                     )}
                                                 </div>
                                             </div>
-                                        ))}
+                                        )})}
 
                                         {/* Processing indicator */}
                                         {isProcessing && (
@@ -1049,10 +1055,8 @@ export function UnifiedChatPanel() {
                                                     {/* Typing bubble */}
                                                     <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
                                                         <div className="flex items-center gap-2">
-                                                            <span className={`text-[11px] font-bold uppercase tracking-widest ${chatMode === 'general' ? 'text-emerald-500' : (chatMode === 'combined' ? 'text-amber-500' : 'text-indigo-500')}`}>
-                                                                {chatMode === 'combined' && combinedStore.stepLabel
-                                                                    ? combinedStore.stepLabel
-                                                                    : chatMode === 'general' ? 'Thinking...' : (chatMode === 'combined' ? 'Researching...' : 'Analyzing...')}
+                                                            <span className={`text-[11px] font-bold uppercase tracking-widest ${chatMode === 'general' ? 'text-emerald-500' : 'text-indigo-500'}`}>
+                                                                Thinking...
                                                             </span>
                                                             {/* Typing cursor animation */}
                                                             <span className="inline-flex gap-[3px]">
@@ -1062,16 +1066,15 @@ export function UnifiedChatPanel() {
                                                             </span>
                                                         </div>
                                                     </div>
-                                                    {/* Step progress pills */}
-                                                    {((chatMode === 'general' ? neuralStore.currentStep : (chatMode === 'combined' ? combinedStore.currentStep : 0)) > 0) && (
+                                                    {/* Step progress pills (Only show for general mode) */}
+                                                    {chatMode === 'general' && (neuralStore.currentStep > 0) && (
                                                         <div className="flex flex-wrap gap-1.5 pl-1">
-                                                            {REASONING_STEPS.slice(0, chatMode === 'general' ? neuralStore.currentStep : combinedStore.currentStep).map((step, idx) => {
-                                                                const currentStep = chatMode === 'general' ? neuralStore.currentStep : combinedStore.currentStep;
-                                                                const isActive = idx === currentStep - 1;
+                                                            {REASONING_STEPS.slice(0, neuralStore.currentStep).map((step, idx) => {
+                                                                const isActive = idx === neuralStore.currentStep - 1;
                                                                 const StepIcon = step.icon;
                                                                 return (
                                                                     <span key={idx} className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full transition-all duration-300 ${isActive
-                                                                        ? (chatMode === 'general' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 shadow-sm')
+                                                                        ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 shadow-sm'
                                                                         : 'text-slate-400 dark:text-slate-600 bg-slate-100/50 dark:bg-slate-800/50'}`}>
                                                                         <StepIcon size={9} />
                                                                         {step.name}
