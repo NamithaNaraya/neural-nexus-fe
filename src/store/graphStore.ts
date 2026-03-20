@@ -174,6 +174,8 @@ interface GraphState {
     setTraversalModeActive: (active: boolean) => void;
     traversalPath: string[];
     traverseToNode: (nodeId: string) => void;
+    traverseBack: () => void;       // go one step back in the path
+    resetTraversal: () => void;     // clear memory, stay in traversal mode
 
     // Custom Coloring
     setNodeTypeColor: (type: string, color: string) => void;
@@ -726,62 +728,69 @@ export const useGraphStore = create<GraphState>()(
             const pathIndex = newPath.indexOf(nodeId);
 
             if (pathIndex !== -1) {
-                // Scenario 1: Reverse traversal - truncate path
+                // ── Reverse traversal: clicked a node already on the path ──
+                // Truncate path back to that node, drop everything after it
                 newPath = newPath.slice(0, pathIndex + 1);
             } else {
-                // Scenario 2: Forward traversal or New Root
                 const lastNode = newPath.length > 0 ? newPath[newPath.length - 1] : null;
-                
-                // Is it a neighbor of the last node?
-                let isNeighbor = false;
+
+                // Is the clicked node a direct neighbor of the current tip?
+                let isNeighborOfTip = false;
                 if (lastNode) {
                     state.links.forEach((link: any) => {
                         const s = typeof link.source === 'object' ? link.source.id : link.source;
                         const t = typeof link.target === 'object' ? link.target.id : link.target;
                         if ((s === lastNode && t === nodeId) || (t === lastNode && s === nodeId)) {
-                            isNeighbor = true;
+                            isNeighborOfTip = true;
                         }
                     });
                 }
 
-                if (isNeighbor) {
+                if (isNeighborOfTip) {
+                    // ── Forward traversal: extend the path ──
+                    // The user chose this neighbor — all sibling neighbors of the PREVIOUS tip
+                    // will be dropped because they are no longer in the path or the frontier.
                     newPath.push(nodeId);
                 } else {
-                    // Start a new path
+                    // ── New root: start a fresh path ──
                     newPath = [nodeId];
                 }
             }
 
-            // Now compute discovered nodes: all nodes in path + contextual neighbors of the active node
-            const newDiscovered = new Set<string>(newPath);
-            const activeNode = newPath[newPath.length - 1];
+            // ── Build discoveredNodeIds ──
+            // Rule: only the path nodes + the CURRENT TIP's direct neighbors are visible.
+            // Siblings from previous steps (e.g. A1, A3 when you chose A2) are NOT included.
+            const newDiscovered = new Set<string>(newPath);  // path is always shown
+            const tipNode = newPath[newPath.length - 1];     // frontier = the latest chosen node
 
-            if (activeNode) {
+            if (tipNode) {
                 const rootNode = state.nodes.find(n => n.id === newPath[0]);
-                const originHerbName = (rootNode && (rootNode.type === 'Herb' || rootNode.type?.toLowerCase() === 'herb')) ? rootNode.name : null;
+                // Generic: detect origin "context" node for optional link filtering
+                const originContextName = rootNode?.name || null;
+                const originContextType = rootNode?.type?.toLowerCase() || '';
 
                 state.links.forEach((link: any) => {
                     const s = typeof link.source === 'object' ? link.source.id : link.source;
                     const t = typeof link.target === 'object' ? link.target.id : link.target;
-                    
-                    const isNeighbor = s === activeNode || t === activeNode;
-                    if (!isNeighbor) return;
 
-                    const neighborId = s === activeNode ? t : s;
+                    // Only expand neighbors of the TIP (current frontier)
+                    const isTipNeighbor = s === tipNode || t === tipNode;
+                    if (!isTipNeighbor) return;
 
-                    // If we have a herb context, apply filtering to specific relationship types
-                    if (originHerbName) {
+                    const neighborId = s === tipNode ? t : s;
+
+                    // Optional: if root is a "Herb" type, filter contextual links by herb name
+                    // This prevents cross-talk between different herb subtrees
+                    if (originContextName && originContextType === 'herb') {
                         const lt = (link.type || '').toUpperCase().replace(/[\s-]/g, '_');
                         const contextualTypes = ['HAS_QUALITY', 'HAS_USE', 'CONTAINS'];
-                        
                         if (contextualTypes.includes(lt)) {
                             const props = link.properties || {};
-                            const herbPropRaw = (props.herb || props.herb_name || props.source_herb || '') as string;
-                            if (herbPropRaw) {
-                                const h = herbPropRaw.trim().toLowerCase();
-                                const o = originHerbName.toLowerCase();
-                                if (!(h === o || o.includes(h) || h.includes(o))) {
-                                    return; // Skip non-contextual neighbors
+                            const herbProp = ((props.herb || props.herb_name || props.source_herb || '') as string).trim().toLowerCase();
+                            if (herbProp) {
+                                const o = originContextName.toLowerCase();
+                                if (!(herbProp === o || o.includes(herbProp) || herbProp.includes(o))) {
+                                    return; // Skip neighbors from a different herb context
                                 }
                             }
                         }
@@ -793,8 +802,39 @@ export const useGraphStore = create<GraphState>()(
 
             return {
                 traversalPath: newPath,
+                // ← KEY FIX: only path + tip's neighbors survive. All previous siblings gone.
                 discoveredNodeIds: newDiscovered,
             };
+        }),
+
+        // Go one step back: remove the last node from the path and re-expand the new tip's neighbors
+        traverseBack: () => set((state) => {
+            const path = state.traversalPath;
+            if (path.length <= 1) {
+                // At root or empty — reset fully (stay in traversal mode)
+                return { traversalPath: [], discoveredNodeIds: new Set<string>() };
+            }
+
+            // Pop last node
+            const newPath = path.slice(0, -1);
+            const newTip = newPath[newPath.length - 1];
+
+            // Re-discover: path nodes + new tip's neighbors
+            const newDiscovered = new Set<string>(newPath);
+            state.links.forEach((link: any) => {
+                const s = typeof link.source === 'object' ? link.source.id : link.source;
+                const t = typeof link.target === 'object' ? link.target.id : link.target;
+                if (s === newTip) newDiscovered.add(t);
+                if (t === newTip) newDiscovered.add(s);
+            });
+
+            return { traversalPath: newPath, discoveredNodeIds: newDiscovered };
+        }),
+
+        // Reset traversal memory — clear path and discoveries, stay in traversal mode
+        resetTraversal: () => set({
+            traversalPath: [],
+            discoveredNodeIds: new Set<string>(),
         }),
 
         // Analytics Selection Flow
@@ -802,6 +842,7 @@ export const useGraphStore = create<GraphState>()(
         setAnalyticSelectionActive: (active) => set({ analyticSelectionActive: active }),
         analyticIncludeNeighbors: false,
         setAnalyticIncludeNeighbors: (include) => set({ analyticIncludeNeighbors: include }),
+
 
         // Custom Coloring Actions
         setNodeTypeColor: (type, color) => set((state) => ({

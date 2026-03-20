@@ -15,6 +15,7 @@ import {
     Grid3X3,
     Filter,
     RotateCcw,
+    RotateCw,
     Maximize2,
     Minimize2,
     Download,
@@ -23,6 +24,7 @@ import {
     HelpCircle,
     Search,
     ChevronDown,
+    ChevronRight,
     Shrink,
     PieChart,
     Link2,
@@ -106,8 +108,18 @@ export function GraphToolbar({
         setAnalyticSelectionActive,
         clearSelection,
         traversalModeActive,
-        setTraversalModeActive
+        setTraversalModeActive,
+        traversalPath,
+        traverseBack,
+        resetTraversal,
+        nodes,
     } = useGraphStore();
+
+    // Resolve node names for breadcrumb display
+    const pathNames = traversalPath.map(id => {
+        const n = nodes.find(x => x.id === id);
+        return n ? (n.name.length > 18 ? n.name.slice(0, 16) + '…' : n.name) : id.slice(0, 8);
+    });
 
     // Calculate if filtering is active
     const isFiltered = nodeCount !== totalNodeCount || linkCount !== totalLinkCount;
@@ -290,6 +302,69 @@ export function GraphToolbar({
                         </div>
                     </div>
                 </div>
+
+                {/* ── Traversal HUD — minimal, theme-aware ── */}
+                <AnimatePresence>
+                    {traversalModeActive && (
+                        <motion.div
+                            key="traversal-hud"
+                            initial={{ opacity: 0, y: -8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                            className="absolute -bottom-10 left-1/2 -translate-x-1/2 z-[40] flex items-center gap-1.5"
+                        >
+                            {/* Back icon-button */}
+                            <button
+                                onClick={traverseBack}
+                                disabled={traversalPath.length === 0}
+                                title="Go back one step"
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold
+                                           text-muted-foreground hover:text-foreground
+                                           hover:bg-accent/60 border border-transparent hover:border-border/60
+                                           disabled:opacity-25 disabled:cursor-not-allowed transition-all duration-150"
+                            >
+                                <ArrowLeft className="w-3 h-3" />
+                                <span className="hidden sm:inline">Back</span>
+                            </button>
+
+                            {/* Breadcrumb trail — only when path exists */}
+                            {pathNames.length > 0 && (
+                                <div className="flex items-center gap-0.5 max-w-[260px] lg:max-w-md overflow-x-auto no-scrollbar
+                                                bg-background/80 backdrop-blur-md border border-border/50 shadow-sm
+                                                rounded-lg px-2 py-0.5">
+                                    {pathNames.map((name, i) => (
+                                        <React.Fragment key={traversalPath[i]}>
+                                            <span className={`text-[10px] font-medium whitespace-nowrap transition-colors ${
+                                                i === pathNames.length - 1
+                                                    ? 'text-primary font-semibold'
+                                                    : 'text-muted-foreground'
+                                            }`}>
+                                                {name}
+                                            </span>
+                                            {i < pathNames.length - 1 && (
+                                                <ChevronRight className="w-2.5 h-2.5 text-border flex-shrink-0" />
+                                            )}
+                                        </React.Fragment>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Reset icon-button */}
+                            <button
+                                onClick={resetTraversal}
+                                title="Reset traversal"
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold
+                                           text-muted-foreground hover:text-destructive
+                                           hover:bg-destructive/10 border border-transparent hover:border-destructive/30
+                                           transition-all duration-150"
+                            >
+                                <RotateCw className="w-3 h-3" />
+                                <span className="hidden sm:inline">Reset</span>
+                            </button>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
             {/* Algorithm Drawer */}

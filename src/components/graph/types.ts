@@ -145,16 +145,70 @@ export const NODE_TYPE_COLORS: Record<string, string> = new Proxy(
         }
     }
 );
-// Relationship type colors
-export const RELATIONSHIP_COLORS: Record<string, string> = {
-    WORKS_FOR: '#3B82F6',
-    LIVES_IN: '#10B981',
-    MARRIED_TO: '#EC4899',
-    RELATED_TO: '#8B5CF6',
-    OWNS: '#F59E0B',
-    PART_OF: '#06B6D4',
-    default: '#6B7280',
-};
+// ── Relationship colour palette ──
+// Rich, saturated-but-classic hues that pair well with the pastel node colours.
+// Deliberately darker/deeper than the node palette so edges are distinct.
+const REL_COLOR_PALETTE = [
+    '#2563EB', // Strong Blue
+    '#059669', // Forest Green
+    '#D97706', // Warm Amber
+    '#7C3AED', // Deep Violet
+    '#DB2777', // Rich Pink
+    '#0891B2', // Deep Cyan
+    '#DC2626', // Brick Red
+    '#65A30D', // Olive Green
+    '#9333EA', // Bold Purple
+    '#0D9488', // Deep Teal
+    '#EA580C', // Burnt Orange
+    '#1D4ED8', // Royal Blue
+    '#BE185D', // Magenta Rose
+    '#15803D', // Deep Green
+    '#B45309', // Caramel Brown
+    '#6D28D9', // Dark Indigo
+    '#0E7490', // Petrol Blue
+    '#C2410C', // Rust
+    '#166534', // Dark Forest
+    '#7E22CE', // Grape
+];
+
+// Separate assigned/used maps for relationship colours (independent of node palette)
+const assignedRelColors = new Map<string, string>();
+const usedRelColorIndices = new Set<number>();
+
+// Dynamic proxy — each relationship type deterministically gets a unique colour
+export const RELATIONSHIP_COLORS: Record<string, string> = new Proxy(
+    {
+        default: '#64748B', // Slate default
+    },
+    {
+        get: (target: Record<string, string>, prop: string | symbol) => {
+            if (typeof prop !== 'string' || prop === 'default') return target.default;
+            if (prop in target) return target[prop];
+            if (assignedRelColors.has(prop)) return assignedRelColors.get(prop)!;
+
+            // Find an unused palette colour starting from this type's hash
+            const hash = getStringHash(prop);
+            let idx = hash % REL_COLOR_PALETTE.length;
+
+            for (let attempt = 0; attempt < REL_COLOR_PALETTE.length; attempt++) {
+                const candidateIdx = (idx + attempt) % REL_COLOR_PALETTE.length;
+                if (!usedRelColorIndices.has(candidateIdx)) {
+                    usedRelColorIndices.add(candidateIdx);
+                    const color = REL_COLOR_PALETTE[candidateIdx];
+                    assignedRelColors.set(prop, color);
+                    return color;
+                }
+            }
+
+            // Palette exhausted — generate from golden-angle HSL
+            const hue = (assignedRelColors.size * 137.508) % 360;
+            const color = `hsl(${Math.round(hue)}, 65%, 40%)`;
+            assignedRelColors.set(prop, color);
+            return color;
+        }
+    }
+);
+
 
 // Camera presets
 export interface CameraPreset {

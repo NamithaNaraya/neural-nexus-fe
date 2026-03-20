@@ -149,6 +149,7 @@ export function UnifiedChatPanel() {
     const [feedback, setFeedback] = useState({ rating: 5, comment: '' });
     const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
     const [showExportMenu, setShowExportMenu] = useState(false);
+    const [expandedAlgo, setExpandedAlgo] = useState<string | null>(null); // collapsible algo bar
 
     const { activeFolderId, activeFileId, selectedNodes, zoomToNode: storeZoomToNode } = useGraphStore();
     const { user } = useAuthStore();
@@ -881,20 +882,43 @@ export function UnifiedChatPanel() {
                                     {/* Messages */}
                                     <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
                                         {activeMessages.length === 0 && !isProcessing && (
-                                            <div className="h-full flex flex-col items-center justify-center text-center pt-16">
-                                                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-5 ${chatMode === 'general' ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-indigo-50 dark:bg-indigo-900/20'}`}>
-                                                    <ThemeIcon className={`w-8 h-8 ${chatMode === 'general' ? 'text-emerald-500' : 'text-indigo-500'}`} />
+                                            <div className="h-full flex flex-col items-center justify-center text-center pt-10">
+                                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 ${chatMode === 'general' ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-indigo-50 dark:bg-indigo-900/20'}`}>
+                                                    <ThemeIcon className={`w-7 h-7 ${chatMode === 'general' ? 'text-emerald-500' : 'text-indigo-500'}`} />
                                                 </div>
-                                                <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
+                                                <h4 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-1">
                                                     {chatMode === 'general' ? 'Ready to Help' : chatMode === 'algorithmic' ? 'Ready to Analyze' : 'Ready to Chat'}
                                                 </h4>
-                                                <p className="text-sm text-slate-400 dark:text-slate-500 leading-relaxed max-w-sm">
-                                                    {chatMode === 'general'
-                                                        ? 'Ask questions about your data. I\'ll search your knowledge graph and give you answers.'
-                                                        : chatMode === 'algorithmic'
-                                                            ? 'Ask things like "What are the most important items?" or "Find groups in my data".'
-                                                            : 'Ask questions, explore your knowledge graph, and get intelligent real-time answers.'}
+                                                <p className="text-xs text-slate-400 dark:text-slate-500 mb-5 max-w-[240px]">
+                                                    Ask anything about your active folder's data.
                                                 </p>
+
+                                                {/* Question hint chips */}
+                                                <div className="flex flex-wrap gap-2 justify-center max-w-[340px]">
+                                                    {[
+                                                        { icon: '🔍', text: 'Which items are connected to X?' },
+                                                        { icon: '📊', text: 'What are the most linked nodes?' },
+                                                        { icon: '🔗', text: 'Show me relationships between A and B' },
+                                                        { icon: '🌐', text: 'Find clusters or groups in the data' },
+                                                        { icon: '📋', text: 'List all entities of a type' },
+                                                        { icon: '💡', text: 'What does [entity] connect to?' },
+                                                    ].map((hint, hi) => (
+                                                        <button
+                                                            key={hi}
+                                                            onClick={() => setInput(hint.text)}
+                                                            className={`text-[11px] px-3 py-1.5 rounded-full border transition-all
+                                                                bg-white dark:bg-slate-800
+                                                                border-slate-200 dark:border-slate-700
+                                                                text-slate-500 dark:text-slate-400
+                                                                hover:border-indigo-300 dark:hover:border-indigo-600
+                                                                hover:text-indigo-600 dark:hover:text-indigo-400
+                                                                hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20
+                                                                cursor-pointer select-none`}
+                                                        >
+                                                            {hint.icon} {hint.text}
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             </div>
                                         )}
 
@@ -922,29 +946,54 @@ export function UnifiedChatPanel() {
                                                             <ReactMarkdown
                                                                 remarkPlugins={[remarkGfm]}
                                                                 components={{
-                                                                    p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
-                                                                    ul: ({ node, ...props }) => <ul className="list-none ml-2 mb-3 space-y-1.5" {...props} />,
-                                                                    ol: ({ node, ...props }) => <ol className="list-decimal ml-5 mb-3 space-y-1.5" {...props} />,
+                                                                    p: ({ node, ...props }) => <p className="mb-2 last:mb-0 leading-relaxed" {...props} />,
+
+                                                                    ul: ({ node, ...props }) => <ul className="my-2 space-y-1" {...props} />,
+                                                                    ol: ({ node, ...props }) => <ol className="my-2 space-y-1 list-decimal ml-4" {...props} />,
                                                                     li: ({ node, ...props }) => (
-                                                                        <li className="flex items-start gap-2 text-slate-700 dark:text-slate-300">
-                                                                            <span className={`mt-1.5 h-1.5 w-1.5 rounded-full flex-shrink-0 ${chatMode === 'general' ? 'bg-emerald-400' : 'bg-indigo-400'}`} />
-                                                                            <span className="flex-1">{props.children}</span>
+                                                                        <li className="flex items-start gap-2 text-slate-700 dark:text-slate-300 text-[12px]">
+                                                                            <span className={`mt-[5px] h-[5px] w-[5px] rounded-full flex-shrink-0 ${chatMode === 'general' ? 'bg-emerald-400' : 'bg-indigo-400'}`} />
+                                                                            <span className="flex-1 leading-snug">{props.children}</span>
                                                                         </li>
                                                                     ),
-                                                                    strong: ({ node, ...props }) => <strong className={`font-semibold ${chatMode === 'general' ? 'text-emerald-700 dark:text-emerald-400' : 'text-indigo-700 dark:text-indigo-400'}`} {...props} />,
-                                                                    code: ({ node, ...props }) => <code className="bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-xs font-mono" {...props} />,
-                                                                    h1: ({ node, ...props }) => <h1 className="text-base font-bold mb-2 mt-3" {...props} />,
-                                                                    h2: ({ node, ...props }) => <h2 className="text-sm font-bold mb-1.5 mt-2" {...props} />,
-                                                                    h3: ({ node, ...props }) => <h3 className="text-xs font-bold mb-1 mt-2" {...props} />,
+
+                                                                    strong: ({ node, ...props }) => <strong className={`font-semibold ${chatMode === 'general' ? 'text-emerald-700 dark:text-emerald-400' : 'text-indigo-600 dark:text-indigo-400'}`} {...props} />,
+                                                                    em: ({ node, ...props }) => <em className="italic text-slate-500 dark:text-slate-400" {...props} />,
+
+                                                                    code: ({ node, ...props }) => <code className="bg-slate-100 dark:bg-slate-700/70 text-indigo-600 dark:text-indigo-300 px-1.5 py-0.5 rounded text-[11px] font-mono" {...props} />,
+                                                                    pre: ({ node, ...props }) => <pre className="bg-slate-900 text-slate-100 rounded-lg p-3 my-3 overflow-x-auto text-[11px] font-mono leading-relaxed" {...props} />,
+
+                                                                    h1: ({ node, ...props }) => <h1 className="text-[14px] font-bold text-slate-800 dark:text-slate-100 mt-4 mb-2 pb-1 border-b border-slate-200 dark:border-slate-700" {...props} />,
+                                                                    h2: ({ node, ...props }) => <h2 className="text-[13px] font-bold text-slate-700 dark:text-slate-200 mt-3 mb-1.5" {...props} />,
+                                                                    h3: ({ node, ...props }) => <h3 className="text-[12px] font-semibold text-slate-600 dark:text-slate-300 mt-2 mb-1 uppercase tracking-wide" {...props} />,
+
+                                                                    blockquote: ({ node, ...props }) => (
+                                                                        <blockquote className={`border-l-2 pl-3 my-2 italic text-slate-500 dark:text-slate-400 text-[12px] ${chatMode === 'general' ? 'border-emerald-400' : 'border-indigo-400'}`} {...props} />
+                                                                    ),
+
+                                                                    // ── Table: premium striped design ──
                                                                     table: ({ node, ...props }) => (
-                                                                        <div className="overflow-x-auto my-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                                                                            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700" {...props} />
+                                                                        <div className="overflow-x-auto my-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                                                            <table className="min-w-full text-[12px]" {...props} />
                                                                         </div>
                                                                     ),
-                                                                    thead: ({ node, ...props }) => <thead className="bg-slate-50 dark:bg-slate-900/50" {...props} />,
-                                                                    th: ({ node, ...props }) => <th className="px-3 py-2 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider" {...props} />,
-                                                                    td: ({ node, ...props }) => <td className="px-3 py-2 text-[11px] text-slate-600 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800" {...props} />,
-                                                                    tr: ({ node, ...props }) => <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors" {...props} />,
+                                                                    thead: ({ node, ...props }) => (
+                                                                        <thead className={`${chatMode === 'general' ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-indigo-50 dark:bg-indigo-900/20'}`} {...props} />
+                                                                    ),
+                                                                    th: ({ node, ...props }) => (
+                                                                        <th className={`px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${chatMode === 'general' ? 'text-emerald-700 dark:text-emerald-400' : 'text-indigo-700 dark:text-indigo-400'}`} {...props} />
+                                                                    ),
+                                                                    tbody: ({ node, ...props }) => (
+                                                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800" {...props} />
+                                                                    ),
+                                                                    tr: ({ node, ...props }) => (
+                                                                        <tr className="even:bg-slate-50/60 dark:even:bg-slate-800/30 hover:bg-slate-100/70 dark:hover:bg-slate-700/30 transition-colors duration-100" {...props} />
+                                                                    ),
+                                                                    td: ({ node, ...props }) => (
+                                                                        <td className="px-3 py-2 text-[12px] text-slate-700 dark:text-slate-300 align-top max-w-[260px]" {...props} />
+                                                                    ),
+
+                                                                    hr: () => <hr className="my-3 border-slate-200 dark:border-slate-700" />,
                                                                 }}
                                                             >
                                                                 {msg.content}
@@ -971,17 +1020,67 @@ export function UnifiedChatPanel() {
                                                         </div>
                                                     )}
 
-                                                    {/* Algorithm badge (Combined or Algorithmic mode) */}
-                                                    {msg.role === 'assistant' && (msg.algorithm || msg.intent?.use_gds) && (
-                                                        <div className="flex flex-wrap items-center gap-1.5">
-                                                            <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800 flex items-center gap-1">
-                                                                <Zap size={9} /> {msg.algorithm || msg.intent?.gds_algo || 'Graph Analysis'}
-                                                            </span>
-                                                            {msg.results?.length > 0 && (
-                                                                <span className="text-[9px] text-slate-400">{msg.results.length} results</span>
-                                                            )}
-                                                        </div>
-                                                    )}
+                                                    {/* Algorithm collapsible bar — only when GDS was used */}
+                                                    {msg.role === 'assistant' && (msg.algorithm || msg.intent?.use_gds) && (() => {
+                                                        const algoName: string = msg.algorithm || msg.intent?.gds_algo || 'graph-analysis';
+                                                        const algoKey = msg.id || String(i);
+                                                        const isOpen = expandedAlgo === algoKey;
+
+                                                        const ALGO_INFO: Record<string, { label: string; summary: string }> = {
+                                                            centrality: {
+                                                                label: 'Centrality Analysis',
+                                                                summary: 'Ranks nodes by how many connections they have across the graph. Highly central nodes are the most influential or frequently referenced entities in your data.',
+                                                            },
+                                                            community: {
+                                                                label: 'Community Detection',
+                                                                summary: 'Groups nodes into clusters based on how densely they connect with each other. Reveals natural groupings or categories hidden in your data.',
+                                                            },
+                                                            similarity: {
+                                                                label: 'Similarity Search',
+                                                                summary: 'Finds nodes that share similar graph neighborhoods. Two nodes are considered similar if they connect to many of the same entities.',
+                                                            },
+                                                            paths: {
+                                                                label: 'Path Analysis',
+                                                                summary: 'Traces the shortest or most relevant paths between entities. Reveals indirect connections and how far apart two concepts are in your knowledge graph.',
+                                                            },
+                                                        };
+
+                                                        const info = ALGO_INFO[algoName] ?? {
+                                                            label: algoName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+                                                            summary: 'A graph algorithm was applied to analyse structural patterns in your data and enrich the answer.',
+                                                        };
+
+                                                        return (
+                                                            <div className="mt-1 rounded-xl border border-indigo-100 dark:border-indigo-900/50 overflow-hidden">
+                                                                <button
+                                                                    onClick={() => setExpandedAlgo(isOpen ? null : algoKey)}
+                                                                    className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-indigo-50/60 dark:bg-indigo-900/20 hover:bg-indigo-100/70 dark:hover:bg-indigo-900/40 transition-colors"
+                                                                >
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Zap size={11} className="text-indigo-500 flex-shrink-0" />
+                                                                        <span className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">{info.label}</span>
+                                                                        <span className="text-[10px] text-indigo-400 dark:text-indigo-500">used</span>
+                                                                    </div>
+                                                                    <ChevronDown size={12} className={`text-indigo-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                                                                </button>
+                                                                <AnimatePresence>
+                                                                    {isOpen && (
+                                                                        <motion.div
+                                                                            initial={{ height: 0, opacity: 0 }}
+                                                                            animate={{ height: 'auto', opacity: 1 }}
+                                                                            exit={{ height: 0, opacity: 0 }}
+                                                                            transition={{ duration: 0.2 }}
+                                                                            className="overflow-hidden"
+                                                                        >
+                                                                            <p className="px-3 py-2.5 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed bg-white dark:bg-slate-900">
+                                                                                {info.summary}
+                                                                            </p>
+                                                                        </motion.div>
+                                                                    )}
+                                                                </AnimatePresence>
+                                                            </div>
+                                                        );
+                                                    })()}
 
                                                     {/* Result chips (Combined or Algorithmic mode) */}
                                                     {msg.results?.length > 0 && (
@@ -1045,8 +1144,8 @@ export function UnifiedChatPanel() {
                                             </div>
                                         )})}
 
-                                        {/* Processing indicator */}
-                                        {isProcessing && (
+                                        {/* Processing indicator (only while truly thinking, hiding once streaming starts) */}
+                                        {isProcessing && (!activeMessages.length || activeMessages[activeMessages.length - 1]?.role !== 'assistant' || !activeMessages[activeMessages.length - 1]?.content) && (
                                             <div className="flex gap-3">
                                                 <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white ${chatMode === 'general' ? 'bg-emerald-500' : 'bg-indigo-500'}`}>
                                                     <Loader2 size={14} className="animate-spin" />
