@@ -355,7 +355,10 @@ export function UnifiedChatPanel() {
                     body: JSON.stringify({
                         question: userQuery,
                         folder_id: activeFolderId || undefined,
-                        history: combinedMessages.slice(-10).map(m => ({ role: m.role, content: m.content }))
+                        history: combinedMessages
+                            .filter(m => m.content.trim().length > 0)
+                            .slice(-10)
+                            .map(m => ({ role: m.role, content: m.content }))
                     })
                 });
 
