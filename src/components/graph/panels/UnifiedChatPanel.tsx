@@ -335,16 +335,15 @@ export function UnifiedChatPanel() {
                 analyticStore.setProcessing(false);
             }
         } else {
-            // Combined mode (STREAMING with batched UI updates)
+            // Combined mode (NON-STREAMING — single JSON response)
             combinedStore.addMessage(currentSessionId, { role: "user", content: userQuery }, activeFolderId || undefined);
-            const assistantMsgId = combinedStore.addMessage(currentSessionId, { role: "assistant", content: "" }, activeFolderId || undefined);
             
             combinedStore.setProcessing(true);
             combinedStore.setCurrentStep(1, 'Analyzing research intent...');
 
             try {
                 const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-                const cleanUrl = baseUrl.endsWith('/api/v1') ? `${baseUrl}/combined-chat/stream-answer` : `${baseUrl}/api/v1/combined-chat/stream-answer`;
+                const cleanUrl = baseUrl.endsWith('/api/v1') ? `${baseUrl}/combined-chat/answer` : `${baseUrl}/api/v1/combined-chat/answer`;
                 
                 const response = await fetch(cleanUrl, {
                     method: 'POST',
@@ -364,60 +363,22 @@ export function UnifiedChatPanel() {
 
                 if (!response.ok) throw new Error("Connection failed");
 
-                const reader = response.body?.getReader();
-                const decoder = new TextDecoder();
-                let buffer = "";
+                const data = await response.json();
 
-                // Batched content flushing via requestAnimationFrame
-                let contentBuffer = "";
-                let rafPending = false;
-
-                const flushContent = () => {
-                    if (contentBuffer && currentSessionId) {
-                        combinedStore.appendToLastMessage(currentSessionId, contentBuffer);
-                        contentBuffer = "";
-                    }
-                    rafPending = false;
-                };
-
-                if (reader) {
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-
-                        buffer += decoder.decode(value, { stream: true });
-                        const lines = buffer.split('\n');
-                        buffer = lines.pop() || "";
-
-                        for (const line of lines) {
-                            if (!line.trim()) continue;
-                            try {
-                                const payload = JSON.parse(line);
-                                if (payload.type === "step") {
-                                    combinedStore.setCurrentStep(payload.id, payload.status || '');
-                                } else if (payload.type === "content") {
-                                    // Batch content updates — flush via RAF
-                                    contentBuffer += payload.data;
-                                    if (!rafPending) {
-                                        rafPending = true;
-                                        requestAnimationFrame(flushContent);
-                                    }
-                                } else if (payload.type === "intent") {
-                                    combinedStore.updateLastMessage(currentSessionId, "", payload.data);
-                                } else if (payload.type === "gds_results") {
-                                    combinedStore.updateLastMessage(currentSessionId, "", undefined, payload.data.algorithm, payload.data.results);
-                                }
-                            } catch (e) {
-                                // Silently skip malformed chunks
-                            }
-                        }
-                    }
-                    // Final flush
-                    flushContent();
+                // Create assistant message with the full answer at once
+                combinedStore.addMessage(currentSessionId, { role: "assistant", content: data.answer || "" }, activeFolderId || undefined);
+                
+                // Attach intent, algorithm, and results to the message
+                if (data.intent) {
+                    combinedStore.updateLastMessage(currentSessionId, "", data.intent);
                 }
+                if (data.algorithm && data.results) {
+                    combinedStore.updateLastMessage(currentSessionId, "", undefined, data.algorithm, data.results);
+                }
+
             } catch (err: any) {
                 const errorMsg = err?.message || "Something went wrong in the combined pipeline.";
-                combinedStore.updateLastMessage(currentSessionId, `Error: ${errorMsg}`);
+                combinedStore.addMessage(currentSessionId, { role: "assistant", content: `Error: ${errorMsg}` }, activeFolderId || undefined);
             } finally {
                 combinedStore.setProcessing(false);
                 combinedStore.setCurrentStep(0, '');
@@ -1023,8 +984,8 @@ export function UnifiedChatPanel() {
                                                         </div>
                                                     )}
 
-                                                    {/* Algorithm collapsible bar — only when GDS was used */}
-                                                    {msg.role === 'assistant' && (msg.algorithm || msg.intent?.use_gds) && (() => {
+                                                    {/* Algorithm collapsible bar — only when GDS was used AND message has content */}
+                                                    {msg.role === 'assistant' && msg.content && (msg.algorithm || msg.intent?.use_gds) && (() => {
                                                         const algoName: string = msg.algorithm || msg.intent?.gds_algo || 'graph-analysis';
                                                         const algoKey = msg.id || String(i);
                                                         const isOpen = expandedAlgo === algoKey;
@@ -1034,13 +995,45 @@ export function UnifiedChatPanel() {
                                                                 label: 'Centrality Analysis',
                                                                 summary: 'Ranks nodes by how many connections they have across the graph. Highly central nodes are the most influential or frequently referenced entities in your data.',
                                                             },
+                                                            pagerank: {
+                                                                label: 'PageRank Analysis',
+                                                                summary: 'Measures node importance based on the quality and quantity of links. Nodes linked by many other important nodes score higher — like Google\'s original web ranking.',
+                                                            },
+                                                            articlerank: {
+                                                                label: 'ArticleRank Analysis',
+                                                                summary: 'An improved PageRank variant that reduces bias from low-degree nodes. Better for graphs with diverse connection patterns.',
+                                                            },
+                                                            betweenness: {
+                                                                label: 'Betweenness Centrality',
+                                                                summary: 'Identifies bridge nodes that connect different parts of the graph. High betweenness means the node is a critical bottleneck or gateway.',
+                                                            },
+                                                            closeness: {
+                                                                label: 'Closeness Centrality',
+                                                                summary: 'Finds nodes closest to all others in the graph. High closeness means the node can reach every other node quickly.',
+                                                            },
+                                                            degree: {
+                                                                label: 'Degree Centrality',
+                                                                summary: 'Counts the direct connections per node. The simplest centrality measure — more connections means higher degree.',
+                                                            },
+                                                            hits: {
+                                                                label: 'HITS Analysis',
+                                                                summary: 'Identifies hub nodes (link to many) and authority nodes (linked by many). Reveals the dual nature of node importance.',
+                                                            },
                                                             community: {
                                                                 label: 'Community Detection',
                                                                 summary: 'Groups nodes into clusters based on how densely they connect with each other. Reveals natural groupings or categories hidden in your data.',
                                                             },
+                                                            louvain: {
+                                                                label: 'Louvain Community Detection',
+                                                                summary: 'Discovers tightly connected communities using modularity optimization. Reveals hidden groups in your knowledge graph.',
+                                                            },
+                                                            leiden: {
+                                                                label: 'Leiden Community Detection',
+                                                                summary: 'An improved community detection over Louvain with guaranteed well-connected communities.',
+                                                            },
                                                             similarity: {
                                                                 label: 'Similarity Search',
-                                                                summary: 'Finds nodes that share similar graph neighborhoods. Two nodes are considered similar if they connect to many of the same entities.',
+                                                                summary: 'Finds nodes that share similar connectivity patterns using Jaccard Similarity. Two nodes are similar if they connect to many of the same entities.',
                                                             },
                                                             paths: {
                                                                 label: 'Path Analysis',
@@ -1085,8 +1078,8 @@ export function UnifiedChatPanel() {
                                                         );
                                                     })()}
 
-                                                    {/* Result chips (Combined or Algorithmic mode) */}
-                                                    {msg.results?.length > 0 && (
+                                                    {/* Result chips (Combined or Algorithmic mode) — only after content has arrived */}
+                                                    {msg.content && msg.results?.length > 0 && (
                                                         <div className="flex flex-wrap gap-1.5 mt-1">
                                                             {(expandedResults.has(msg.id) ? msg.results : msg.results.slice(0, 8)).map((res: any, ri: number) => {
                                                                 const isSimilarity = !!(res.source_name && res.target_name);
