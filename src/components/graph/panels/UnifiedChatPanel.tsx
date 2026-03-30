@@ -335,15 +335,21 @@ export function UnifiedChatPanel() {
                 analyticStore.setProcessing(false);
             }
         } else {
-            // Combined mode (NON-STREAMING — single JSON response)
+            // Combined mode (STREAMING via SSE — token-by-token delivery)
             combinedStore.addMessage(currentSessionId, { role: "user", content: userQuery }, activeFolderId || undefined);
             
             combinedStore.setProcessing(true);
             combinedStore.setCurrentStep(1, 'Analyzing research intent...');
 
+            // Pre-create assistant message placeholder for streaming content into
+            const assistantMsgId = combinedStore.addMessage(currentSessionId, { 
+                role: "assistant", 
+                content: "" 
+            }, activeFolderId || undefined);
+
             try {
                 const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-                const cleanUrl = baseUrl.endsWith('/api/v1') ? `${baseUrl}/combined-chat/answer` : `${baseUrl}/api/v1/combined-chat/answer`;
+                const cleanUrl = baseUrl.endsWith('/api/v1') ? `${baseUrl}/combined-chat/stream-answer` : `${baseUrl}/api/v1/combined-chat/stream-answer`;
                 
                 const response = await fetch(cleanUrl, {
                     method: 'POST',
@@ -363,27 +369,74 @@ export function UnifiedChatPanel() {
 
                 if (!response.ok) throw new Error("Connection failed");
 
-                const data = await response.json();
+                // Stream NDJSON lines from the response body
+                const reader = response.body?.getReader();
+                if (!reader) throw new Error("No response stream");
 
-                // Create assistant message with the full answer at once
-                combinedStore.addMessage(currentSessionId, { 
-                    role: "assistant", 
-                    content: data.answer || "" ,
-                    suggestWebSearch: data.suggest_web_search,
-                    webSearchEmphasized: data.web_search_emphasized
-                }, activeFolderId || undefined);
-                
-                // Attach intent, algorithm, and results to the message
-                if (data.intent) {
-                    combinedStore.updateLastMessage(currentSessionId, "", data.intent);
-                }
-                if (data.algorithm && data.results) {
-                    combinedStore.updateLastMessage(currentSessionId, "", undefined, data.algorithm, data.results);
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (!trimmed) continue;
+                        
+                        try {
+                            const chunk = JSON.parse(trimmed);
+                            
+                            switch (chunk.type) {
+                                case 'step':
+                                    combinedStore.setCurrentStep(chunk.id, chunk.status);
+                                    break;
+                                case 'content':
+                                    // Append token to the assistant message in real-time
+                                    combinedStore.appendToLastMessage(currentSessionId, chunk.data);
+                                    // Force React to flush and paint this chunk before processing next
+                                    await new Promise(r => requestAnimationFrame(r));
+                                    break;
+                                case 'intent':
+                                    combinedStore.updateLastMessage(currentSessionId, "", chunk.data);
+                                    break;
+                                case 'gds_results':
+                                    combinedStore.updateLastMessage(
+                                        currentSessionId, "", undefined,
+                                        chunk.data?.algorithm, chunk.data?.results
+                                    );
+                                    break;
+                                case 'web_search_suggestion':
+                                    // Update the last message with web search flags
+                                    combinedStore.updateLastMessage(currentSessionId, "");
+                                    // Use set to update suggestWebSearch flags on last message
+                                    useCombinedChatStore.setState((state) => {
+                                        const msgs = state.messages[currentSessionId];
+                                        if (!msgs || msgs.length === 0) return state;
+                                        const updated = [...msgs];
+                                        updated[updated.length - 1] = {
+                                            ...updated[updated.length - 1],
+                                            suggestWebSearch: chunk.data,
+                                            webSearchEmphasized: chunk.emphasized
+                                        };
+                                        return { messages: { ...state.messages, [currentSessionId]: updated } };
+                                    });
+                                    break;
+                            }
+                        } catch {
+                            // Skip malformed JSON lines
+                        }
+                    }
                 }
 
             } catch (err: any) {
                 const errorMsg = err?.message || "Something went wrong in the combined pipeline.";
-                combinedStore.addMessage(currentSessionId, { role: "assistant", content: `Error: ${errorMsg}` }, activeFolderId || undefined);
+                // If we already created the assistant message placeholder, update it with error
+                combinedStore.appendToLastMessage(currentSessionId, `Error: ${errorMsg}`);
             } finally {
                 combinedStore.setProcessing(false);
                 combinedStore.setCurrentStep(0, '');
