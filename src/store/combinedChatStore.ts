@@ -10,6 +10,12 @@ export interface Message {
     context_summary?: string;
     algorithm?: string;
     results?: any[];
+    // Web search fields
+    suggestWebSearch?: boolean;
+    webSearchEmphasized?: boolean;
+    webSearchAnswer?: string;
+    webSearchPending?: boolean;
+    webSearchSources?: Array<{ title?: string; uri?: string }>;
 }
 
 interface CombinedChatState {
@@ -28,6 +34,8 @@ interface CombinedChatState {
     appendToLastMessage: (sessionId: string, chunk: string) => void;
     clearMessages: (sessionId: string) => void;
     setSessionId: (id: string | null, folderId?: string) => void;
+    setWebSearchResult: (sessionId: string, msgId: string, answer: string, sources?: Array<{ title?: string; uri?: string }>) => void;
+    setWebSearchPending: (sessionId: string, msgId: string, pending: boolean) => void;
 }
 
 const generateUUID = () => {
@@ -130,6 +138,30 @@ export const useCombinedChatStore = create<CombinedChatState>()(
                     delete newMessages[sessionId];
                     delete newFolders[sessionId];
                     return { messages: newMessages, sessionFolders: newFolders };
+                });
+            },
+
+            setWebSearchPending: (sessionId, msgId, pending) => {
+                set((state) => {
+                    const sessionMessages = state.messages[sessionId];
+                    if (!sessionMessages) return state;
+                    const updated = sessionMessages.map((msg) =>
+                        msg.id === msgId ? { ...msg, webSearchPending: pending } : msg
+                    );
+                    return { messages: { ...state.messages, [sessionId]: updated } };
+                });
+            },
+
+            setWebSearchResult: (sessionId, msgId, answer, sources) => {
+                set((state) => {
+                    const sessionMessages = state.messages[sessionId];
+                    if (!sessionMessages) return state;
+                    const updated = sessionMessages.map((msg) =>
+                        msg.id === msgId
+                            ? { ...msg, webSearchAnswer: answer, webSearchPending: false, webSearchSources: sources }
+                            : msg
+                    );
+                    return { messages: { ...state.messages, [sessionId]: updated } };
                 });
             },
         }),

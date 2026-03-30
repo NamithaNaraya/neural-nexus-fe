@@ -6,7 +6,7 @@ import {
     Zap, ChevronDown, Send, Loader2, X, ClipboardList,
     Star, User, Bot, Maximize2, Minimize2, Trash2, Network, BarChart3,
     Plus, Clock, History, Folder as FolderIcon, FileText as FileIcon, Download,
-    FileType, FileText as FileTxtIcon
+    FileType, FileText as FileTxtIcon, Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGraphStore } from '@/store/graphStore';
@@ -366,7 +366,12 @@ export function UnifiedChatPanel() {
                 const data = await response.json();
 
                 // Create assistant message with the full answer at once
-                combinedStore.addMessage(currentSessionId, { role: "assistant", content: data.answer || "" }, activeFolderId || undefined);
+                combinedStore.addMessage(currentSessionId, { 
+                    role: "assistant", 
+                    content: data.answer || "" ,
+                    suggestWebSearch: data.suggest_web_search,
+                    webSearchEmphasized: data.web_search_emphasized
+                }, activeFolderId || undefined);
                 
                 // Attach intent, algorithm, and results to the message
                 if (data.intent) {
@@ -383,6 +388,46 @@ export function UnifiedChatPanel() {
                 combinedStore.setProcessing(false);
                 combinedStore.setCurrentStep(0, '');
             }
+        }
+    };
+
+    const handleWebSearch = async (msgId: string, question: string, contextHint?: string) => {
+        if (!currentSessionId) return;
+        
+        combinedStore.setWebSearchPending(currentSessionId, msgId, true);
+        
+        try {
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+            const cleanUrl = baseUrl.endsWith('/api/v1') ? `${baseUrl}/combined-chat/web-search` : `${baseUrl}/api/v1/combined-chat/web-search`;
+            
+            const response = await fetch(cleanUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                },
+                body: JSON.stringify({
+                    question: question,
+                    context_hint: contextHint
+                })
+            });
+
+            if (!response.ok) throw new Error("Web search failed");
+
+            const data = await response.json();
+            
+            combinedStore.setWebSearchResult(
+                currentSessionId, 
+                msgId, 
+                data.answer, 
+                data.grounding_metadata?.grounding_chunks
+            );
+            
+            toast.success("Web search results loaded");
+        } catch (err: any) {
+            console.error("Web search error:", err);
+            toast.error("Could not complete web search");
+            combinedStore.setWebSearchPending(currentSessionId, msgId, false);
         }
     };
 
@@ -1107,6 +1152,76 @@ export function UnifiedChatPanel() {
                                                                 >
                                                                     {expandedResults.has(msg.id) ? "Show less" : `+${msg.results.length - 8} more`}
                                                                 </button>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* 🌐 Web Search Integration */}
+                                                    {msg.role === 'assistant' && chatMode === 'combined' && (
+                                                        <div className="mt-2 space-y-3 w-full">
+                                                            {/* Web Search Button */}
+                                                            {!msg.webSearchAnswer && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const userMsg = activeMessages[i-1];
+                                                                        handleWebSearch(msg.id, userMsg?.content || "", msg.content);
+                                                                    }}
+                                                                    disabled={msg.webSearchPending}
+                                                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all
+                                                                        ${msg.webSearchEmphasized 
+                                                                            ? 'bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200 animate-pulse' 
+                                                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                                                        } disabled:opacity-50 disabled:animate-none`}
+                                                                >
+                                                                    {msg.webSearchPending ? (
+                                                                        <Loader2 size={12} className="animate-spin" />
+                                                                    ) : (
+                                                                        <Globe size={12} />
+                                                                    )}
+                                                                    {msg.webSearchPending ? 'Searching the Web...' : 'Search the Web'}
+                                                                </button>
+                                                            )}
+
+                                                            {/* Web Search Results Display */}
+                                                            {msg.webSearchAnswer && (
+                                                                <motion.div 
+                                                                    initial={{ opacity: 0, y: 10 }}
+                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                    className="bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-2xl p-4 space-y-3"
+                                                                >
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                                                                            <Globe size={14} />
+                                                                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Web Insights</span>
+                                                                        </div>
+                                                                        <span className="text-[9px] font-bold text-blue-400 dark:text-blue-600 uppercase tracking-widest bg-blue-100/50 dark:bg-blue-900/20 px-2 py-0.5 rounded-full">Grounded</span>
+                                                                    </div>
+                                                                    
+                                                                    <div className="text-[12px] text-slate-700 dark:text-slate-300 leading-relaxed">
+                                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                                            {msg.webSearchAnswer}
+                                                                        </ReactMarkdown>
+                                                                    </div>
+
+                                                                    {msg.webSearchSources && msg.webSearchSources.length > 0 && (
+                                                                        <div className="pt-2 border-t border-blue-100/50 dark:border-blue-900/20">
+                                                                            <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Sources</p>
+                                                                            <div className="flex flex-wrap gap-2">
+                                                                                {msg.webSearchSources.map((source: any, si: number) => (
+                                                                                    <a 
+                                                                                        key={si}
+                                                                                        href={source.uri}
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer"
+                                                                                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[10px] text-blue-600 dark:text-blue-400 hover:border-blue-300 dark:hover:border-blue-700 transition-all shadow-sm"
+                                                                                    >
+                                                                                        <span className="truncate max-w-[150px] font-medium">{source.title || 'Source'}</span>
+                                                                                    </a>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </motion.div>
                                                             )}
                                                         </div>
                                                     )}
